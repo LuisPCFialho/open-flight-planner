@@ -1270,3 +1270,150 @@ button,
 .hud-accoes button {
   justify-content: center;
 }
+
+/* --- ecra de projetos ------------------------------------------------------ */
+
+.ecra-projetos {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+.ecra-projetos .barra-superior h1 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.lista-projetos {
+  overflow: auto;
+  padding: 14px;
+}
+
+.lista-projetos table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.lista-projetos th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--texto-suave);
+  font-weight: 600;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.lista-projetos th.numerico,
+.lista-projetos td.numerico {
+  text-align: right;
+}
+
+.lista-projetos td {
+  padding: 3px 8px;
+  border-bottom: 1px solid #1a2129;
+}
+
+.lista-projetos tr:hover td {
+  background: #151c24;
+}
+
+.lista-projetos input {
+  width: 100%;
+  background: transparent;
+  color: var(--texto);
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.lista-projetos input:hover {
+  border-color: var(--borda);
+}
+
+.lista-projetos input:focus {
+  outline: none;
+  background: var(--fundo);
+  border-color: var(--destaque);
+}
+
+.lista-projetos .ligacao {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  color: var(--destaque);
+  font-size: 13px;
+  text-align: left;
+}
+
+.lista-projetos .ligacao:hover {
+  text-decoration: underline;
+  background: none;
+}
+
+.accoes-linha {
+  display: flex;
+  gap: 3px;
+  justify-content: flex-end;
+}
+
+.accoes-linha button {
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.aviso-ficheiro.estatico {
+  position: static;
+  transform: none;
+  margin: 10px 14px 0;
+  max-width: none;
+}
+
+/* --- origem da cota e botao de ficheiro ------------------------------------ */
+
+.origem-cota {
+  font-size: 9px;
+  padding: 0 3px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.origem-cota.dxf {
+  background: rgba(79, 217, 115, 0.18);
+  color: var(--rota);
+}
+
+.origem-cota.terrarium {
+  background: rgba(143, 163, 186, 0.14);
+  color: var(--texto-suave);
+}
+
+.linha-principal {
+  grid-template-columns: 26px auto 1fr auto;
+}
+
+.botao-ficheiro {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--fundo-elevado);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.botao-ficheiro:hover {
+  border-color: var(--borda-forte);
+  background: #212a35;
+}
+
+.botao-ficheiro.activo {
+  border-color: var(--rota);
+  color: var(--rota);
+}

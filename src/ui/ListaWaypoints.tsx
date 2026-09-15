@@ -8,6 +8,8 @@ export type LinhaWaypoint = {
   /** Altura acima do solo, se ja foi possivel calcula-la. */
   acimaDoSolo: number | null
   alerta: boolean
+  /** De onde veio a cota: levantamento topografico ou mosaicos publicos. */
+  origemCota: 'dxf' | 'terrarium' | null
 }
 
 type Props = {
@@ -42,7 +44,7 @@ export function ListaWaypoints({
         </p>
       ) : (
         <ol className="lista-waypoints">
-          {linhas.map(({ waypoint, acimaDoSolo, alerta }) => (
+          {linhas.map(({ waypoint, acimaDoSolo, alerta, origemCota }) => (
             <li
               key={waypoint.id}
               className={[
@@ -65,6 +67,18 @@ export function ListaWaypoints({
                 <span className="agl numerico" title="Altura acima do solo">
                   {acimaDoSolo === null ? '--' : `${acimaDoSolo.toFixed(0)} agl`}
                 </span>
+                {origemCota ? (
+                  <span
+                    className={`origem-cota ${origemCota}`}
+                    title={
+                      origemCota === 'dxf'
+                        ? 'Cota do levantamento topografico'
+                        : 'Cota dos mosaicos publicos, com dezenas de metros de resolucao'
+                    }
+                  >
+                    {origemCota === 'dxf' ? 'topo' : 'srtm'}
+                  </span>
+                ) : null}
               </button>
 
               <span className="accoes-rapidas">

@@ -29,6 +29,9 @@ import { useEnquadramento } from './estado/useEnquadramento.ts'
 import { useVooVirtual, type EstadoVoo } from './estado/useVooVirtual.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
+import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
+import { lerDXF } from './terreno/dxf.ts'
+import { exportarKML } from './kmz/kml.ts'
 import { criarProjeto, gravarRota, listarProjetos, listarRotas } from './dados/bd.ts'
 import { droneComId } from './drones.ts'
 import { Mapa, type CursorTerreno } from './mapa/Mapa.tsx'
@@ -42,14 +45,29 @@ import { PerfilTerreno } from './ui/PerfilTerreno.tsx'
 import { PainelValidacoes } from './ui/PainelValidacoes.tsx'
 import { VistaCamara } from './ui/VistaCamara.tsx'
 import { HudVoo } from './ui/HudVoo.tsx'
+import { EcraProjetos } from './ui/EcraProjetos.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
 const CENTRO_INICIAL: LatLon = { lat: 40.746552, lon: -8.41061 }
 
-const fonteTerreno = new FonteTerrariumAWS({ descodificador: descodificarPNGBrowser })
+const fonteMosaicos = new FonteTerrariumAWS({ descodificador: descodificarPNGBrowser })
 
 export function App() {
+  const [projetoAberto, setProjetoAberto] = useState<string | null>(null)
+  const [topografia, setTopografia] = useState<FonteTerrenoDXF | null>(null)
+  const [avisoTopografia, setAvisoTopografia] = useState<string | null>(null)
+
+  /*
+   * A topografia importada manda dentro da area que cobre, e os mosaicos
+   * publicos servem o resto. A fonte muda de identidade quando ha DXF novo, o
+   * que faz as cotas ja lidas serem descartadas e pedidas de novo.
+   */
+  const fonteTerreno = useMemo(
+    () => (topografia ? new FonteComposta(topografia, fonteMosaicos) : fonteMosaicos),
+    [topografia],
+  )
+
   const editor = useEditorRota()
   const { rota, aplicar, carregar } = editor
   const seleccao = useSeleccao(rota)
@@ -67,9 +85,14 @@ export function App() {
   useEffect(() => {
     let cancelado = false
 
+    if (!projetoAberto) return
+
     const iniciar = async (): Promise<void> => {
       const projetos = await listarProjetos()
-      const projeto = projetos[0] ?? (await criarProjeto({ nome: 'Projeto sem nome' }))
+      const projeto =
+        projetos.find((p) => p.id === projetoAberto) ??
+        projetos[0] ??
+        (await criarProjeto({ nome: 'Projeto sem nome' }))
       const rotas = await listarRotas(projeto.id)
       const existente = [...rotas].sort((a, b) => b.alteradaEm - a.alteradaEm)[0]
 
@@ -100,7 +123,7 @@ export function App() {
     }
     // So `carregar` interessa aqui, e e estavel. Depender do editor inteiro faria
     // este efeito correr a cada render e repor a rota gravada por cima das edicoes.
-  }, [carregar])
+  }, [carregar, projetoAberto])
 
   // --- persistencia, com folga para nao gravar a cada pixel de arrasto -------
   useEffect(() => {
@@ -128,16 +151,23 @@ export function App() {
     if (!rota) return []
     return rota.waypoints.map((waypoint, i) => {
       const acimaDoSolo = alturasAGL[i] ?? null
+      const cotaTerreno = cotas.get(chaveDaPosicao(waypoint)) ?? null
       return {
         waypoint,
-        cotaTerreno: cotas.get(chaveDaPosicao(waypoint)) ?? null,
+        cotaTerreno,
         acimaDoSolo,
         alerta:
           acimaDoSolo !== null &&
           (acimaDoSolo < rota.alturaMinimaAcimaDoSolo || acimaDoSolo > AGL_MAXIMO),
+        origemCota:
+          cotaTerreno === null
+            ? null
+            : fonteTerreno instanceof FonteComposta
+              ? fonteTerreno.origemEm(waypoint.lat, waypoint.lon)
+              : 'terrarium',
       }
     })
-  }, [rota, cotas, alturasAGL])
+  }, [rota, cotas, alturasAGL, fonteTerreno])
 
   const pontos3D = useMemo<PontoRota3D[]>(() => {
     if (!rota) return []
@@ -253,7 +283,7 @@ export function App() {
   const { enquadramento, aCarregar: enquadramentoACarregar } = useEnquadramento(
     alvoCamara,
     drone ?? droneComId('mini5pro'),
-    fonteTerreno,
+    fonteMosaicos,
   )
 
   // --- alteracoes -----------------------------------------------------------
@@ -414,6 +444,10 @@ export function App() {
     return () => window.removeEventListener('keydown', aoTeclar)
   }, [editor, seleccao, eliminarSeleccionados, acrescentarAccao, voo.activo])
 
+  if (!projetoAberto) {
+    return <EcraProjetos aoAbrir={setProjetoAberto} />
+  }
+
   if (arranque) {
     return (
       <div className="aviso-arranque">
@@ -470,6 +504,69 @@ export function App() {
               seleccao.limpar()
             }}
           />
+          <button
+            type="button"
+            title="Voltar a lista de projetos"
+            onClick={() => {
+              voo.parar()
+              setProjetoAberto(null)
+            }}
+          >
+            Projetos
+          </button>
+          <label
+            className={`botao-ficheiro ${topografia ? 'activo' : ''}`}
+            title={
+              topografia
+                ? `Topografia activa: ${topografia.topografia.camadas.join(', ')}`
+                : 'Importar topografia DXF em ETRS89 / PT-TM06'
+            }
+          >
+            DXF
+            <input
+              type="file"
+              accept=".dxf"
+              hidden
+              onChange={(evento) => {
+                const ficheiro = evento.target.files?.[0]
+                evento.target.value = ''
+                if (!ficheiro) return
+                void ficheiro
+                  .text()
+                  .then((texto) => {
+                    const lida = lerDXF(texto)
+                    setTopografia(new FonteTerrenoDXF(lida))
+                    setAvisoTopografia(
+                      `${ficheiro.name}: ${lida.triangulos.length} triangulos e ${lida.pontos.length} pontos cotados, nas camadas ${lida.camadas.join(', ')}`,
+                    )
+                  })
+                  .catch((causa: unknown) => {
+                    setTopografia(null)
+                    setAvisoTopografia(
+                      causa instanceof Error ? causa.message : 'nao foi possivel ler o DXF',
+                    )
+                  })
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            title="Exportar KML para o Google Earth"
+            disabled={rota.waypoints.length === 0}
+            onClick={() => {
+              const texto = exportarKML(rota, { cotas, chave: chaveDaPosicao })
+              const url = URL.createObjectURL(new Blob([texto], { type: 'application/vnd.google-earth.kml+xml' }))
+              const ligacao = document.createElement('a')
+              ligacao.href = url
+              ligacao.download = `${rota.nome.replace(/[^\w-]+/g, '-').toLowerCase()}.kml`
+              document.body.appendChild(ligacao)
+              ligacao.click()
+              ligacao.remove()
+              setTimeout(() => URL.revokeObjectURL(url), 1000)
+            }}
+          >
+            KML
+          </button>
           <button
             type="button"
             className={modoPOI ? 'activo' : ''}
@@ -674,6 +771,9 @@ export function App() {
               <span className="erro">{erroTerreno ?? erroMapa}</span>
             ) : null}
             {modoPOI ? <span className="modo-activo">Clica no mapa para criar um POI</span> : null}
+            {avisoTopografia ? (
+              <span className={topografia ? 'modo-activo' : 'erro'}>{avisoTopografia}</span>
+            ) : null}
             <span className="numerico">
               {cursor ? `${cursor.lat.toFixed(6)}, ${cursor.lon.toFixed(6)}` : '--'}
             </span>

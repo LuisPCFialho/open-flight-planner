@@ -133,3 +133,34 @@ ao motor de terreno quando o ficheiro nao a traz.
 
 O dialeto do Pilot 2 nao tem este problema: traz `takeOffRefPoint` com a altura
 elipsoidal, de onde sai a ortometrica subtraindo a ondulacao do geoide.
+
+## Topografia DXF
+
+O DXF traz cotas em tres formas, e todas contam: a elevacao das polilinhas, que e
+onde vive a cota de uma curva de nivel, os vertices das superficies 3DFACE, e os
+pontos cotados soltos. O resto do desenho e ignorado.
+
+As coordenadas vem em ETRS89 / PT-TM06, EPSG:3763, e sao convertidas para WGS84 a
+leitura, uma vez, e nao a cada consulta. A conversao esta verificada: a origem do
+sistema cai em (0, 0) ao milimetro, a ida e volta fecha a nona casa decimal, e mil
+metros no sistema dao mil metros medidos no terreno.
+
+Dentro de um triangulo de superficie a cota sai por interpolacao baricentrica,
+que e exacta porque o triangulo e o plano definido pelos tres pontos medidos.
+Fora deles usa-se a media ponderada pelo inverso do quadrado da distancia sobre
+os oito vizinhos mais proximos, encontrados numa grelha de 25 m.
+
+A `FonteComposta` prefere a topografia onde ela existe e cai para os mosaicos
+publicos fora dela. Cada waypoint mostra na lista de onde veio a sua cota,
+`topo` ou `srtm`. Trocar de fonte esvazia a cache de cotas: as mesmas coordenadas
+passam a ter outra cota, e ficar com as antigas seria pior do que nao ter
+importado nada.
+
+## KML para o Google Earth
+
+As alturas vao em `absolute`, que no Google Earth quer dizer acima do elipsoide.
+Como as da aplicacao sao ortometricas, soma-se a ondulacao do geoide. Sem isso o
+percurso apareceria 55,6 m abaixo do sitio em Portugal continental.
+
+A ordem em `coordinates` e longitude, latitude, altura, ao contrario do
+`waypointPoiPoint` do WPML, que e latitude, longitude, altura.

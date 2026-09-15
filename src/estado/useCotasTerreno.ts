@@ -37,6 +37,16 @@ export function useCotasTerreno(
     }
   }, [])
 
+  /*
+   * Trocar de fonte, por exemplo ao importar topografia, invalida tudo o que ja
+   * foi lido: as mesmas coordenadas passam a ter outra cota, mais precisa. Sem
+   * isto a rota ficava com as cotas antigas ate alguem lhe mexer.
+   */
+  useEffect(() => {
+    pedidas.current.clear()
+    setCotas(new Map())
+  }, [fonte])
+
   useEffect(() => {
     const emFalta = new Map<string, LatLon>()
     for (const ponto of pontos) {

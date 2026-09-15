@@ -22,6 +22,12 @@ export interface FonteTerreno {
   cota(lat: number, lon: number): Promise<number>
 
   /**
+   * Cotas de varios pontos de uma vez, quando a fonte souber faze-lo melhor do
+   * que ponto a ponto. Os mosaicos agrupam por ficheiro e poupam pedidos.
+   */
+  cotas?(pontos: readonly LatLon[]): Promise<number[]>
+
+  /**
    * Cotas ao longo de um percurso, amostrado de `passo` em `passo` metros.
    * Os pontos correspondentes obtem-se com `amostrarPercurso` da geodesia,
    * com os mesmos argumentos.
