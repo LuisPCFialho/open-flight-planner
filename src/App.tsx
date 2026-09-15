@@ -1,36 +1,40 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { LatLon, Rota } from './nucleo/tipos.ts'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
 import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
+import { alturasAcimaDoSolo, converterModoAltitude } from './nucleo/altitude.ts'
 import {
   acrescentarWaypoint,
   alterarWaypoint,
+  alterarWaypoints,
   inserirWaypoint,
   removerWaypoints,
   rotaVazia,
   waypointNovo,
 } from './nucleo/operacoes-rota.ts'
 import {
-  desfazer,
-  historicoInicial,
-  podeDesfazer,
-  podeRefazer,
-  refazer,
-  registar,
-  substituir,
-  type Historico,
-} from './estado/historico.ts'
+  acrescentarAccaoEmLote,
+  alterarAccao,
+  moverAccao,
+  removerAccao,
+} from './nucleo/operacoes-accoes.ts'
+import { acrescentarPOI, poiNovo, removerPOI } from './nucleo/operacoes-poi.ts'
 import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
+import { useEditorRota } from './estado/useEditorRota.ts'
+import { useSeleccao } from './estado/useSeleccao.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { criarProjeto, gravarRota, listarProjetos, listarRotas } from './dados/bd.ts'
+import { droneComId } from './drones.ts'
 import { Mapa, type CursorTerreno } from './mapa/Mapa.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
 import { BarraEstatisticas } from './ui/BarraEstatisticas.tsx'
 import { ListaWaypoints, type LinhaWaypoint } from './ui/ListaWaypoints.tsx'
+import { PainelPropriedades, type AlteracaoWaypoint } from './ui/PainelPropriedades.tsx'
+import { ConfiguracoesRota } from './ui/ConfiguracoesRota.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 
-/** Intervalo seguro acima do solo, em metros. Fora dele o ponto fica assinalado. */
+/** Intervalo seguro acima do solo, em metros. Fora dele o waypoint fica assinalado. */
 const AGL_MINIMO = 30
 const AGL_MAXIMO = 120
 
@@ -40,15 +44,16 @@ const CENTRO_INICIAL: LatLon = { lat: 40.746552, lon: -8.41061 }
 const fonteTerreno = new FonteTerrariumAWS({ descodificador: descodificarPNGBrowser })
 
 export function App() {
-  const [historico, setHistorico] = useState<Historico<Rota> | null>(null)
-  const [seleccionados, setSeleccionados] = useState<ReadonlySet<string>>(new Set())
+  const editor = useEditorRota()
+  const { rota, aplicar, carregar } = editor
+  const seleccao = useSeleccao(rota)
+
   const [modo3D, setModo3D] = useState(false)
+  const [modoPOI, setModoPOI] = useState(false)
+  const [configuracoesAbertas, setConfiguracoesAbertas] = useState(false)
   const [cursor, setCursor] = useState<CursorTerreno | null>(null)
   const [arranque, setArranque] = useState<string | null>(null)
   const [erroMapa, setErroMapa] = useState<string | null>(null)
-  const ultimoSeleccionado = useRef<string | null>(null)
-
-  const rota = historico?.presente ?? null
 
   // --- arranque: recupera a ultima rota ou cria uma nova ---------------------
   useEffect(() => {
@@ -58,10 +63,10 @@ export function App() {
       const projetos = await listarProjetos()
       const projeto = projetos[0] ?? (await criarProjeto({ nome: 'Projeto sem nome' }))
       const rotas = await listarRotas(projeto.id)
-      const existente = rotas.sort((a, b) => b.alteradaEm - a.alteradaEm)[0]
+      const existente = [...rotas].sort((a, b) => b.alteradaEm - a.alteradaEm)[0]
 
       if (existente) {
-        if (!cancelado) setHistorico(historicoInicial(existente))
+        if (!cancelado) carregar(existente)
         return
       }
 
@@ -73,7 +78,7 @@ export function App() {
         pontoDescolagem: { ...CENTRO_INICIAL, cotaTerreno: cotaDescolagem },
       })
       await gravarRota(nova)
-      if (!cancelado) setHistorico(historicoInicial(nova))
+      if (!cancelado) carregar(nova)
     }
 
     iniciar().catch((causa: unknown) => {
@@ -85,44 +90,44 @@ export function App() {
     return () => {
       cancelado = true
     }
-  }, [])
+    // So `carregar` interessa aqui, e e estavel. Depender do editor inteiro faria
+    // este efeito correr a cada render e repor a rota gravada por cima das edicoes.
+  }, [carregar])
 
   // --- persistencia, com folga para nao gravar a cada pixel de arrasto -------
   useEffect(() => {
     if (!rota) return
-    const temporizador = setTimeout(() => {
-      void gravarRota(rota)
-    }, 400)
+    const temporizador = setTimeout(() => void gravarRota(rota), 400)
     return () => clearTimeout(temporizador)
   }, [rota])
 
-  // --- cotas do terreno sob cada waypoint -----------------------------------
-  const posicoes = useMemo(
-    () => rota?.waypoints.map((w) => ({ lat: w.lat, lon: w.lon })) ?? [],
-    [rota],
-  )
+  // --- cotas do terreno -----------------------------------------------------
+  const posicoes = useMemo(() => {
+    if (!rota) return []
+    return [
+      ...rota.waypoints.map((w) => ({ lat: w.lat, lon: w.lon })),
+      ...rota.pois.map((p) => ({ lat: p.lat, lon: p.lon })),
+    ]
+  }, [rota])
   const { cotas, erro: erroTerreno } = useCotasTerreno(posicoes, fonteTerreno)
+
+  const alturasAGL = useMemo(
+    () => (rota ? alturasAcimaDoSolo(rota, cotas, chaveDaPosicao) : []),
+    [rota, cotas],
+  )
 
   const linhas = useMemo<LinhaWaypoint[]>(() => {
     if (!rota) return []
-    return rota.waypoints.map((waypoint) => {
-      const cota = cotas.get(chaveDaPosicao(waypoint)) ?? null
-      if (cota === null) {
-        return { waypoint, cotaTerreno: null, acimaDoSolo: null, alerta: false }
-      }
-      const asl = paraASL(waypoint.altura, rota.modoAltitude, {
-        cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
-        cotaTerreno: cota,
-      })
-      const acimaDoSolo = asl - cota
+    return rota.waypoints.map((waypoint, i) => {
+      const acimaDoSolo = alturasAGL[i] ?? null
       return {
         waypoint,
-        cotaTerreno: cota,
+        cotaTerreno: cotas.get(chaveDaPosicao(waypoint)) ?? null,
         acimaDoSolo,
-        alerta: acimaDoSolo < AGL_MINIMO || acimaDoSolo > AGL_MAXIMO,
+        alerta: acimaDoSolo !== null && (acimaDoSolo < AGL_MINIMO || acimaDoSolo > AGL_MAXIMO),
       }
     })
-  }, [rota, cotas])
+  }, [rota, cotas, alturasAGL])
 
   const pontos3D = useMemo<PontoRota3D[]>(() => {
     if (!rota) return []
@@ -137,29 +142,29 @@ export function App() {
           cotaTerreno: linha.cotaTerreno,
         }),
         cotaTerreno: linha.cotaTerreno,
-        seleccionado: seleccionados.has(linha.waypoint.id),
+        seleccionado: seleccao.ids.has(linha.waypoint.id),
         alerta: linha.alerta,
       })
     }
     return pontos
-  }, [rota, linhas, seleccionados])
+  }, [rota, linhas, seleccao.ids])
 
-  const estatisticas = useMemo(
-    () => (rota ? calcularEstatisticas(rota) : null),
-    [rota],
-  )
+  const estatisticas = useMemo(() => (rota ? calcularEstatisticas(rota) : null), [rota])
+  const drone = useMemo(() => (rota ? droneComId(rota.droneId) : null), [rota])
 
-  // --- alteracoes a rota ----------------------------------------------------
-  const aplicar = useCallback((transformacao: (atual: Rota) => Rota, comPasso = true) => {
-    setHistorico((anterior) => {
-      if (!anterior) return anterior
-      const nova = transformacao(anterior.presente)
-      return comPasso ? registar(anterior, nova) : substituir(anterior, nova)
-    })
-  }, [])
-
+  // --- alteracoes -----------------------------------------------------------
   const aoAdicionarWaypoint = useCallback(
     (lat: number, lon: number) => {
+      if (modoPOI) {
+        aplicar((atual) =>
+          acrescentarPOI(
+            atual,
+            poiNovo({ lat, lon, altura: alturaPredefinida(atual), nome: `POI ${atual.pois.length + 1}` }),
+          ),
+        )
+        setModoPOI(false)
+        return
+      }
       aplicar((atual) =>
         acrescentarWaypoint(
           atual,
@@ -167,7 +172,7 @@ export function App() {
         ),
       )
     },
-    [aplicar],
+    [aplicar, modoPOI],
   )
 
   const aoInserirWaypoint = useCallback(
@@ -190,56 +195,85 @@ export function App() {
     [aplicar],
   )
 
-  const eliminarSeleccionados = useCallback(() => {
-    if (seleccionados.size === 0) return
-    aplicar((atual) => removerWaypoints(atual, [...seleccionados]))
-    setSeleccionados(new Set())
-  }, [aplicar, seleccionados])
+  const alterarSeleccionados = useCallback(
+    (alteracao: AlteracaoWaypoint) => {
+      aplicar((atual) => alterarWaypoints(atual, [...seleccao.ids], alteracao))
+    },
+    [aplicar, seleccao.ids],
+  )
 
-  // --- seleccao -------------------------------------------------------------
-  const seleccionar = useCallback(
-    (id: string, juntar: boolean, intervalo = false) => {
-      setSeleccionados((anteriores) => {
-        if (intervalo && ultimoSeleccionado.current && rota) {
-          const indices = rota.waypoints.map((w) => w.id)
-          const de = indices.indexOf(ultimoSeleccionado.current)
-          const para = indices.indexOf(id)
-          if (de >= 0 && para >= 0) {
-            const [inicio, fim] = de <= para ? [de, para] : [para, de]
-            return new Set(indices.slice(inicio, fim + 1))
-          }
-        }
-        if (!juntar) {
-          ultimoSeleccionado.current = id
-          return new Set([id])
-        }
-        const novos = new Set(anteriores)
-        if (novos.has(id)) novos.delete(id)
-        else novos.add(id)
-        ultimoSeleccionado.current = id
-        return novos
+  /** Soma o mesmo delta a cada waypoint, mantendo as diferencas entre eles. */
+  const incrementarAltura = useCallback(
+    (delta: number) => {
+      aplicar((atual) => ({
+        ...atual,
+        waypoints: atual.waypoints.map((w) =>
+          seleccao.ids.has(w.id) ? { ...w, altura: w.altura + delta } : w,
+        ),
+      }))
+    },
+    [aplicar, seleccao.ids],
+  )
+
+  const eliminarSeleccionados = useCallback(() => {
+    if (seleccao.ids.size === 0) return
+    aplicar((atual) => removerWaypoints(atual, [...seleccao.ids]))
+    seleccao.limpar()
+  }, [aplicar, seleccao])
+
+  const acrescentarAccao = useCallback(
+    (tipo: TipoAccao) => {
+      aplicar((atual) => acrescentarAccaoEmLote(atual, [...seleccao.ids], tipo))
+    },
+    [aplicar, seleccao.ids],
+  )
+
+  const mudarModoAltitude = useCallback(
+    (modo: ModoAltitude) => {
+      aplicar((atual) => {
+        const resultado = converterModoAltitude(atual, modo, cotas, chaveDaPosicao)
+        return resultado.estado === 'convertida' ? resultado.rota : atual
       })
     },
-    [rota],
+    [aplicar, cotas],
   )
+
+  /** Enquanto faltarem cotas, mudar de modo mexeria na posicao real da rota. */
+  const impedimentoConversao = useMemo(() => {
+    if (!rota) return null
+    const emFalta = rota.waypoints.filter((w) => !cotas.has(chaveDaPosicao(w))).length
+    if (emFalta === 0) return null
+    return `A aguardar a cota do terreno de ${emFalta} waypoint${emFalta === 1 ? '' : 's'}. Mudar de modo agora deslocava a rota.`
+  }, [rota, cotas])
 
   // --- atalhos --------------------------------------------------------------
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent): void => {
       const alvo = evento.target
-      if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement) return
+      if (
+        alvo instanceof HTMLInputElement ||
+        alvo instanceof HTMLTextAreaElement ||
+        alvo instanceof HTMLSelectElement
+      ) {
+        return
+      }
 
       const comando = evento.ctrlKey || evento.metaKey
+
       if (comando && evento.key.toLowerCase() === 'z') {
         evento.preventDefault()
-        setHistorico((anterior) =>
-          anterior ? (evento.shiftKey ? refazer(anterior) : desfazer(anterior)) : anterior,
-        )
+        if (evento.shiftKey) editor.refazer()
+        else editor.desfazer()
         return
       }
       if (comando && evento.key.toLowerCase() === 'y') {
         evento.preventDefault()
-        setHistorico((anterior) => (anterior ? refazer(anterior) : anterior))
+        editor.refazer()
+        return
+      }
+      if (evento.shiftKey && evento.key.toLowerCase() === 'f') {
+        evento.preventDefault()
+        if (seleccao.ids.size > 0) acrescentarAccao('tirarFoto')
         return
       }
       if (evento.key === 'Delete' || evento.key === 'Backspace') {
@@ -247,20 +281,21 @@ export function App() {
         eliminarSeleccionados()
         return
       }
-      if ((evento.key === 'ArrowDown' || evento.key === 'ArrowUp') && rota) {
+      if (evento.key === 'Escape') {
+        setModoPOI(false)
+        setConfiguracoesAbertas(false)
+        seleccao.limpar()
+        return
+      }
+      if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
         evento.preventDefault()
-        const ids = rota.waypoints.map((w) => w.id)
-        if (ids.length === 0) return
-        const actual = ultimoSeleccionado.current ? ids.indexOf(ultimoSeleccionado.current) : -1
-        const passo = evento.key === 'ArrowDown' ? 1 : -1
-        const seguinte = ids[Math.max(0, Math.min(ids.length - 1, actual + passo))]
-        if (seguinte) seleccionar(seguinte, false)
+        seleccao.mover(evento.key === 'ArrowDown' ? 1 : -1)
       }
     }
 
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [eliminarSeleccionados, rota, seleccionar])
+  }, [editor, seleccao, eliminarSeleccionados, acrescentarAccao])
 
   if (arranque) {
     return (
@@ -271,36 +306,58 @@ export function App() {
     )
   }
 
-  if (!rota || !historico || !estatisticas) {
+  if (!rota || !estatisticas || !drone) {
     return <div className="aviso-arranque">A abrir o projeto local...</div>
   }
 
   const cotaCursor = cursor?.cotaTerreno ?? null
+  const unicoSeleccionado = seleccao.waypoints.length === 1 ? seleccao.waypoints[0] : null
+  const aglSeleccionados = seleccao.waypoints.map((w) => {
+    const i = rota.waypoints.findIndex((outro) => outro.id === w.id)
+    return alturasAGL[i] ?? null
+  })
 
   return (
     <div className="aplicacao">
       <header className="barra-superior">
-        <BarraEstatisticas estatisticas={estatisticas} />
+        <div className="grupo-esquerda">
+          <button
+            type="button"
+            className={configuracoesAbertas ? 'activo' : ''}
+            onClick={() => setConfiguracoesAbertas((v) => !v)}
+          >
+            Configuracoes de rota de voo
+          </button>
+          <BarraEstatisticas estatisticas={estatisticas} />
+        </div>
 
         <div className="titulo-rota">
           <strong>{rota.nome}</strong>
-          <span className="subtitulo">{rota.droneId}</span>
+          <span className="subtitulo">{drone.nome}</span>
         </div>
 
         <div className="accoes-superiores">
           <button
             type="button"
+            className={modoPOI ? 'activo' : ''}
+            title="Clicar no mapa cria um ponto de interesse"
+            onClick={() => setModoPOI((v) => !v)}
+          >
+            POI
+          </button>
+          <button
+            type="button"
             title="Desfazer (Ctrl+Z)"
-            disabled={!podeDesfazer(historico)}
-            onClick={() => setHistorico((a) => (a ? desfazer(a) : a))}
+            disabled={!editor.podeDesfazer}
+            onClick={editor.desfazer}
           >
             <IconeDesfazer />
           </button>
           <button
             type="button"
             title="Refazer (Ctrl+Shift+Z)"
-            disabled={!podeRefazer(historico)}
-            onClick={() => setHistorico((a) => (a ? refazer(a) : a))}
+            disabled={!editor.podeRefazer}
+            onClick={editor.refazer}
           >
             <IconeRefazer />
           </button>
@@ -320,16 +377,12 @@ export function App() {
         <ListaWaypoints
           rota={rota}
           linhas={linhas}
-          seleccionados={seleccionados}
-          aoSeleccionar={seleccionar}
+          seleccionados={seleccao.ids}
+          aoSeleccionar={seleccao.seleccionar}
           aoCentrar={() => undefined}
           aoEliminar={(id) => {
             aplicar((atual) => removerWaypoints(atual, [id]))
-            setSeleccionados((anteriores) => {
-              const novos = new Set(anteriores)
-              novos.delete(id)
-              return novos
-            })
+            seleccao.limpar()
           }}
         />
 
@@ -337,21 +390,35 @@ export function App() {
           <Mapa
             rota={rota}
             pontos3D={pontos3D}
-            seleccionados={seleccionados}
+            seleccionados={seleccao.ids}
             modo3D={modo3D}
+            modoPOI={modoPOI}
             centroInicial={CENTRO_INICIAL}
             aoAdicionarWaypoint={aoAdicionarWaypoint}
             aoInserirWaypoint={aoInserirWaypoint}
             aoMoverWaypoint={aoMoverWaypoint}
-            aoSeleccionar={(id, juntar) => seleccionar(id, juntar)}
+            aoSeleccionar={(id, juntar) => seleccao.seleccionar(id, juntar)}
             aoMoverCursor={setCursor}
+            aoRemoverPOI={(id) => aplicar((atual) => removerPOI(atual, id))}
             aoErro={setErroMapa}
           />
+
+          {configuracoesAbertas ? (
+            <ConfiguracoesRota
+              rota={rota}
+              drone={drone}
+              impedimentoConversao={impedimentoConversao}
+              aoAlterarRota={editor.alterarRota}
+              aoMudarModoAltitude={mudarModoAltitude}
+              aoFechar={() => setConfiguracoesAbertas(false)}
+            />
+          ) : null}
 
           <div className="barra-inferior-mapa">
             {erroTerreno ?? erroMapa ? (
               <span className="erro">{erroTerreno ?? erroMapa}</span>
             ) : null}
+            {modoPOI ? <span className="modo-activo">Clica no mapa para criar um POI</span> : null}
             <span className="numerico">
               {cursor ? `${cursor.lat.toFixed(6)}, ${cursor.lon.toFixed(6)}` : '--'}
             </span>
@@ -364,6 +431,28 @@ export function App() {
             <span>WGS 84</span>
           </div>
         </section>
+
+        <PainelPropriedades
+          rota={rota}
+          drone={drone}
+          seleccionados={seleccao.waypoints}
+          alturasAcimaDoSolo={aglSeleccionados}
+          aoAlterar={alterarSeleccionados}
+          aoIncrementarAltura={incrementarAltura}
+          aoAcrescentarAccao={acrescentarAccao}
+          aoAlterarAccao={(indice, accao) => {
+            if (!unicoSeleccionado) return
+            aplicar((atual) => alterarAccao(atual, unicoSeleccionado.id, indice, accao))
+          }}
+          aoRemoverAccao={(indice) => {
+            if (!unicoSeleccionado) return
+            aplicar((atual) => removerAccao(atual, unicoSeleccionado.id, indice))
+          }}
+          aoMoverAccao={(de, para) => {
+            if (!unicoSeleccionado) return
+            aplicar((atual) => moverAccao(atual, unicoSeleccionado.id, de, para))
+          }}
+        />
       </main>
     </div>
   )

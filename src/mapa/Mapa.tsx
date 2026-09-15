@@ -23,6 +23,8 @@ export type PropsMapa = {
   pontos3D: readonly PontoRota3D[]
   seleccionados: ReadonlySet<string>
   modo3D: boolean
+  /** Enquanto activo, clicar no mapa cria um ponto de interesse em vez de um waypoint. */
+  modoPOI: boolean
   centroInicial: LatLon
   aoAdicionarWaypoint: (lat: number, lon: number) => void
   aoInserirWaypoint: (posicao: number, lat: number, lon: number) => void
@@ -30,6 +32,7 @@ export type PropsMapa = {
   aoMoverWaypoint: (id: string, lat: number, lon: number, definitivo: boolean) => void
   aoSeleccionar: (id: string, juntar: boolean) => void
   aoMoverCursor: (cursor: CursorTerreno | null) => void
+  aoRemoverPOI: (id: string) => void
   aoErro: (mensagem: string) => void
 }
 
@@ -38,6 +41,7 @@ export function Mapa(props: PropsMapa) {
   const mapa = useRef<MapaLibre | null>(null)
   const camada3D = useRef<CamadaRota3D | null>(null)
   const marcadores = useRef(new Map<string, Marker>())
+  const marcadoresPOI = useRef(new Map<string, Marker>())
   const pronto = useRef(false)
 
   /** As funcoes mudam a cada render; os handlers do MapLibre registam-se uma vez. */
@@ -100,7 +104,7 @@ export function Mapa(props: PropsMapa) {
       instancia.addLayer(camada)
 
       pronto.current = true
-      desenhar(instancia, camada, marcadores.current, callbacks.current, callbacks)
+      desenhar(instancia, camada, marcadores.current, marcadoresPOI.current, callbacks.current, callbacks)
     })
 
     // Clique em vazio acrescenta um waypoint no fim.
@@ -139,6 +143,8 @@ export function Mapa(props: PropsMapa) {
       pronto.current = false
       for (const marcador of marcadores.current.values()) marcador.remove()
       marcadores.current.clear()
+      for (const marcador of marcadoresPOI.current.values()) marcador.remove()
+      marcadoresPOI.current.clear()
       camada3D.current = null
       instancia.remove()
       mapa.current = null
@@ -166,8 +172,15 @@ export function Mapa(props: PropsMapa) {
     const instancia = mapa.current
     const camada = camada3D.current
     if (!instancia || !camada || !pronto.current) return
-    desenhar(instancia, camada, marcadores.current, props, callbacks)
+    desenhar(instancia, camada, marcadores.current, marcadoresPOI.current, props, callbacks)
   })
+
+  // O cursor diz de imediato que o proximo clique cria um POI, nao um waypoint.
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto.current) return
+    instancia.getCanvas().style.cursor = props.modoPOI ? 'crosshair' : ''
+  }, [props.modoPOI])
 
   return <div className="mapa" ref={contentor} />
 }
@@ -187,6 +200,7 @@ function desenhar(
   instancia: MapaLibre,
   camada: CamadaRota3D,
   marcadores: Map<string, Marker>,
+  marcadoresPOI: Map<string, Marker>,
   props: PropsMapa,
   callbacks: RefCallbacks,
 ): void {
@@ -195,6 +209,53 @@ function desenhar(
 
   camada.definirPontos(props.pontos3D)
   sincronizarMarcadores(instancia, marcadores, props, callbacks)
+  sincronizarPOIs(instancia, marcadoresPOI, props, callbacks)
+}
+
+/**
+ * Marcadores dos pontos de interesse. Sao losangos, para nao se confundirem com
+ * os circulos numerados dos waypoints a um relance.
+ */
+function sincronizarPOIs(
+  instancia: MapaLibre,
+  marcadores: Map<string, Marker>,
+  props: PropsMapa,
+  callbacks: RefCallbacks,
+): void {
+  const vivos = new Set(props.rota.pois.map((p) => p.id))
+  for (const [id, marcador] of marcadores) {
+    if (!vivos.has(id)) {
+      marcador.remove()
+      marcadores.delete(id)
+    }
+  }
+
+  for (const poi of props.rota.pois) {
+    let marcador = marcadores.get(poi.id)
+
+    if (!marcador) {
+      const elemento = document.createElement('button')
+      elemento.type = 'button'
+      elemento.className = 'marcador-poi'
+      elemento.addEventListener('click', (evento) => {
+        evento.stopPropagation()
+        if (evento.shiftKey) callbacks.current.aoRemoverPOI(poi.id)
+      })
+
+      marcador = new Marker({ element: elemento, draggable: false })
+      marcador.setLngLat([poi.lon, poi.lat]).addTo(instancia)
+      marcadores.set(poi.id, marcador)
+    } else {
+      const atual = marcador.getLngLat()
+      if (atual.lat !== poi.lat || atual.lng !== poi.lon) {
+        marcador.setLngLat([poi.lon, poi.lat])
+      }
+    }
+
+    const elemento = marcador.getElement()
+    elemento.title = `${poi.nome} — shift e clique para remover`
+    elemento.setAttribute('aria-label', `Ponto de interesse ${poi.nome}`)
+  }
 }
 
 /** Um troco por feature, para se saber onde inserir quando se alt+clica na linha. */
