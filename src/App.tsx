@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
 import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
-import { alturasAcimaDoSolo, converterModoAltitude } from './nucleo/altitude.ts'
+import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
+import { calcularPerfil } from './nucleo/perfil.ts'
+import { PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
 import {
   acrescentarWaypoint,
   alterarWaypoint,
@@ -22,6 +24,7 @@ import { acrescentarPOI, poiNovo, removerPOI } from './nucleo/operacoes-poi.ts'
 import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
 import { useEditorRota } from './estado/useEditorRota.ts'
 import { useSeleccao } from './estado/useSeleccao.ts'
+import { usePerfilTerreno } from './estado/usePerfilTerreno.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { criarProjeto, gravarRota, listarProjetos, listarRotas } from './dados/bd.ts'
@@ -33,6 +36,8 @@ import { ListaWaypoints, type LinhaWaypoint } from './ui/ListaWaypoints.tsx'
 import { PainelPropriedades, type AlteracaoWaypoint } from './ui/PainelPropriedades.tsx'
 import { ConfiguracoesRota } from './ui/ConfiguracoesRota.tsx'
 import { BarraFicheiro } from './ui/BarraFicheiro.tsx'
+import { PerfilTerreno } from './ui/PerfilTerreno.tsx'
+import { PainelValidacoes } from './ui/PainelValidacoes.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 
 /** Intervalo seguro acima do solo, em metros. Fora dele o waypoint fica assinalado. */
@@ -52,6 +57,8 @@ export function App() {
   const [modo3D, setModo3D] = useState(false)
   const [modoPOI, setModoPOI] = useState(false)
   const [configuracoesAbertas, setConfiguracoesAbertas] = useState(false)
+  const [abaInferior, setAbaInferior] = useState<'perfil' | 'validacoes' | null>('perfil')
+  const [registoFotografico, setRegistoFotografico] = useState(false)
   const [cursor, setCursor] = useState<CursorTerreno | null>(null)
   const [arranque, setArranque] = useState<string | null>(null)
   const [erroMapa, setErroMapa] = useState<string | null>(null)
@@ -153,6 +160,31 @@ export function App() {
   const estatisticas = useMemo(() => (rota ? calcularEstatisticas(rota) : null), [rota])
   const drone = useMemo(() => (rota ? droneComId(rota.droneId) : null), [rota])
 
+  // --- perfil do terreno e validacoes ---------------------------------------
+  const amostrado = usePerfilTerreno(rota, fonteTerreno, PASSO_COLISAO)
+
+  const perfil = useMemo(
+    () =>
+      rota
+        ? calcularPerfil(rota, { pontos: amostrado.pontos, cotas: amostrado.cotas }, cotas, chaveDaPosicao)
+        : null,
+    [rota, amostrado.pontos, amostrado.cotas, cotas],
+  )
+
+  const validacoes = useMemo(() => {
+    if (!rota || !drone) return []
+    return validarRota(rota, drone, {
+      cotas,
+      chave: chaveDaPosicao,
+      registoFotografico,
+      ...(amostrado.cotas.length > 0
+        ? { perfil: { pontos: amostrado.pontos, cotas: amostrado.cotas } }
+        : {}),
+    })
+  }, [rota, drone, cotas, amostrado.pontos, amostrado.cotas, registoFotografico])
+
+  const exportacaoBloqueada = temErros(validacoes)
+
   // --- alteracoes -----------------------------------------------------------
   const aoAdicionarWaypoint = useCallback(
     (lat: number, lon: number) => {
@@ -227,6 +259,16 @@ export function App() {
       aplicar((atual) => acrescentarAccaoEmLote(atual, [...seleccao.ids], tipo))
     },
     [aplicar, seleccao.ids],
+  )
+
+  const nivelar = useCallback(
+    (alturaAcimaDoSolo: number) => {
+      aplicar((atual) => {
+        const resultado = nivelarAcimaDoSolo(atual, alturaAcimaDoSolo, cotas, chaveDaPosicao)
+        return resultado.estado === 'convertida' ? resultado.rota : atual
+      })
+    },
+    [aplicar, cotas],
   )
 
   const mudarModoAltitude = useCallback(
@@ -344,6 +386,11 @@ export function App() {
             cotas={cotas}
             chave={chaveDaPosicao}
             fonteTerreno={fonteTerreno}
+            bloqueio={
+              exportacaoBloqueada
+                ? `${validacoes.filter((v) => v.severidade === 'erro').length} erro(s) de validacao impedem a exportacao`
+                : null
+            }
             aoImportar={(importada) => {
               carregar(importada.rota)
               seleccao.limpar()
@@ -424,6 +471,83 @@ export function App() {
               aoMudarModoAltitude={mudarModoAltitude}
               aoFechar={() => setConfiguracoesAbertas(false)}
             />
+          ) : null}
+
+          {abaInferior && perfil ? (
+            <div className="painel-inferior">
+              <nav className="abas abas-inferior" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={abaInferior === 'perfil'}
+                  className={abaInferior === 'perfil' ? 'activo' : ''}
+                  onClick={() => setAbaInferior('perfil')}
+                >
+                  Perfil de terreno
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={abaInferior === 'validacoes'}
+                  className={`${abaInferior === 'validacoes' ? 'activo' : ''} ${
+                    exportacaoBloqueada ? 'com-erro' : ''
+                  }`}
+                  onClick={() => setAbaInferior('validacoes')}
+                >
+                  Validacoes
+                  {validacoes.length > 0 ? (
+                    <span className="contador numerico">{validacoes.length}</span>
+                  ) : null}
+                </button>
+                <label className="interruptor" title="Espera-se accao de foto em cada waypoint">
+                  <input
+                    type="checkbox"
+                    checked={registoFotografico}
+                    onChange={(e) => setRegistoFotografico(e.target.checked)}
+                  />
+                  Registo fotografico
+                </label>
+                <button type="button" className="fechar-inferior" onClick={() => setAbaInferior(null)}>
+                  Ocultar
+                </button>
+              </nav>
+
+              {abaInferior === 'perfil' ? (
+                <PerfilTerreno
+                  perfil={perfil}
+                  aCarregar={amostrado.aCarregar}
+                  erro={amostrado.erro}
+                  seleccionados={new Set(seleccao.waypoints.map((w) => w.index))}
+                  aoSeleccionarWaypoint={(indice) => {
+                    const alvo = rota.waypoints[indice]
+                    if (alvo) seleccao.substituir([alvo.id])
+                  }}
+                  aoNivelar={nivelar}
+                  podeNivelar={rota.waypoints.length > 0 && cotas.size > 0}
+                />
+              ) : (
+                <PainelValidacoes
+                  validacoes={validacoes}
+                  aoSeleccionarWaypoints={(indices) => {
+                    const ids = indices
+                      .map((i) => rota.waypoints[i]?.id)
+                      .filter((id): id is string => id !== undefined)
+                    seleccao.substituir(ids)
+                  }}
+                />
+              )}
+            </div>
+          ) : null}
+
+          {!abaInferior ? (
+            <button
+              type="button"
+              className="mostrar-inferior"
+              onClick={() => setAbaInferior('perfil')}
+            >
+              Perfil de terreno
+              {exportacaoBloqueada ? <span className="ponto-erro" aria-hidden="true" /> : null}
+            </button>
           ) : null}
 
           <div className="barra-inferior-mapa">

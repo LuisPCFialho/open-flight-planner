@@ -736,3 +736,379 @@ input.campo-entrada {
   font-size: 11px;
   padding: 2px 6px;
 }
+
+/* --- painel inferior: perfil e validacoes ---------------------------------- */
+
+.painel-inferior {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  background: rgba(18, 23, 29, 0.97);
+  border-top: 1px solid var(--borda-forte);
+  display: flex;
+  flex-direction: column;
+  max-height: 46%;
+}
+
+.abas-inferior {
+  grid-auto-flow: column;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  padding-right: 8px;
+}
+
+.abas-inferior button {
+  padding: 6px 14px;
+}
+
+.abas-inferior .contador {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--fundo-elevado);
+  font-size: 10px;
+}
+
+.abas-inferior button.com-erro {
+  color: var(--alerta);
+}
+
+.abas-inferior button.com-erro .contador {
+  background: var(--alerta);
+  color: #2a0a07;
+}
+
+.abas-inferior .fechar-inferior {
+  border-bottom: none;
+  font-size: 11px;
+  color: var(--texto-suave);
+}
+
+.interruptor {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 14px;
+  font-size: 11px;
+  color: var(--texto-suave);
+  cursor: pointer;
+}
+
+.interruptor input {
+  accent-color: var(--destaque);
+}
+
+.mostrar-inferior {
+  position: absolute;
+  left: 8px;
+  bottom: 26px;
+  z-index: 4;
+}
+
+.ponto-erro {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--alerta);
+}
+
+/* --- grafico do perfil ----------------------------------------------------- */
+
+.perfil {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 10px 4px;
+  gap: 6px;
+}
+
+.vazio-perfil {
+  padding: 22px 12px;
+  color: var(--texto-suave);
+  text-align: center;
+}
+
+.perfil-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.perfil-cabecalho h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--texto-suave);
+}
+
+.perfil-leitura {
+  font-size: 12px;
+}
+
+.perfil-nivelar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--texto-suave);
+}
+
+.perfil-nivelar label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.perfil-nivelar input {
+  width: 56px;
+  background: var(--fundo);
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 3px 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.perfil-grafico {
+  width: 100%;
+  height: 168px;
+  overflow: visible;
+}
+
+.perfil-terreno {
+  fill: #2c3742;
+  stroke: #56697c;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.perfil-voo {
+  fill: none;
+  stroke: var(--rota);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.perfil-tecto,
+.perfil-piso {
+  fill: none;
+  stroke: var(--alerta);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  opacity: 0.75;
+  vector-effect: non-scaling-stroke;
+}
+
+.perfil-piso {
+  opacity: 0.45;
+}
+
+.perfil-zona-alerta {
+  fill: rgba(242, 90, 76, 0.16);
+}
+
+.perfil-waypoint line {
+  stroke: rgba(230, 237, 245, 0.45);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.perfil-waypoint circle {
+  fill: var(--rota);
+  stroke: #0b0e11;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.perfil-waypoint.alerta circle {
+  fill: var(--alerta);
+}
+
+.perfil-waypoint.seleccionado circle {
+  fill: var(--destaque);
+  r: 5;
+}
+
+.perfil-waypoint {
+  cursor: pointer;
+}
+
+.perfil-regua line {
+  stroke: rgba(86, 105, 124, 0.3);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.perfil-regua text,
+.perfil-eixo {
+  fill: var(--texto-suave);
+  font-size: 10px;
+  font-family: var(--fonte-numerica);
+}
+
+.perfil-legenda {
+  display: flex;
+  gap: 16px;
+  font-size: 10px;
+  color: var(--texto-suave);
+}
+
+.perfil-legenda span::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.legenda-voo::before { background: var(--rota); }
+.legenda-terreno::before { background: #56697c; }
+.legenda-tecto::before,
+.legenda-piso::before { background: var(--alerta); }
+.legenda-carregar::before { display: none; }
+
+/* --- lista de validacoes --------------------------------------------------- */
+
+.validacoes {
+  overflow-y: auto;
+  padding: 6px 10px 10px;
+}
+
+.validacoes ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.validacao {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 9px;
+  padding: 7px 9px;
+  background: var(--fundo-elevado);
+  border: 1px solid var(--borda);
+  border-left-width: 3px;
+  border-radius: var(--raio);
+}
+
+.validacao.erro {
+  border-left-color: var(--alerta);
+}
+
+.validacao.aviso {
+  border-left-color: #d8a23c;
+}
+
+.validacao-marca {
+  padding-top: 1px;
+}
+
+.validacao.erro .validacao-marca { color: var(--alerta); }
+.validacao.aviso .validacao-marca { color: #d8a23c; }
+
+.validacao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.45;
+}
+
+.validacao-texto span {
+  color: var(--texto-suave);
+  font-size: 11px;
+}
+
+.validacao-limpa {
+  margin: 0;
+  padding: 16px 10px;
+  color: var(--rota);
+  text-align: center;
+}
+
+.grupo-ficheiro button.bloqueado {
+  border-color: var(--alerta);
+}
+
+/* --- resistencia a janelas estreitas --------------------------------------- */
+
+/*
+ * Numa ferramenta densa, um rotulo partido em tres linhas rebenta o alinhamento
+ * de tudo o que esta a volta. Os textos curtos nao quebram; quem encolhe sao as
+ * colunas, e o painel do meio absorve o resto.
+ */
+button,
+.abas button,
+.painel-cabecalho h2,
+.perfil-cabecalho h2,
+.estatistica-rotulo,
+.estatistica-valor,
+.interruptor,
+.perfil-nivelar,
+.perfil-legenda span,
+.validacao-texto strong {
+  white-space: nowrap;
+}
+
+.estatisticas {
+  gap: 14px;
+}
+
+.corpo {
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(240px, 290px);
+}
+
+.perfil-cabecalho {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.validacao-texto strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.validacao-texto span {
+  white-space: normal;
+}
+
+@media (max-width: 1100px) {
+  .corpo {
+    grid-template-columns: minmax(150px, 190px) minmax(0, 1fr) minmax(210px, 250px);
+  }
+
+  .estatisticas .estatistica:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+.lista-waypoints {
+  overflow-x: hidden;
+}
+
+.linha-principal {
+  min-width: 0;
+}
+
+.linha-waypoint .altura,
+.linha-waypoint .agl {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  /* Mais vale nao mostrar o nome da rota do que mostra-lo cortado a meio. */
+  .titulo-rota {
+    display: none;
+  }
+}

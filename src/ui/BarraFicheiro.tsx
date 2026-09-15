@@ -12,10 +12,20 @@ type Props = {
   cotas: ReadonlyMap<string, number>
   chave: (ponto: { lat: number; lon: number }) => string
   fonteTerreno: FonteTerreno
+  /** Razao para nao deixar exportar, ou `null` se estiver tudo bem. */
+  bloqueio: string | null
   aoImportar: (importada: RotaImportada) => void
 }
 
-export function BarraFicheiro({ rota, drone, cotas, chave, fonteTerreno, aoImportar }: Props) {
+export function BarraFicheiro({
+  rota,
+  drone,
+  cotas,
+  chave,
+  fonteTerreno,
+  bloqueio,
+  aoImportar,
+}: Props) {
   const entrada = useRef<HTMLInputElement>(null)
   const [estado, setEstado] = useState<{ tipo: 'erro' | 'nota'; texto: string } | null>(null)
 
@@ -65,8 +75,9 @@ export function BarraFicheiro({ rota, drone, cotas, chave, fonteTerreno, aoImpor
       <div className="grupo-ficheiro">
         <button
           type="button"
-          title={`Exportar KMZ no dialeto ${drone.dialeto}`}
-          disabled={rota.waypoints.length === 0}
+          className={bloqueio ? 'bloqueado' : ''}
+          title={bloqueio ?? `Exportar KMZ no dialeto ${drone.dialeto}`}
+          disabled={rota.waypoints.length === 0 || bloqueio !== null}
           onClick={() => void exportar()}
         >
           <IconeDescarregar />
