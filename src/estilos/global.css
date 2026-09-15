@@ -1,0 +1,365 @@
+/*
+ * Interface escura e densa, de ferramenta de trabalho.
+ * Numeros sempre com algarismos tabulares: coordenadas e alturas em colunas que
+ * nao dancam quando os valores mudam.
+ */
+
+:root {
+  --fundo: #0b0e11;
+  --fundo-painel: #12171d;
+  --fundo-elevado: #1a212a;
+  --borda: #263140;
+  --borda-forte: #34445a;
+  --texto: #e6edf5;
+  --texto-suave: #8fa3ba;
+  --destaque: #4aa3ff;
+  --rota: #4fd973;
+  --alerta: #f25a4c;
+
+  --raio: 4px;
+  --fonte: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --fonte-numerica: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#raiz {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--fonte);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.numerico {
+  font-family: var(--fonte-numerica);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--texto);
+  background: var(--fundo-elevado);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 4px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--borda-forte);
+  background: #212a35;
+}
+
+button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+button.activo {
+  border-color: var(--destaque);
+  color: var(--destaque);
+}
+
+/* --- estrutura ------------------------------------------------------------ */
+
+.aplicacao {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+.barra-superior {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  background: var(--fundo-painel);
+  border-bottom: 1px solid var(--borda);
+}
+
+.titulo-rota {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  justify-content: center;
+}
+
+.titulo-rota .subtitulo {
+  color: var(--texto-suave);
+}
+
+.accoes-superiores {
+  display: flex;
+  gap: 6px;
+}
+
+.corpo {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 0;
+}
+
+.zona-mapa {
+  position: relative;
+  min-width: 0;
+}
+
+.mapa {
+  position: absolute;
+  inset: 0;
+}
+
+/* --- estatisticas --------------------------------------------------------- */
+
+.estatisticas {
+  display: flex;
+  gap: 18px;
+}
+
+.estatistica {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.estatistica-rotulo {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--texto-suave);
+}
+
+.estatistica-valor {
+  font-size: 14px;
+}
+
+/* --- painel de waypoints -------------------------------------------------- */
+
+.painel {
+  background: var(--fundo-painel);
+  border-right: 1px solid var(--borda);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.painel-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.painel-cabecalho h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--texto-suave);
+}
+
+.etiqueta-modo {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  color: var(--destaque);
+}
+
+.vazio {
+  padding: 16px 12px;
+  color: var(--texto-suave);
+  line-height: 1.6;
+}
+
+.lista-waypoints {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.linha-waypoint {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-bottom: 1px solid #1a2129;
+}
+
+.linha-waypoint.seleccionado {
+  background: #182838;
+  box-shadow: inset 2px 0 0 var(--destaque);
+}
+
+.linha-waypoint.alerta .agl {
+  color: var(--alerta);
+}
+
+.linha-principal {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 5px 8px;
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  gap: 6px;
+  text-align: left;
+  width: 100%;
+}
+
+.linha-principal:hover {
+  background: #182028;
+}
+
+.linha-waypoint .numero {
+  color: var(--texto-suave);
+}
+
+.linha-waypoint .agl {
+  color: var(--texto-suave);
+  font-size: 11px;
+}
+
+.accoes-rapidas {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding-right: 5px;
+  color: var(--texto-suave);
+}
+
+.accoes-rapidas button {
+  background: none;
+  border: none;
+  padding: 3px;
+  color: var(--texto-suave);
+}
+
+.accoes-rapidas button:hover {
+  color: var(--texto);
+  background: var(--fundo-elevado);
+}
+
+.accoes-rapidas .indicador {
+  display: inline-flex;
+  padding: 3px;
+  color: var(--rota);
+}
+
+/* --- marcadores no mapa --------------------------------------------------- */
+
+.marcador-waypoint {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(18, 23, 29, 0.9);
+  border: 1.5px solid var(--rota);
+  color: var(--texto);
+  font-family: var(--fonte-numerica);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+.marcador-waypoint:hover {
+  border-color: #fff;
+}
+
+.marcador-waypoint.seleccionado {
+  border-color: var(--destaque);
+  background: var(--destaque);
+  color: #06101c;
+  font-weight: 600;
+}
+
+/* --- barra inferior do mapa ----------------------------------------------- */
+
+.barra-inferior-mapa {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 10px;
+  background: linear-gradient(transparent, rgba(11, 14, 17, 0.88) 55%);
+  color: var(--texto-suave);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.barra-inferior-mapa .erro {
+  color: var(--alerta);
+  margin-right: auto;
+}
+
+/* --- arranque ------------------------------------------------------------- */
+
+.aviso-arranque {
+  display: grid;
+  place-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--texto-suave);
+  text-align: center;
+}
+
+.aviso-arranque h1 {
+  font-size: 16px;
+  color: var(--texto);
+  margin: 0;
+}
+
+/* --- controlos do MapLibre ------------------------------------------------ */
+
+.maplibregl-ctrl-group {
+  background: var(--fundo-painel);
+  border: 1px solid var(--borda);
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--borda);
+}
+
+.maplibregl-ctrl-group button {
+  border-radius: 0;
+  border: none;
+}
+
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-scale {
+  background: rgba(11, 14, 17, 0.75) !important;
+  color: var(--texto-suave) !important;
+  border-color: var(--borda) !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--texto-suave);
+}

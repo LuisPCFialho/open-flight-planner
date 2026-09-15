@@ -1,0 +1,24 @@
+Conjunto fechado de etiquetas wpml do dialeto DJI Fly (http://www.uav.com/wpmz/1.0.2).
+Fonte: ficheiro real extraido de um DJI RC 2 com Mini 5 Pro.
+Nao emitir nenhuma etiqueta fora desta lista.
+
+action actionActuatorFunc actionActuatorFuncParam actionGroup actionGroupEndIndex
+actionGroupId actionGroupMode actionGroupStartIndex actionId actionTrigger
+actionTriggerType author autoFlightSpeed createTime distance droneEnumValue droneInfo
+droneSubEnumValue duration executeHeight executeHeightMode executeRCLostAction
+exitOnRCLost finishAction flyToWaylineMode gimbalHeadingYawBase gimbalPitchRotateAngle
+gimbalPitchRotateEnable gimbalRollRotateAngle gimbalRollRotateEnable gimbalRotateMode
+gimbalRotateTime gimbalRotateTimeEnable gimbalYawRotateAngle gimbalYawRotateEnable
+globalTransitionalSpeed index missionConfig payloadPositionIndex templateId updateTime
+useGlobalPayloadLensIndex useStraightLine waylineId waypointGimbalHeadingParam
+waypointGimbalPitchAngle waypointGimbalYawAngle waypointHeadingAngle
+waypointHeadingAngleEnable waypointHeadingMode waypointHeadingParam
+waypointHeadingPathMode waypointHeadingPoiIndex waypointPoiPoint waypointSpeed
+waypointTurnDampingDist waypointTurnMode waypointTurnParam
+
+Valores observados
+  waypointHeadingMode : followWayline | towardPOI
+  waypointTurnMode    : toPointAndStopWithContinuityCurvature | toPointAndPassWithContinuityCurvature
+  actionActuatorFunc  : takePhoto | gimbalRotate | gimbalEvenlyRotate
+  actionGroupMode     : parallel (sempre)
+  executeHeightMode   : relativeToStartPoint (sempre)
