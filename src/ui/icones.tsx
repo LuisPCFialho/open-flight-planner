@@ -112,3 +112,21 @@ export function IconeTerreno(props: PropsIcone) {
     </Envolucro>
   )
 }
+
+export function IconeDescarregar(props: PropsIcone) {
+  return (
+    <Envolucro {...props}>
+      <path d="M8 1.8v8.4M4.8 7 8 10.2 11.2 7" />
+      <path d="M2.4 11.4v1.6a1.2 1.2 0 0 0 1.2 1.2h8.8a1.2 1.2 0 0 0 1.2-1.2v-1.6" />
+    </Envolucro>
+  )
+}
+
+export function IconeCarregar(props: PropsIcone) {
+  return (
+    <Envolucro {...props}>
+      <path d="M8 10.2V1.8M4.8 5 8 1.8 11.2 5" />
+      <path d="M2.4 11.4v1.6a1.2 1.2 0 0 0 1.2 1.2h8.8a1.2 1.2 0 0 0 1.2-1.2v-1.6" />
+    </Envolucro>
+  )
+}

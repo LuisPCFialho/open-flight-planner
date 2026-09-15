@@ -32,6 +32,7 @@ import { BarraEstatisticas } from './ui/BarraEstatisticas.tsx'
 import { ListaWaypoints, type LinhaWaypoint } from './ui/ListaWaypoints.tsx'
 import { PainelPropriedades, type AlteracaoWaypoint } from './ui/PainelPropriedades.tsx'
 import { ConfiguracoesRota } from './ui/ConfiguracoesRota.tsx'
+import { BarraFicheiro } from './ui/BarraFicheiro.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 
 /** Intervalo seguro acima do solo, em metros. Fora dele o waypoint fica assinalado. */
@@ -337,6 +338,17 @@ export function App() {
         </div>
 
         <div className="accoes-superiores">
+          <BarraFicheiro
+            rota={rota}
+            drone={drone}
+            cotas={cotas}
+            chave={chaveDaPosicao}
+            fonteTerreno={fonteTerreno}
+            aoImportar={(importada) => {
+              carregar(importada.rota)
+              seleccao.limpar()
+            }}
+          />
           <button
             type="button"
             className={modoPOI ? 'activo' : ''}

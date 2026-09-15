@@ -118,3 +118,18 @@ Calibrada contra a rota de Sever do Vouga no Pilot 2: 89 waypoints, 8385,2 m, 10
 em "a aeronave para", que o simulador estima em 23 m 27 s. So o percurso daria 838 s,
 portanto os restantes 569 s sao o custo de travar e voltar a acelerar em cada ponto, cerca
 de 6,4 s por ponto. Com 1,5 m/s2 a estimativa fica a menos de 2% do simulador.
+
+## O dialeto Fly nao grava a cota do ponto de descolagem
+
+O `waylines.wpml` do dialeto de consumo nao tem `takeOffRefPoint` nem qualquer
+outra referencia a cota do terreno. As alturas sao todas relativas a descolagem
+(`relativeToStartPoint`), e o aparelho resolve isso em voo, mas quem le o ficheiro
+fora do aparelho fica sem saber a que cota corresponde o zero.
+
+Assumir zero faz a rota inteira aparecer abaixo do solo pela cota do sitio. Em
+Sever do Vouga sao 356 m: uma rota a 60 m acima do solo aparece a 336 m abaixo
+dele. Por isso a importacao marca `cotaDescolagemConhecida` e vai buscar a cota
+ao motor de terreno quando o ficheiro nao a traz.
+
+O dialeto do Pilot 2 nao tem este problema: traz `takeOffRefPoint` com a altura
+elipsoidal, de onde sai a ortometrica subtraindo a ondulacao do geoide.
