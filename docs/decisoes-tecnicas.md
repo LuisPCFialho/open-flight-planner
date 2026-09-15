@@ -239,3 +239,33 @@ rota lida de um ficheiro tem de dar o mesmo ficheiro, nao um com a data de hoje.
 
 Com isto, importar o `OBRA_SEVER_v4` e voltar a exporta-lo devolve os dois
 ficheiros **identicos byte a byte**, e ha um teste que o garante.
+
+## Ciclos de importacao entre a base de dados e o nucleo
+
+`copiarRota` esteve em `dados/projetos.ts`, que importa `bd.ts`. Quando `bd.ts`
+passou a precisar dela criou-se um ciclo, e o resultado foi `rotaVazia is not
+defined` em tempo de execucao: o botao de rota nova deixou de fazer nada.
+
+A funcao e pura e vive agora em `nucleo/operacoes-rota.ts`. A regra que fica: o
+nucleo nao conhece a camada de dados, e o que for puro mora la.
+
+O que tornou o defeito dificil de ver nao foi o ciclo, foi o `void promessa` sem
+`catch` a engolir a rejeicao. As operacoes que tocam na base de dados passam
+todas por um envolucro que mostra a falha na barra inferior.
+
+## Referencias de depuracao em modo estrito
+
+`window.__mapa` guardava a instancia do mapa no momento da criacao. Em modo
+estrito o React monta duas vezes, e a referencia ficava a apontar para um mapa ja
+destruido, que responde a tudo com silencio: `getStyle()` a `undefined`,
+`getCenter()` sempre igual, nenhum evento. Fez parecer avariado, mais do que uma
+vez, codigo que estava bom.
+
+Passou a ser um acessor que le o `ref`, e por isso devolve sempre a instancia
+viva.
+
+Relacionado, e a mesma causa de varias horas perdidas: com a janela oculta o
+`requestAnimationFrame` nao corre, e o MapLibre nao carrega mosaicos nem anima.
+Para verificar uma animacao nessas condicoes ha que forcar os fotogramas com
+`map._render(...)`. Foi assim que se confirmou que centrar num waypoint deixa o
+mapa a 0,00 m dele.

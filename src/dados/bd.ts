@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Projeto, Rota } from '../nucleo/tipos.ts'
 import { novoId } from '../nucleo/ids.ts'
+import { copiarRota, rotaVazia } from '../nucleo/operacoes-rota.ts'
 
 /**
  * Persistencia local em IndexedDB. Sem backend e sem contas: os projetos ficam
@@ -88,4 +89,35 @@ export function listarRotas(projetoId: string): Promise<Rota[]> {
 
 export async function apagarRota(id: string): Promise<void> {
   await bd.rotas.delete(id)
+}
+
+/**
+ * Cria uma rota no projeto, com o ponto de descolagem dado.
+ *
+ * O ponto de descolagem tem de vir de fora porque a cota do terreno e
+ * assincrona: quem chama e que sabe espera-la.
+ */
+export async function criarRota(dados: {
+  nome: string
+  projetoId: string
+  droneId: string
+  pontoDescolagem: Rota['pontoDescolagem']
+}): Promise<Rota> {
+  const rota = rotaVazia(dados)
+  await bd.rotas.add(rota)
+  return rota
+}
+
+/** Duplica uma rota dentro do mesmo projeto, com identificadores novos. */
+export async function duplicarRota(rotaId: string): Promise<Rota> {
+  const original = await bd.rotas.get(rotaId)
+  if (!original) throw new Error('rota nao encontrada')
+
+  const copia = copiarRota(original, original.projetoId, `${original.nome} (copia)`)
+  await bd.rotas.add(copia)
+  return copia
+}
+
+export async function renomearRota(rotaId: string, nome: string): Promise<void> {
+  await bd.rotas.update(rotaId, { nome, alteradaEm: Date.now() })
 }

@@ -32,7 +32,17 @@ import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
 import { lerDXF } from './terreno/dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
-import { criarProjeto, gravarRota, listarProjetos, listarRotas } from './dados/bd.ts'
+import {
+  apagarRota,
+  bd,
+  criarProjeto,
+  criarRota,
+  duplicarRota,
+  gravarRota,
+  listarProjetos,
+  listarRotas,
+  renomearRota,
+} from './dados/bd.ts'
 import { droneComId } from './drones.ts'
 import { Mapa, type CursorTerreno } from './mapa/Mapa.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
@@ -46,6 +56,7 @@ import { PainelValidacoes } from './ui/PainelValidacoes.tsx'
 import { VistaCamara } from './ui/VistaCamara.tsx'
 import { HudVoo } from './ui/HudVoo.tsx'
 import { EcraProjetos } from './ui/EcraProjetos.tsx'
+import { SelectorRota } from './ui/SelectorRota.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
@@ -55,6 +66,27 @@ const fonteMosaicos = new FonteTerrariumAWS({ descodificador: descodificarPNGBro
 
 export function App() {
   const [projetoAberto, setProjetoAberto] = useState<string | null>(null)
+  const [rotaAberta, setRotaAberta] = useState<string | null>(null)
+  const [centrarEm, setCentrarEm] = useState<{ posicao: LatLon; pedido: number } | null>(null)
+  const [falha, setFalha] = useState<string | null>(null)
+
+  /*
+   * Envolve as operacoes que tocam na base de dados.
+   *
+   * Sem isto uma promessa rejeitada some-se: foi assim que um ciclo de
+   * importacao entre a base de dados e as operacoes de projeto deixou o botao
+   * de rota nova a nao fazer nada, sem uma palavra a dizer porque.
+   */
+  const tentar = useCallback(<T,>(promessa: Promise<T>, aoConseguir?: (valor: T) => void) => {
+    promessa
+      .then((valor) => {
+        setFalha(null)
+        aoConseguir?.(valor)
+      })
+      .catch((causa: unknown) => {
+        setFalha(causa instanceof Error ? causa.message : 'a operacao falhou')
+      })
+  }, [])
   const [topografia, setTopografia] = useState<FonteTerrenoDXF | null>(null)
   const [avisoTopografia, setAvisoTopografia] = useState<string | null>(null)
 
@@ -96,8 +128,15 @@ export function App() {
       const rotas = await listarRotas(projeto.id)
       const existente = [...rotas].sort((a, b) => b.alteradaEm - a.alteradaEm)[0]
 
-      if (existente) {
-        if (!cancelado) carregar(existente)
+      // Uma rota explicitamente escolhida manda sobre a ultima alterada.
+      const escolhida = rotaAberta ? rotas.find((r) => r.id === rotaAberta) : undefined
+      const aAbrir = escolhida ?? existente
+
+      if (aAbrir) {
+        if (!cancelado) {
+          carregar(aAbrir)
+          setRotaAberta(aAbrir.id)
+        }
         return
       }
 
@@ -109,7 +148,10 @@ export function App() {
         pontoDescolagem: { ...CENTRO_INICIAL, cotaTerreno: cotaDescolagem },
       })
       await gravarRota(nova)
-      if (!cancelado) carregar(nova)
+      if (!cancelado) {
+        carregar(nova)
+        setRotaAberta(nova.id)
+      }
     }
 
     iniciar().catch((causa: unknown) => {
@@ -123,7 +165,8 @@ export function App() {
     }
     // So `carregar` interessa aqui, e e estavel. Depender do editor inteiro faria
     // este efeito correr a cada render e repor a rota gravada por cima das edicoes.
-  }, [carregar, projetoAberto])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregar, projetoAberto, rotaAberta])
 
   // --- persistencia, com folga para nao gravar a cada pixel de arrasto -------
   useEffect(() => {
@@ -483,7 +526,49 @@ export function App() {
         </div>
 
         <div className="titulo-rota">
-          <strong>{rota.nome}</strong>
+          <SelectorRota
+            rota={rota}
+            aoAbrir={(id) => {
+              voo.parar()
+              seleccao.limpar()
+              setRotaAberta(id)
+            }}
+            aoRenomear={(nome) => {
+              tentar(renomearRota(rota.id, nome))
+              editor.alterarRota({ nome })
+            }}
+            aoCriar={() => {
+              tentar(
+                criarRota({
+                  nome: `Rota ${new Date().toLocaleDateString('pt-PT')}`,
+                  projetoId: rota.projetoId,
+                  droneId: rota.droneId,
+                  pontoDescolagem: rota.pontoDescolagem,
+                }),
+                (nova) => {
+                  seleccao.limpar()
+                  setRotaAberta(nova.id)
+                },
+              )
+            }}
+            aoDuplicar={() => {
+              tentar(duplicarRota(rota.id), (copia) => {
+                seleccao.limpar()
+                setRotaAberta(copia.id)
+              })
+            }}
+            aoApagar={() => {
+              tentar(
+                apagarRota(rota.id).then(() =>
+                  bd.rotas.where('projetoId').equals(rota.projetoId).toArray(),
+                ),
+                (restantes) => {
+                  seleccao.limpar()
+                  setRotaAberta(restantes[0]?.id ?? null)
+                },
+              )
+            }}
+          />
           <span className="subtitulo">{drone.nome}</span>
         </div>
 
@@ -509,6 +594,7 @@ export function App() {
             title="Voltar a lista de projetos"
             onClick={() => {
               voo.parar()
+              setRotaAberta(null)
               setProjetoAberto(null)
             }}
           >
@@ -631,7 +717,12 @@ export function App() {
           linhas={linhas}
           seleccionados={seleccao.ids}
           aoSeleccionar={seleccao.seleccionar}
-          aoCentrar={() => undefined}
+          aoCentrar={(id) => {
+            const alvo = rota.waypoints.find((w) => w.id === id)
+            if (!alvo) return
+            setCentrarEm({ posicao: { lat: alvo.lat, lon: alvo.lon }, pedido: Date.now() })
+            seleccao.seleccionar(id, false)
+          }}
           aoEliminar={(id) => {
             aplicar((atual) => removerWaypoints(atual, [id]))
             seleccao.limpar()
@@ -647,6 +738,7 @@ export function App() {
             modoPOI={modoPOI}
             enquadramento={enquadramento}
             seguir={voo.activo ? { posicao: voo.estado.posicao, guinada: voo.estado.guinada } : null}
+            centrarEm={centrarEm}
             centroInicial={CENTRO_INICIAL}
             aoAdicionarWaypoint={aoAdicionarWaypoint}
             aoInserirWaypoint={aoInserirWaypoint}
@@ -736,7 +828,9 @@ export function App() {
                   seleccionados={new Set(seleccao.waypoints.map((w) => w.index))}
                   aoSeleccionarWaypoint={(indice) => {
                     const alvo = rota.waypoints[indice]
-                    if (alvo) seleccao.substituir([alvo.id])
+                    if (!alvo) return
+                    seleccao.substituir([alvo.id])
+                    setCentrarEm({ posicao: { lat: alvo.lat, lon: alvo.lon }, pedido: Date.now() })
                   }}
                   aoNivelar={nivelar}
                   podeNivelar={rota.waypoints.length > 0 && cotas.size > 0}
@@ -749,6 +843,15 @@ export function App() {
                       .map((i) => rota.waypoints[i]?.id)
                       .filter((id): id is string => id !== undefined)
                     seleccao.substituir(ids)
+
+                    // Leva a vista ao primeiro dos waypoints em causa.
+                    const primeiro = indices[0] === undefined ? null : rota.waypoints[indices[0]]
+                    if (primeiro) {
+                      setCentrarEm({
+                        posicao: { lat: primeiro.lat, lon: primeiro.lon },
+                        pedido: Date.now(),
+                      })
+                    }
                   }}
                 />
               )}
@@ -774,6 +877,7 @@ export function App() {
             {avisoTopografia ? (
               <span className={topografia ? 'modo-activo' : 'erro'}>{avisoTopografia}</span>
             ) : null}
+            {falha ? <span className="erro">{falha}</span> : null}
             <span className="numerico">
               {cursor ? `${cursor.lat.toFixed(6)}, ${cursor.lon.toFixed(6)}` : '--'}
             </span>

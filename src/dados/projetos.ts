@@ -1,6 +1,9 @@
 import type { Projeto, Rota } from '../nucleo/tipos.ts'
 import { novoId } from '../nucleo/ids.ts'
+import { copiarRota } from '../nucleo/operacoes-rota.ts'
 import { bd } from './bd.ts'
+
+export { copiarRota }
 
 /**
  * Operacoes sobre projetos inteiros: duplicar, renomear, apagar, e a troca em
@@ -60,37 +63,6 @@ export async function duplicarProjeto(projetoId: string): Promise<Projeto> {
     if (rotas.length > 0) await bd.rotas.bulkAdd(rotas)
   })
   return copia
-}
-
-/**
- * Copia uma rota para outro projeto.
- *
- * Os identificadores sao todos novos, incluindo os dos POI, e as referencias dos
- * waypoints sao reapontadas. Copiar mantendo os ids antigos faria as duas rotas
- * partilhar POI e uma alteracao numa aparecer na outra.
- */
-export function copiarRota(rota: Rota, projetoId: string, nome?: string): Rota {
-  const mapaPOI = new Map(rota.pois.map((poi) => [poi.id, novoId()]))
-  const agora = Date.now()
-
-  return {
-    ...rota,
-    id: novoId(),
-    projetoId,
-    nome: nome ?? rota.nome,
-    pois: rota.pois.map((poi) => ({ ...poi, id: mapaPOI.get(poi.id) ?? novoId() })),
-    waypoints: rota.waypoints.map((waypoint) => {
-      const novo = { ...waypoint, id: novoId() }
-      if (waypoint.poiId) {
-        const destino = mapaPOI.get(waypoint.poiId)
-        if (destino) novo.poiId = destino
-        else delete novo.poiId
-      }
-      return novo
-    }),
-    criadaEm: agora,
-    alteradaEm: agora,
-  }
 }
 
 // --- troca em JSON -----------------------------------------------------------

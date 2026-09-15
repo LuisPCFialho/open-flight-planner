@@ -1417,3 +1417,57 @@ button,
   border-color: var(--rota);
   color: var(--rota);
 }
+
+/* --- selector de rota ------------------------------------------------------ */
+
+.selector-rota {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.selector-rota .lista-rotas {
+  background: var(--fundo);
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 260px;
+}
+
+.selector-rota .lista-rotas:focus {
+  outline: none;
+  border-color: var(--destaque);
+}
+
+.selector-rota button {
+  font-size: 11px;
+  padding: 4px 6px;
+}
+
+.selector-rota .nome-rota {
+  background: var(--fundo);
+  color: var(--texto);
+  border: 1px solid var(--destaque);
+  border-radius: var(--raio);
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 220px;
+}
+
+.selector-rota .nome-rota:focus {
+  outline: none;
+}
+
+@media (max-width: 1280px) {
+  /* Em janela apertada ficam so as accoes essenciais sobre a rota. */
+  .selector-rota button:not(:last-child):not(:first-of-type) {
+    display: none;
+  }
+}

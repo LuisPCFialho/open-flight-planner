@@ -33,6 +33,13 @@ export type PropsMapa = {
   enquadramento: Enquadramento | null
   /** Posicao da aeronave em voo virtual, para o mapa a seguir. */
   seguir: { posicao: LatLon; guinada: number } | null
+  /**
+   * Ponto para onde levar a vista.
+   *
+   * O `pedido` distingue dois pedidos seguidos para o mesmo ponto, que de outra
+   * forma seriam indistinguiveis e o segundo nao faria nada.
+   */
+  centrarEm: { posicao: LatLon; pedido: number } | null
   centroInicial: LatLon
   aoAdicionarWaypoint: (lat: number, lon: number) => void
   aoInserirWaypoint: (posicao: number, lat: number, lon: number) => void
@@ -87,7 +94,18 @@ export function Mapa(props: PropsMapa) {
     instancia.setStyle(estiloBase())
 
     if (import.meta.env.DEV) {
-      Object.assign(window, { __mapa: instancia, __camada3D: () => camada3D.current })
+      /*
+       * Acessores, e nao a instancia directa.
+       *
+       * Em modo estrito o React monta duas vezes, e guardar a instancia deixava
+       * a referencia a apontar para um mapa ja destruido, que responde a tudo
+       * com silencio. Passou horas a fazer parecer avariado o que estava bom.
+       */
+      Object.defineProperty(window, '__mapa', {
+        configurable: true,
+        get: () => mapa.current,
+      })
+      Object.assign(window, { __camada3D: () => camada3D.current })
     }
 
     instancia.on('load', () => {
@@ -172,6 +190,7 @@ export function Mapa(props: PropsMapa) {
       for (const marcador of marcadoresPOI.current.values()) marcador.remove()
       marcadoresPOI.current.clear()
       camada3D.current = null
+
       instancia.remove()
       mapa.current = null
     }
@@ -212,6 +231,20 @@ export function Mapa(props: PropsMapa) {
       bearing: seguir.guinada,
     })
   }, [props.seguir])
+
+  // Levar a vista a um waypoint, a pedido da lista ou do perfil.
+  useEffect(() => {
+    const instancia = mapa.current
+    const alvo = props.centrarEm
+    // Nao espera pelo `load`: mover a camara nao depende de o estilo ter chegado.
+    if (!instancia || !alvo) return
+
+    instancia.easeTo({
+      center: [alvo.posicao.lon, alvo.posicao.lat],
+      zoom: Math.max(instancia.getZoom(), 17),
+      duration: 500,
+    })
+  }, [props.centrarEm])
 
   // O cursor diz de imediato que o proximo clique cria um POI, nao um waypoint.
   useEffect(() => {
