@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
+import type { Area, LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
 import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
@@ -33,6 +33,8 @@ import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
 import { lerDXF } from './terreno/dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
+import { importarAreas } from './kmz/ficheiro.ts'
+import { areaDoContorno, centroDasAreas, formatarArea } from './nucleo/areas.ts'
 import {
   apagarRota,
   bd,
@@ -68,7 +70,11 @@ const fonteMosaicos = new FonteTerrariumAWS({ descodificador: descodificarPNGBro
 export function App() {
   const [projetoAberto, setProjetoAberto] = useState<string | null>(null)
   const [rotaAberta, setRotaAberta] = useState<string | null>(null)
-  const [centrarEm, setCentrarEm] = useState<{ posicao: LatLon; pedido: number } | null>(null)
+  const [centrarEm, setCentrarEm] = useState<{
+    posicao: LatLon
+    pedido: number
+    envolvente?: [[number, number], [number, number]]
+  } | null>(null)
   const [falha, setFalha] = useState<string | null>(null)
 
   /*
@@ -673,6 +679,66 @@ export function App() {
             Projetos
           </button>
           <label
+            className={`botao-ficheiro ${rota.areas?.length ? 'activo' : ''}`}
+            title={
+              rota.areas?.length
+                ? `${rota.areas.length} area(s) de referencia, ${formatarArea(rota.areas.reduce((total, a) => total + areaDoContorno(a.contorno), 0))} no total. Importar de novo substitui.`
+                : 'Importar KMZ ou KML com poligonos, para ter no mapa o contorno da area a filmar'
+            }
+          >
+            Area
+            <input
+              type="file"
+              accept=".kmz,.kml"
+              hidden
+              onChange={(evento) => {
+                const ficheiro = evento.target.files?.[0]
+                evento.target.value = ''
+                if (!ficheiro) return
+
+                void importarAreas(ficheiro)
+                  .then(({ areas, avisos }) => {
+                    editor.alterarRota({ areas })
+                    setFalha(null)
+
+                    const total = areas.reduce((soma, a) => soma + areaDoContorno(a.contorno), 0)
+                    setAvisoTopografia(
+                      [
+                        `${ficheiro.name}: ${areas.length} area(s), ${formatarArea(total)}`,
+                        ...avisos,
+                      ].join('. '),
+                    )
+
+                    // Leva a vista ate la, com a area toda enquadrada: o
+                    // ficheiro importado e quase sempre de outro sitio do mapa.
+                    const centro = centroDasAreas(areas)
+                    const envolvente = envolventeDasAreas(areas)
+                    if (centro) {
+                      setCentrarEm({
+                        posicao: centro,
+                        pedido: Date.now(),
+                        ...(envolvente ? { envolvente } : {}),
+                      })
+                    }
+                  })
+                  .catch((causa: unknown) => {
+                    setFalha(causa instanceof Error ? causa.message : 'falha a ler as areas')
+                  })
+              }}
+            />
+          </label>
+
+          {rota.areas?.length ? (
+            <button
+              type="button"
+              title="Retirar as areas de referencia do mapa"
+              onClick={() => editor.alterarRota({ areas: [] })}
+            >
+              Sem area
+            </button>
+          ) : null}
+
+          <label
             className={`botao-ficheiro ${topografia ? 'activo' : ''}`}
             title={
               topografia
@@ -1004,4 +1070,26 @@ export function App() {
 /** Altura de um waypoint novo: a do ultimo, para a rota nao dar saltos. */
 function alturaPredefinida(rota: Rota): number {
   return rota.waypoints.at(-1)?.altura ?? 60
+}
+
+/** Envolvente de todas as areas, na forma que o `fitBounds` do mapa espera. */
+function envolventeDasAreas(areas: readonly Area[]): [[number, number], [number, number]] | null {
+  const pontos = areas.flatMap((area) => area.contorno)
+  const primeiro = pontos[0]
+  if (!primeiro) return null
+
+  let latMin = primeiro.lat
+  let latMax = primeiro.lat
+  let lonMin = primeiro.lon
+  let lonMax = primeiro.lon
+  for (const ponto of pontos) {
+    latMin = Math.min(latMin, ponto.lat)
+    latMax = Math.max(latMax, ponto.lat)
+    lonMin = Math.min(lonMin, ponto.lon)
+    lonMax = Math.max(lonMax, ponto.lon)
+  }
+  return [
+    [lonMin, latMin],
+    [lonMax, latMax],
+  ]
 }

@@ -1,9 +1,11 @@
-import type { Drone, Rota } from '../nucleo/tipos.ts'
+import type { Area, Drone, Rota } from '../nucleo/tipos.ts'
 import type { FonteTerreno } from '../terreno/fonte.ts'
+import { novoId } from '../nucleo/ids.ts'
 import { gerarFly } from './dialeto-fly.ts'
 import { gerarPilot2 } from './dialeto-pilot2.ts'
 import { criarKMZ, lerKMZ } from './empacotar.ts'
 import { importarKMZ, type RotaImportada } from './importar.ts'
+import { importarKML } from './kml.ts'
 
 /**
  * Ligacao entre os geradores e o sistema de ficheiros do browser.
@@ -91,4 +93,66 @@ export async function importarFicheiro(
       ],
     }
   }
+}
+
+
+// --- areas de referencia -----------------------------------------------------
+
+/**
+ * Le as areas de um KMZ ou KML qualquer.
+ *
+ * Nao e um ficheiro de rota: e o que sai do Google Earth, de um SIG ou de um
+ * topografo, com o limite da parcela ou da empreitada desenhado. Serve de
+ * rascunho por baixo da rota, para se saber o que ha para filmar.
+ *
+ * Aceita as duas formas porque quem manda o ficheiro manda o que tem: o KMZ e
+ * so um zip com o KML la dentro, em caminho que ninguem garante.
+ */
+export async function importarAreas(
+  ficheiro: File,
+): Promise<{ areas: Area[]; nome: string; avisos: string[] }> {
+  const bytes = new Uint8Array(await ficheiro.arrayBuffer())
+  const texto = await textoKML(bytes, ficheiro.name)
+
+  const conteudo = importarKML(texto)
+  const avisos: string[] = []
+
+  const areas: Area[] = conteudo.poligonos.map((poligono) => ({
+    id: novoId(),
+    nome: poligono.nome,
+    contorno: poligono.contorno,
+  }))
+
+  if (areas.length === 0) {
+    throw new Error(
+      `${ficheiro.name} nao traz nenhum poligono. Confirma que o desenho tem areas fechadas e nao so linhas ou marcadores.`,
+    )
+  }
+  if (conteudo.linhas.length > 0) {
+    avisos.push(
+      `${conteudo.linhas.length} linha(s) aberta(s) do ficheiro foram ignoradas: so entram areas fechadas`,
+    )
+  }
+
+  return { areas, nome: conteudo.nome, avisos }
+}
+
+/** Assinatura de um zip, que e o que um KMZ e por dentro. */
+function ehZip(bytes: Uint8Array): boolean {
+  return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
+}
+
+async function textoKML(bytes: Uint8Array, nomeDoFicheiro: string): Promise<string> {
+  if (!ehZip(bytes)) return new TextDecoder().decode(bytes)
+
+  const { default: JSZip } = await import('jszip')
+  const zip = await JSZip.loadAsync(bytes)
+
+  // O doc.kml e a convencao, mas serve qualquer .kml que la esteja.
+  const entrada =
+    zip.file('doc.kml') ??
+    zip.filter((nome, item) => !item.dir && nome.toLowerCase().endsWith('.kml')).at(0)
+
+  if (!entrada) throw new Error(`${nomeDoFicheiro} e um KMZ mas nao tem nenhum .kml dentro`)
+  return entrada.async('string')
 }

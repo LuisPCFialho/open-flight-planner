@@ -9,6 +9,7 @@ import {
 import type { Feature, FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LatLon, Rota } from '../nucleo/tipos.ts'
+import { contornoFechado } from '../nucleo/areas.ts'
 import { estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
@@ -18,6 +19,9 @@ const CAMADA_SEGMENTOS = 'rota-terreno'
 const FONTE_ENQUADRAMENTO = 'enquadramento'
 const CAMADA_ENQUADRAMENTO_AREA = 'enquadramento-area'
 const CAMADA_ENQUADRAMENTO_LINHA = 'enquadramento-linha'
+const FONTE_AREAS = 'areas-referencia'
+const CAMADA_AREAS_PREENCHIMENTO = 'areas-preenchimento'
+const CAMADA_AREAS_CONTORNO = 'areas-contorno'
 
 export type CursorTerreno = { lat: number; lon: number; cotaTerreno: number | null }
 
@@ -39,7 +43,12 @@ export type PropsMapa = {
    * O `pedido` distingue dois pedidos seguidos para o mesmo ponto, que de outra
    * forma seriam indistinguiveis e o segundo nao faria nada.
    */
-  centrarEm: { posicao: LatLon; pedido: number } | null
+  centrarEm: {
+    posicao: LatLon
+    pedido: number
+    /** Envolvente a enquadrar, quando o alvo e uma area e nao um ponto. */
+    envolvente?: [[number, number], [number, number]]
+  } | null
   centroInicial: LatLon
   aoAdicionarWaypoint: (lat: number, lon: number) => void
   aoInserirWaypoint: (posicao: number, lat: number, lon: number) => void
@@ -109,6 +118,36 @@ export function Mapa(props: PropsMapa) {
     }
 
     instancia.on('load', () => {
+      /*
+       * As areas de referencia entram primeiro, e por isso ficam por baixo.
+       *
+       * Sao o rascunho do que ha para filmar: a rota desenha-se por cima delas,
+       * e nao ao contrario. O preenchimento e fraco de proposito para nao
+       * esconder a ortofoto, que e o que se esta a ler.
+       */
+      instancia.addSource(FONTE_AREAS, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      instancia.addLayer({
+        id: CAMADA_AREAS_PREENCHIMENTO,
+        type: 'fill',
+        source: FONTE_AREAS,
+        paint: { 'fill-color': '#4fd973', 'fill-opacity': 0.12 },
+      })
+      instancia.addLayer({
+        id: CAMADA_AREAS_CONTORNO,
+        type: 'line',
+        source: FONTE_AREAS,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#4fd973',
+          'line-width': 2,
+          'line-opacity': 0.9,
+          'line-dasharray': [3, 2],
+        },
+      })
+
       instancia.addSource(FONTE_SEGMENTOS, {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -239,6 +278,12 @@ export function Mapa(props: PropsMapa) {
     // Nao espera pelo `load`: mover a camara nao depende de o estilo ter chegado.
     if (!instancia || !alvo) return
 
+    // Uma area quer-se enquadrada inteira; um waypoint quer-se de perto.
+    if (alvo.envolvente) {
+      instancia.fitBounds(alvo.envolvente, { padding: 60, duration: 500, maxZoom: 18 })
+      return
+    }
+
     instancia.easeTo({
       center: [alvo.posicao.lon, alvo.posicao.lat],
       zoom: Math.max(instancia.getZoom(), 17),
@@ -277,6 +322,9 @@ function desenhar(
 ): void {
   const fonte = instancia.getSource(FONTE_SEGMENTOS) as GeoJSONSource | undefined
   if (fonte) fonte.setData(segmentosGeoJSON(props.rota))
+
+  const fonteAreas = instancia.getSource(FONTE_AREAS) as GeoJSONSource | undefined
+  if (fonteAreas) fonteAreas.setData(areasGeoJSON(props.rota))
 
   camada.definirPontos(props.pontos3D)
 
@@ -393,6 +441,23 @@ function sincronizarPOIs(
 }
 
 /** Um troco por feature, para se saber onde inserir quando se alt+clica na linha. */
+function areasGeoJSON(rota: Rota): FeatureCollection {
+  const features: Feature[] = []
+
+  for (const area of rota.areas ?? []) {
+    const anel = contornoFechado(area.contorno)
+    if (anel.length === 0) continue
+
+    features.push({
+      type: 'Feature',
+      properties: { id: area.id, nome: area.nome },
+      geometry: { type: 'Polygon', coordinates: [anel.map((p) => [p.lon, p.lat])] },
+    })
+  }
+
+  return { type: 'FeatureCollection', features }
+}
+
 function segmentosGeoJSON(rota: Rota): FeatureCollection {
   const features: Feature[] = []
   for (let i = 1; i < rota.waypoints.length; i++) {

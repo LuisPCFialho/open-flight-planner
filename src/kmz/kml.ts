@@ -19,7 +19,14 @@ const NS_KML = 'http://www.opengis.net/kml/2.2'
 
 export type PontoKML = { nome: string; lat: number; lon: number; altura: number | null }
 export type LinhaKML = { nome: string; pontos: { lat: number; lon: number; altura: number | null }[] }
-export type ConteudoKML = { nome: string; pontos: PontoKML[]; linhas: LinhaKML[] }
+/** Contorno fechado. O primeiro ponto nao vem repetido no fim. */
+export type PoligonoKML = { nome: string; contorno: { lat: number; lon: number }[] }
+export type ConteudoKML = {
+  nome: string
+  pontos: PontoKML[]
+  linhas: LinhaKML[]
+  poligonos: PoligonoKML[]
+}
 
 export type OpcoesKML = {
   cotas?: ReadonlyMap<string, number>
@@ -126,23 +133,65 @@ export function importarKML(fonte: string): ConteudoKML {
 
   const pontos: PontoKML[] = []
   const linhas: LinhaKML[] = []
+  const poligonos: PoligonoKML[] = []
+
+  /*
+   * Desce pela geometria em vez de olhar so para os filhos directos do
+   * Placemark.
+   *
+   * Um `Polygon` guarda o contorno em `outerBoundaryIs/LinearRing`, dois niveis
+   * abaixo, e um `MultiGeometry` pode embrulhar varias geometrias. Procurar so a
+   * um nivel fazia os poligonos passarem despercebidos, que e precisamente o que
+   * vem num ficheiro de limites de parcela.
+   */
+  const lerGeometria = (elemento: NoLido, nome: string): void => {
+    for (const filhoGeometria of elemento.filhos) {
+      switch (filhoGeometria.nome) {
+        case 'Point': {
+          const [primeiro] = lerCoordenadas(
+            filhoGeometria.filhos.find((f) => f.nome === 'coordinates')?.texto,
+          )
+          if (primeiro) pontos.push({ nome, ...primeiro })
+          break
+        }
+
+        case 'LineString': {
+          const lidos = lerCoordenadas(
+            filhoGeometria.filhos.find((f) => f.nome === 'coordinates')?.texto,
+          )
+          if (lidos.length > 1) linhas.push({ nome, pontos: lidos })
+          break
+        }
+
+        case 'Polygon': {
+          const contorno = contornoExterior(filhoGeometria)
+          if (contorno.length >= 3) poligonos.push({ nome, contorno })
+          break
+        }
+
+        // Um anel solto, fora de um poligono, tambem e um contorno.
+        case 'LinearRing': {
+          const lidos = lerCoordenadas(
+            filhoGeometria.filhos.find((f) => f.nome === 'coordinates')?.texto,
+          )
+          const fechado = semRepetirOFecho(lidos)
+          if (fechado.length >= 3) poligonos.push({ nome, contorno: fechado })
+          break
+        }
+
+        case 'MultiGeometry':
+          lerGeometria(filhoGeometria, nome)
+          break
+
+        default:
+          break
+      }
+    }
+  }
 
   const percorrer = (elemento: NoLido): void => {
     for (const placemark of filhos(elemento, 'Placemark')) {
-      const nome = textoEm(placemark, 'name') ?? 'sem nome'
-
-      const ponto = placemark.filhos.find((f) => f.nome === 'Point')
-      if (ponto) {
-        const [primeiro] = lerCoordenadas(ponto.filhos.find((f) => f.nome === 'coordinates')?.texto)
-        if (primeiro) pontos.push({ nome, ...primeiro })
-      }
-
-      for (const tipo of ['LineString', 'LinearRing']) {
-        const linha = placemark.filhos.find((f) => f.nome === tipo)
-        if (!linha) continue
-        const lidos = lerCoordenadas(linha.filhos.find((f) => f.nome === 'coordinates')?.texto)
-        if (lidos.length > 1) linhas.push({ nome, pontos: lidos })
-      }
+      lerGeometria(placemark, textoEm(placemark, 'name') ?? 'sem nome')
     }
 
     for (const pasta of [...filhos(elemento, 'Folder'), ...filhos(elemento, 'Document')]) {
@@ -151,7 +200,42 @@ export function importarKML(fonte: string): ConteudoKML {
   }
 
   percorrer(documento)
-  return { nome: textoEm(documento, 'name') ?? 'KML importado', pontos, linhas }
+  return {
+    nome: textoEm(documento, 'name') ?? 'KML importado',
+    pontos,
+    linhas,
+    poligonos,
+  }
+}
+
+/** Contorno exterior de um `Polygon`. Os buracos interiores sao ignorados. */
+function contornoExterior(poligono: NoLido): { lat: number; lon: number }[] {
+  const fora = poligono.filhos.find((f) => f.nome === 'outerBoundaryIs')
+  const anel = fora?.filhos.find((f) => f.nome === 'LinearRing')
+  const texto = anel?.filhos.find((f) => f.nome === 'coordinates')?.texto
+  return semRepetirOFecho(lerCoordenadas(texto))
+}
+
+/**
+ * Tira o ponto de fecho, que no KML repete o primeiro.
+ *
+ * Guardado tal e qual, um contorno de quatro cantos ficava com cinco pontos e o
+ * ultimo por cima do primeiro, o que estraga a conta da area e desenha um
+ * vertice a mais.
+ */
+function semRepetirOFecho(
+  pontos: readonly { lat: number; lon: number }[],
+): { lat: number; lon: number }[] {
+  const limpos = pontos.map((p) => ({ lat: p.lat, lon: p.lon }))
+  const primeiro = limpos[0]
+  const ultimo = limpos.at(-1)
+
+  if (limpos.length > 2 && primeiro && ultimo) {
+    if (Math.abs(primeiro.lat - ultimo.lat) < 1e-12 && Math.abs(primeiro.lon - ultimo.lon) < 1e-12) {
+      limpos.pop()
+    }
+  }
+  return limpos
 }
 
 /** `lon,lat[,alt]` separados por espacos ou mudancas de linha. */

@@ -123,6 +123,20 @@ export function deFicheiro(bruto: unknown): ProjetoComRotas {
   return { projeto, rotas }
 }
 
+/** Uma area sem contorno fechado nao se desenha, e entrar assim so daria erro depois. */
+function areaValida(bruto: unknown): boolean {
+  if (typeof bruto !== 'object' || bruto === null) return false
+  const area = bruto as { contorno?: unknown }
+  if (!Array.isArray(area.contorno) || area.contorno.length < 3) return false
+  return area.contorno.every(
+    (ponto: unknown) =>
+      typeof ponto === 'object' &&
+      ponto !== null &&
+      Number.isFinite((ponto as { lat?: unknown }).lat) &&
+      Number.isFinite((ponto as { lon?: unknown }).lon),
+  )
+}
+
 function validarRota(bruto: unknown, ordem: number, projetoId: string): Rota {
   if (typeof bruto !== 'object' || bruto === null) {
     throw new FicheiroInvalido(`a rota ${ordem + 1} nao e um objecto`)
@@ -168,6 +182,8 @@ function validarRota(bruto: unknown, ordem: number, projetoId: string): Rota {
       alturaMinimaAcimaDoSolo: rota.alturaMinimaAcimaDoSolo ?? 30,
       ondulacaoGeoide: Number.isFinite(rota.ondulacaoGeoide) ? (rota.ondulacaoGeoide as number) : 55.6,
       pois: Array.isArray(rota.pois) ? rota.pois : [],
+      // As areas sao posteriores: um ficheiro antigo nao as traz.
+      areas: Array.isArray(rota.areas) ? rota.areas.filter(areaValida) : [],
       droneId: rota.droneId ?? 'mini5pro',
     },
     projetoId,

@@ -33,6 +33,7 @@ export function rotaVazia(dados: {
     ondulacaoGeoide: 55.6,
     waypoints: [],
     pois: [],
+    areas: [],
     criadaEm: agora,
     alteradaEm: agora,
   }
@@ -124,6 +125,8 @@ export function copiarRota(rota: Rota, projetoId: string, nome?: string): Rota {
     projetoId,
     nome: nome ?? rota.nome,
     pois: rota.pois.map((poi) => ({ ...poi, id: mapaPOI.get(poi.id) ?? novoId() })),
+    // As areas sao so contorno, ninguem lhes aponta: chega dar-lhes id novo.
+    areas: (rota.areas ?? []).map((area) => ({ ...area, id: novoId() })),
     waypoints: rota.waypoints.map((waypoint) => {
       const novo = { ...waypoint, id: novoId() }
       if (waypoint.poiId) {

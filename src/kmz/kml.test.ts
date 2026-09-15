@@ -131,11 +131,11 @@ describe('leitura de KML', () => {
 
   it('aceita coordenadas sem altura e separadas por mudancas de linha', () => {
     const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
-  <Placemark><name>Limite</name><LinearRing><coordinates>
+  <Placemark><name>Alinhamento</name><LineString><coordinates>
     -8.41,40.75
     -8.40,40.75
     -8.40,40.76
-  </coordinates></LinearRing></Placemark>
+  </coordinates></LineString></Placemark>
 </Document></kml>`
 
     const lido = importarKML(kml)
@@ -144,11 +144,116 @@ describe('leitura de KML', () => {
     expect(lido.linhas[0]?.pontos[1]?.lon).toBeCloseTo(-8.4, 6)
   })
 
+  it('le um LinearRing solto como contorno e nao como linha aberta', () => {
+    // Um LinearRing e fechado por definicao. Tratado como linha, o contorno de
+    // uma parcela nao dava area nenhuma para desenhar por cima.
+    const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>Limite</name><LinearRing><coordinates>
+    -8.41,40.75
+    -8.40,40.75
+    -8.40,40.76
+  </coordinates></LinearRing></Placemark>
+</Document></kml>`
+
+    const lido = importarKML(kml)
+    expect(lido.poligonos).toHaveLength(1)
+    expect(lido.poligonos[0]?.nome).toBe('Limite')
+    expect(lido.poligonos[0]?.contorno).toHaveLength(3)
+    expect(lido.linhas).toHaveLength(0)
+  })
+
   it('ignora coordenadas ilegiveis em vez de rebentar', () => {
     const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
   <Placemark><name>X</name><LineString><coordinates>-8.41,40.75 nao,e,numero -8.40,40.76</coordinates></LineString></Placemark>
 </Document></kml>`
 
     expect(importarKML(kml).linhas[0]?.pontos).toHaveLength(2)
+  })
+})
+
+describe('poligonos', () => {
+  it('le o contorno exterior de um Polygon', () => {
+    const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>Parcela A</name><Polygon>
+    <outerBoundaryIs><LinearRing><coordinates>
+      -8.41,40.75,0 -8.40,40.75,0 -8.40,40.76,0 -8.41,40.76,0 -8.41,40.75,0
+    </coordinates></LinearRing></outerBoundaryIs>
+  </Polygon></Placemark>
+</Document></kml>`
+
+    const lido = importarKML(kml)
+    expect(lido.poligonos).toHaveLength(1)
+    expect(lido.poligonos[0]?.nome).toBe('Parcela A')
+    // Cinco coordenadas no ficheiro, quatro cantos: o fecho nao se guarda.
+    expect(lido.poligonos[0]?.contorno).toHaveLength(4)
+    expect(lido.poligonos[0]?.contorno[0]?.lon).toBeCloseTo(-8.41, 6)
+  })
+
+  it('ignora os buracos interiores e fica com o contorno de fora', () => {
+    const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>Com buraco</name><Polygon>
+    <outerBoundaryIs><LinearRing><coordinates>
+      -8.41,40.75 -8.40,40.75 -8.40,40.76 -8.41,40.76 -8.41,40.75
+    </coordinates></LinearRing></outerBoundaryIs>
+    <innerBoundaryIs><LinearRing><coordinates>
+      -8.406,40.753 -8.404,40.753 -8.404,40.755 -8.406,40.753
+    </coordinates></LinearRing></innerBoundaryIs>
+  </Polygon></Placemark>
+</Document></kml>`
+
+    const lido = importarKML(kml)
+    expect(lido.poligonos).toHaveLength(1)
+    expect(lido.poligonos[0]?.contorno).toHaveLength(4)
+  })
+
+  it('desce por um MultiGeometry com varios poligonos', () => {
+    const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>Duas parcelas</name><MultiGeometry>
+    <Polygon><outerBoundaryIs><LinearRing><coordinates>
+      -8.41,40.75 -8.40,40.75 -8.40,40.76
+    </coordinates></LinearRing></outerBoundaryIs></Polygon>
+    <Polygon><outerBoundaryIs><LinearRing><coordinates>
+      -8.39,40.75 -8.38,40.75 -8.38,40.76
+    </coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </MultiGeometry></Placemark>
+</Document></kml>`
+
+    expect(importarKML(kml).poligonos).toHaveLength(2)
+  })
+
+  it('encontra poligonos dentro de pastas aninhadas', () => {
+    const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Folder><name>Levantamento</name><Folder><name>Limites</name>
+    <Placemark><name>Implantacao</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+      -8.41,40.75 -8.40,40.75 -8.40,40.76
+    </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+  </Folder></Folder>
+</Document></kml>`
+
+    expect(importarKML(kml).poligonos[0]?.nome).toBe('Implantacao')
+  })
+
+  it('recusa um poligono com menos de tres pontos em vez de o guardar', () => {
+    const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>Degenerado</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    -8.41,40.75 -8.40,40.75 -8.41,40.75
+  </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+</Document></kml>`
+
+    // Tres coordenadas, mas a ultima fecha sobre a primeira: sobram duas.
+    expect(importarKML(kml).poligonos).toHaveLength(0)
+  })
+
+  it('le a descricao em CDATA sem se enganar no poligono ao lado', () => {
+    const kml = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <Placemark><name>Parcela</name>
+    <description><![CDATA[<b>Area</b> > 3 ha]]></description>
+    <Polygon><outerBoundaryIs><LinearRing><coordinates>
+      -8.41,40.75 -8.40,40.75 -8.40,40.76
+    </coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+</Document></kml>`
+
+    expect(importarKML(kml).poligonos).toHaveLength(1)
   })
 })

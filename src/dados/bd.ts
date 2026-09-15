@@ -39,6 +39,25 @@ class BaseDeDados extends Dexie {
             rota.alturaMinimaAcimaDoSolo ??= 30
           }),
       )
+
+    /*
+     * As areas de referencia, importadas de KMZ ou KML com poligonos, sao
+     * posteriores. As rotas gravadas antes disto ficam sem nenhuma, que e o que
+     * sempre tiveram, mas com a lista criada para ninguem ter de a adivinhar.
+     */
+    this.version(3)
+      .stores({
+        projetos: 'id, nome, cliente, criadoEm',
+        rotas: 'id, projetoId, nome, alteradaEm',
+      })
+      .upgrade((transaccao) =>
+        transaccao
+          .table<Rota>('rotas')
+          .toCollection()
+          .modify((rota) => {
+            rota.areas ??= []
+          }),
+      )
   }
 }
 

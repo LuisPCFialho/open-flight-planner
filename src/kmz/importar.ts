@@ -103,6 +103,8 @@ export function importarKMZ(
     ondulacaoGeoide: ondulacao,
     waypoints,
     pois,
+    // O WPML nao tem onde guardar uma area de referencia.
+    areas: [],
     criadaEm: criadoNoAparelho ?? agora,
     alteradaEm: alteradoNoAparelho ?? agora,
   }

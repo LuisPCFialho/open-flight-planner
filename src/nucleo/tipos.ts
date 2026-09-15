@@ -73,6 +73,20 @@ export type Waypoint = {
   acoes: Accao[]
 }
 
+/**
+ * Area de interesse, importada de um KMZ ou KML com poligonos.
+ *
+ * Nao voa nem entra no ficheiro que vai para o aparelho: serve para se ter no
+ * mapa o contorno do que ha para filmar - a area de implantacao, a parcela, o
+ * limite da empreitada - e desenhar a rota por cima com alguma referencia.
+ */
+export type Area = {
+  id: string
+  nome: string
+  /** Contorno em WGS84, sem repetir o primeiro ponto no fim. */
+  contorno: LatLon[]
+}
+
 export type PontoDescolagem = {
   lat: number
   lon: number
@@ -110,6 +124,8 @@ export type Rota = {
   ondulacaoGeoide: number
   waypoints: Waypoint[]
   pois: POI[]
+  /** Contornos de referencia. Rotas gravadas antes disto nao os tem. */
+  areas: Area[]
   criadaEm: number
   alteradaEm: number
 }
