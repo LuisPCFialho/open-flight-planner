@@ -40,7 +40,13 @@ export function HudVoo({ estado, modoAltitude, alturaASL, cotaTerreno, aoGravar,
         <span className="hud-rotulo">Rumo</span>
         <span className="hud-valor grande numerico">{estado.guinada.toFixed(0)}&deg;</span>
         <span className="hud-rotulo">Gimbal</span>
-        <span className="hud-valor numerico">{estado.gimbalPitch.toFixed(1)}&deg;</span>
+        <span className="hud-valor numerico" title="Inclinacao do gimbal">
+          {estado.gimbalPitch.toFixed(1)}&deg;
+        </span>
+        <span className="hud-valor numerico" title="Rotacao do gimbal em relacao ao nariz">
+          {estado.gimbalYaw >= 0 ? '+' : ''}
+          {estado.gimbalYaw.toFixed(1)}&deg; gim
+        </span>
       </div>
 
       <div className="hud-bloco hud-altura">
@@ -64,7 +70,9 @@ export function HudVoo({ estado, modoAltitude, alturaASL, cotaTerreno, aoGravar,
           Gravar waypoint
         </button>
         <span className="hud-ajuda">
-          Shift+Space grava, Shift+F junta foto, setas mexem o gimbal, Esc sai
+          Setas apontam o gimbal e R recentra-o. Arrastar na vista da camara aponta
+          directamente. Alt abranda tudo para o ajuste fino. Shift+Space grava,
+          Shift+F junta foto, Esc sai.
         </span>
         <button type="button" onClick={aoParar}>
           Sair do voo

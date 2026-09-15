@@ -1,29 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LatLon } from '../nucleo/tipos.ts'
-import { deslocar } from '../nucleo/geodesia.ts'
+import { apontarGimbal, avancarVoo, type EstadoVoo } from '../nucleo/voo.ts'
+
+export type { EstadoVoo }
 
 /**
  * Voo virtual: pilotar a aeronave pelo mapa e gravar o waypoint no sitio e com
  * a atitude em que ela esta.
  *
  * Os comandos sao os do Pilot 2, para nao haver duas maneiras de fazer a mesma
- * coisa: W A S D deslocam, Q E rodam, C Z sobem e descem, as setas mexem o
- * gimbal. Shift e espaco grava o waypoint, Shift e F acrescenta-lhe a foto.
+ * coisa: W A S D deslocam, Q E rodam a aeronave, C Z sobem e descem.
+ *
+ * A camara tem comandos so dela, que e o que faz falta para enquadrar: as setas
+ * de cima e baixo inclinam o gimbal, as da esquerda e direita rodam-no em
+ * relacao a aeronave, e R volta a por o gimbal a olhar em frente. Com Alt
+ * premido tudo anda a um quinto da velocidade, para o ajuste fino do
+ * enquadramento. Arrastar o rato na vista da camara aponta-a directamente.
+ *
+ * Shift e espaco grava o waypoint, Shift e F acrescenta-lhe a foto.
  *
  * O movimento corre num ciclo de animacao e nao no evento de tecla, para a
  * velocidade ser a mesma em qualquer teclado, independentemente da cadencia de
  * repeticao que cada um tenha configurada.
  */
-
-export type EstadoVoo = {
-  posicao: LatLon
-  /** Altura no modo de altitude da rota. */
-  altura: number
-  /** Rumo da aeronave em graus. */
-  guinada: number
-  /** Inclinacao do gimbal em graus, negativa para baixo. */
-  gimbalPitch: number
-}
 
 export type ComandosVoo = {
   activo: boolean
@@ -34,13 +33,9 @@ export type ComandosVoo = {
   colocar: (posicao: LatLon) => void
   /** Grava o waypoint na posicao e atitude actuais. */
   gravar: () => void
+  /** Aponta a camara, em graus. Serve o arrastar do rato na vista da camara. */
+  apontar: (deltaPitch: number, deltaYaw: number) => void
 }
-
-/** Metros por segundo em translacao, graus por segundo em rotacao. */
-const VELOCIDADE = 18
-const VELOCIDADE_VERTICAL = 10
-const ROTACAO = 70
-const ROTACAO_GIMBAL = 45
 
 const TECLAS = new Set([
   'w', 'a', 's', 'd', 'q', 'e', 'z', 'c',
@@ -57,6 +52,7 @@ export function useVooVirtual(opcoes: {
     altura: 60,
     guinada: 0,
     gimbalPitch: -30,
+    gimbalYaw: 0,
   })
 
   const premidas = useRef(new Set<string>())
@@ -92,6 +88,10 @@ export function useVooVirtual(opcoes: {
     setEstado((anterior) => ({ ...anterior, posicao }))
   }, [])
 
+  const apontar = useCallback((deltaPitch: number, deltaYaw: number) => {
+    setEstado((anterior) => apontarGimbal(anterior, deltaPitch, deltaYaw))
+  }, [])
+
   // --- teclado --------------------------------------------------------------
   useEffect(() => {
     if (!activo) return
@@ -114,6 +114,18 @@ export function useVooVirtual(opcoes: {
       }
       if (tecla === 'escape') {
         parar()
+        return
+      }
+      // Recentrar o gimbal e instantaneo, nao e um movimento continuo.
+      if (tecla === 'r') {
+        evento.preventDefault()
+        setEstado((anterior) => ({ ...anterior, gimbalYaw: 0 }))
+        return
+      }
+      if (tecla === 'alt') {
+        // Sem isto o Alt passava o foco para o menu do browser a meio do voo.
+        evento.preventDefault()
+        premidas.current.add('alt')
         return
       }
       if (TECLAS.has(tecla)) {
@@ -153,46 +165,12 @@ export function useVooVirtual(opcoes: {
       const teclas = premidas.current
       if (teclas.size === 0) return
 
-      setEstado((actual) => {
-        const metros = VELOCIDADE * delta
-
-        let { posicao, altura, guinada, gimbalPitch } = actual
-
-        // Deslocacao no referencial da aeronave: W e sempre em frente.
-        let frente = 0
-        let lado = 0
-        if (teclas.has('w')) frente += 1
-        if (teclas.has('s')) frente -= 1
-        if (teclas.has('d')) lado += 1
-        if (teclas.has('a')) lado -= 1
-
-        if (frente !== 0 || lado !== 0) {
-          const comprimento = Math.hypot(frente, lado)
-          const rumo = (guinada + (Math.atan2(lado, frente) * 180) / Math.PI + 360) % 360
-          posicao = deslocar(posicao, rumo, metros * comprimento)
-        }
-
-        if (teclas.has('q')) guinada -= ROTACAO * delta
-        if (teclas.has('e')) guinada += ROTACAO * delta
-        guinada = ((guinada % 360) + 360) % 360
-
-        if (teclas.has('c')) altura += VELOCIDADE_VERTICAL * delta
-        if (teclas.has('z')) altura -= VELOCIDADE_VERTICAL * delta
-
-        if (teclas.has('arrowup')) gimbalPitch += ROTACAO_GIMBAL * delta
-        if (teclas.has('arrowdown')) gimbalPitch -= ROTACAO_GIMBAL * delta
-        gimbalPitch = Math.max(-90, Math.min(45, gimbalPitch))
-
-        if (teclas.has('arrowleft')) guinada = ((guinada - ROTACAO * delta) % 360 + 360) % 360
-        if (teclas.has('arrowright')) guinada = ((guinada + ROTACAO * delta) % 360 + 360) % 360
-
-        return { posicao, altura, guinada, gimbalPitch }
-      })
+      setEstado((actual) => avancarVoo(actual, teclas, delta))
     }
 
     pedido = requestAnimationFrame(passo)
     return () => cancelAnimationFrame(pedido)
   }, [activo])
 
-  return { activo, estado, arrancar, parar, colocar, gravar }
+  return { activo, estado, arrancar, parar, colocar, gravar, apontar }
 }

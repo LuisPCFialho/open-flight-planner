@@ -333,6 +333,7 @@ export function App() {
           // O waypoint fica com a atitude em que a aeronave estava, que e a razao
           // de ser do voo virtual: enquadra-se e grava-se o que se esta a ver.
           gimbalPitch: estadoVoo.gimbalPitch,
+          gimbalYaw: estadoVoo.gimbalYaw,
           modoGuinada: 'fixed',
           guinada: estadoVoo.guinada,
         }),
@@ -359,6 +360,7 @@ export function App() {
         }),
         guinada: voo.estado.guinada,
         gimbalPitch: voo.estado.gimbalPitch,
+        gimbalYaw: voo.estado.gimbalYaw,
       }
     }
 
@@ -375,6 +377,9 @@ export function App() {
       }),
       guinada: waypoint.guinada ?? 0,
       gimbalPitch: waypoint.gimbalPitch,
+      // A previsao de um waypoint ignorava a rotacao do gimbal e mostrava o que
+      // a aeronave tinha pela frente, que nao e o que a foto vai apanhar.
+      gimbalYaw: waypoint.gimbalYaw,
     }
   }, [rota, voo.activo, voo.estado, seleccao.waypoints, cotas])
 
@@ -754,6 +759,7 @@ export function App() {
                 altura: ultimo?.altura ?? 60,
                 guinada: ultimo?.guinada ?? 0,
                 gimbalPitch: ultimo?.gimbalPitch ?? -30,
+                gimbalYaw: ultimo?.gimbalYaw ?? 0,
               })
             }}
           >
@@ -842,6 +848,8 @@ export function App() {
               alturaASL={alvoCamara.alturaASL}
               enquadramento={enquadramento}
               aCarregar={enquadramentoACarregar}
+              fovHorizontal={drone.camara.fovHorizontalGraus ?? 80}
+              {...(voo.activo ? { aoApontar: voo.apontar } : {})}
             />
           ) : null}
 

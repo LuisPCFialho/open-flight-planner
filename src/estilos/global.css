@@ -1128,9 +1128,21 @@ button,
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.5);
 }
 
+/* Em voo a vista e um comando: arrastar aponta o gimbal. */
+.vista-camara.apontavel {
+  cursor: grab;
+  border-color: var(--destaque);
+}
+
+.vista-camara.apontavel.a-arrastar {
+  cursor: grabbing;
+}
+
 .vista-camara-mapa {
   position: absolute;
   inset: 0;
+  /* O mapa nao e interactivo, e os eventos tem de chegar ao contentor. */
+  pointer-events: none;
 }
 
 .vista-camara-moldura {

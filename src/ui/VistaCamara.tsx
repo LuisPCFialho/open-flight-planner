@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LngLat, Map as MapaLibre } from 'maplibre-gl'
 import type { LatLon } from '../nucleo/tipos.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
@@ -14,6 +14,10 @@ import { estiloBase, FONTE_TERRENO } from '../mapa/estilo.ts'
  *
  * As molduras sobrepostas sao a regra dos tercos e o centro, para se poder
  * compor a foto como se compoe qualquer outra.
+ *
+ * Em voo, arrastar aqui dentro aponta o gimbal. A conversao de pixeis para graus
+ * sai do campo de visao e da largura do elemento, portanto um detalhe do terreno
+ * acompanha o cursor em vez de fugir a frente ou ficar para tras.
  */
 
 type Props = {
@@ -22,12 +26,25 @@ type Props = {
   alturaASL: number
   enquadramento: Enquadramento | null
   aCarregar: boolean
+  /** Campo de visao horizontal em graus, para o arrasto ser de um para um. */
+  fovHorizontal: number
+  /** Aponta o gimbal, em graus. Ausente fora do voo, e entao nao se arrasta. */
+  aoApontar?: (deltaPitch: number, deltaYaw: number) => void
 }
 
-export function VistaCamara({ posicao, alturaASL, enquadramento, aCarregar }: Props) {
+export function VistaCamara({
+  posicao,
+  alturaASL,
+  enquadramento,
+  aCarregar,
+  fovHorizontal,
+  aoApontar,
+}: Props) {
   const contentor = useRef<HTMLDivElement>(null)
   const mapa = useRef<MapaLibre | null>(null)
   const pronto = useRef(false)
+  const arrasto = useRef<{ x: number; y: number } | null>(null)
+  const [aArrastar, setAArrastar] = useState(false)
 
   useEffect(() => {
     if (!contentor.current) return
@@ -77,8 +94,42 @@ export function VistaCamara({ posicao, alturaASL, enquadramento, aCarregar }: Pr
     instancia.jumpTo(opcoes)
   }, [posicao.lat, posicao.lon, alturaASL, alvoLat, alvoLon, alvoCota])
 
+  const grausPorPixel = (elemento: HTMLElement): number =>
+    fovHorizontal / Math.max(1, elemento.clientWidth)
+
   return (
-    <div className="vista-camara">
+    <div
+      className={`vista-camara${aoApontar ? ' apontavel' : ''}${aArrastar ? ' a-arrastar' : ''}`}
+      title={aoApontar ? 'Arrastar aponta o gimbal' : undefined}
+      onPointerDown={(evento) => {
+        if (!aoApontar) return
+        evento.currentTarget.setPointerCapture(evento.pointerId)
+        arrasto.current = { x: evento.clientX, y: evento.clientY }
+        setAArrastar(true)
+      }}
+      onPointerMove={(evento) => {
+        const anterior = arrasto.current
+        if (!aoApontar || !anterior) return
+
+        const escala = grausPorPixel(evento.currentTarget)
+        const dx = evento.clientX - anterior.x
+        const dy = evento.clientY - anterior.y
+        arrasto.current = { x: evento.clientX, y: evento.clientY }
+
+        // Arrastar para a direita vira a camara para a direita; para baixo,
+        // inclina para baixo. E o gimbal que se conduz, nao a imagem que se puxa.
+        aoApontar(-dy * escala, dx * escala)
+      }}
+      onPointerUp={(evento) => {
+        if (arrasto.current) evento.currentTarget.releasePointerCapture(evento.pointerId)
+        arrasto.current = null
+        setAArrastar(false)
+      }}
+      onPointerCancel={() => {
+        arrasto.current = null
+        setAArrastar(false)
+      }}
+    >
       <div className="vista-camara-mapa" ref={contentor} />
 
       <div className="vista-camara-moldura" aria-hidden="true">

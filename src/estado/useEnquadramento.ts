@@ -15,8 +15,21 @@ import type { FonteTerrariumAWS } from '../terreno/terrarium.ts'
 export type Alvo = {
   posicao: LatLon
   alturaASL: number
+  /** Rumo da aeronave em graus. */
   guinada: number
   gimbalPitch: number
+  /** Rotacao do gimbal em relacao a aeronave, em graus. */
+  gimbalYaw: number
+}
+
+/**
+ * Azimute para onde a camara olha.
+ *
+ * O `gimbalHeadingYawBase` dos ficheiros reais e `aircraft`, portanto a rotacao
+ * do gimbal conta-se a partir do nariz e o azimute e a soma dos dois.
+ */
+export function azimuteDaCamara(alvo: Pick<Alvo, 'guinada' | 'gimbalYaw'>): number {
+  return ((alvo.guinada + alvo.gimbalYaw) % 360 + 360) % 360
 }
 
 const ALCANCE_MAXIMO = 3000
@@ -42,7 +55,7 @@ export function useEnquadramento(
 
   // Assinatura do alvo, para nao reprojectar a cada render.
   const assinatura = alvo
-    ? `${alvo.posicao.lat.toFixed(6)},${alvo.posicao.lon.toFixed(6)},${alvo.alturaASL.toFixed(1)},${alvo.guinada.toFixed(1)},${alvo.gimbalPitch.toFixed(1)},${fov},${proporcao}`
+    ? `${alvo.posicao.lat.toFixed(6)},${alvo.posicao.lon.toFixed(6)},${alvo.alturaASL.toFixed(1)},${azimuteDaCamara(alvo).toFixed(1)},${alvo.gimbalPitch.toFixed(1)},${fov},${proporcao}`
     : ''
 
   useEffect(() => {
@@ -69,7 +82,8 @@ export function useEnquadramento(
           {
             posicao: alvo.posicao,
             alturaASL: alvo.alturaASL,
-            guinada: alvo.guinada,
+            // O que a camara aponta, nao o que a aeronave aponta.
+            guinada: azimuteDaCamara(alvo),
             gimbalPitch: alvo.gimbalPitch,
             fovHorizontal: fov,
             proporcao,
