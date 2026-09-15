@@ -137,3 +137,23 @@ describe('calcularPerfil', () => {
     expect(calcularPerfil(rota, { pontos: [], cotas: [] }, cotas, chave).amostras).toEqual([])
   })
 })
+
+describe('limites do perfil sem amostras utilizaveis', () => {
+  it('nao devolve Infinity quando nenhuma amostra tem cota', () => {
+    const { rota } = cenario({
+      alturas: [300, 320],
+      troco: 100,
+      terreno: () => 200,
+    })
+
+    // Acontece na janela em que a geometria da rota ja existe mas o motor de
+    // terreno ainda nao respondeu: `Math.min()` de uma lista vazia da Infinity,
+    // e o eixo do grafico ficava com um intervalo impossivel.
+    const pontos = amostrarPercurso(rota.waypoints, 10)
+    const perfil = calcularPerfil(rota, { pontos, cotas: [] }, new Map(), chave)
+
+    expect(Number.isFinite(perfil.cotaMinima)).toBe(true)
+    expect(Number.isFinite(perfil.cotaMaxima)).toBe(true)
+    expect(perfil.amostras).toHaveLength(0)
+  })
+})

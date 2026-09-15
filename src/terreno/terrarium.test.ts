@@ -199,3 +199,48 @@ describe('cobertura', () => {
     expect(fonte.cobre(89, 0)).toBe(false)
   })
 })
+
+describe('ligacao que nao responde', () => {
+  it('desiste ao fim do tempo limite em vez de ficar a espera para sempre', async () => {
+    // O caso de obra: a ligacao aceita o pedido e nunca responde. Sem limite de
+    // tempo, a validacao da rota ficava pendurada sem nada a dizer porque.
+    const pendurado: typeof fetch = (_url, init) =>
+      new Promise((_ok, mal) => {
+        init?.signal?.addEventListener('abort', () => {
+          const erro = new Error('abortado')
+          erro.name = 'AbortError'
+          mal(erro)
+        })
+      })
+
+    const fonte = new FonteTerrariumAWS({
+      descodificador: async () => ({ largura: 256, altura: 256, pixels: new Uint8ClampedArray(4) }),
+      buscar: pendurado,
+      tempoLimiteMs: 50,
+    })
+
+    await expect(fonte.cota(40.75, -8.41)).rejects.toThrow(/sem resposta/)
+  })
+
+  it('nao deixa o mosaico falhado preso em cache', async () => {
+    let tentativas = 0
+    const falhaPrimeiro: typeof fetch = async () => {
+      tentativas++
+      if (tentativas === 1) throw new Error('rede em baixo')
+      return new Response(new Uint8Array([0]), { status: 200 })
+    }
+
+    const fonte = new FonteTerrariumAWS({
+      descodificador: async () => ({
+        largura: 256,
+        altura: 256,
+        pixels: new Uint8ClampedArray(256 * 256 * 4).fill(128),
+      }),
+      buscar: falhaPrimeiro,
+    })
+
+    await expect(fonte.cota(40.75, -8.41)).rejects.toThrow(/rede em baixo/)
+    // A segunda tentativa tem de poder repetir o pedido.
+    await expect(fonte.cota(40.75, -8.41)).resolves.toBeTypeOf('number')
+  })
+})

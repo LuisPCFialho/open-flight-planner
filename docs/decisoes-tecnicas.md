@@ -269,3 +269,87 @@ Relacionado, e a mesma causa de varias horas perdidas: com a janela oculta o
 Para verificar uma animacao nessas condicoes ha que forcar os fotogramas com
 `map._render(...)`. Foi assim que se confirmou que centrar num waypoint deixa o
 mapa a 0,00 m dele.
+
+## Limites de um campo valem em todos os caminhos de entrada
+
+`CampoNumerico` aplicava o `min`/`max` so a quem escrevia texto. As setas do
+teclado e os botoes de incremento chamavam `aoAlterar(valor + delta)` sem passar
+pelo mesmo crivo.
+
+Bastava carregar em baixo no campo da velocidade, cujo minimo e 0,5 m/s, para a
+por a zero e depois a negativo. Dai saiam tres coisas, por esta ordem:
+
+1. a duracao estimada dividia por zero e a barra mostrava `Infinity m NaN s`;
+2. a exportacao para o dialeto Pilot 2, que grava a duracao dentro do ficheiro,
+   rebentava com `numero invalido para WPML`, uma mensagem sobre XML que nao tem
+   relacao nenhuma com a causa;
+3. nenhuma validacao dizia que a velocidade estava impossivel.
+
+Ficaram corrigidos os tres: o crivo passou a valer em todos os caminhos,
+`calcularEstatisticas` nunca devolve um valor nao finito, e `validarVelocidades`
+bloqueia a exportacao dizendo o que se passa.
+
+A licao geral: quando um campo tem um invariante, ele pertence ao sitio por onde
+todos os caminhos passam, e nao a um deles.
+
+## A folga da gravacao automatica tinha um buraco
+
+A rota grava-se 400 ms depois da ultima alteracao, para nao escrever a cada pixel
+de arrasto. A limpeza do efeito cancelava o temporizador, o que esta certo entre
+edicoes sucessivas - mas trocar de rota dentro desses 400 ms tambem trocava a
+rota do efeito, e a gravacao da anterior nunca chegava a ser pedida.
+
+Nao havia promessa rejeitada nem erro nenhum: a alteracao estava no ecra e
+desaparecia ao reabrir a rota. O mesmo com F5 dentro da folga.
+
+A rota pendente vive agora num `ref` e ha `gravarPendente()`, chamada antes de
+cada troca de rota e em `visibilitychange`. Excepto ao apagar, onde o pendente e
+deitado fora de proposito: gravar o que se vai apagar podia repo-lo depois.
+
+## Cotas de terreno: o zero e a pior resposta possivel
+
+Dois sitios devolviam 0 m em silencio quando nao sabiam a cota:
+
+- `FonteComposta.perfil` chamava `publica.cotas?.()`, opcional na interface, e
+  caia em `?? 0` quando a fonte so sabia responder ponto a ponto;
+- uma `POLYLINE` classica num DXF perde a elevacao na leitura, porque o
+  `dxf-parser` le o grupo 30 e deita-o fora, e os vertices a zero passavam por
+  cota real.
+
+Zero le-se como uma cota perfeitamente plausivel. Uma rota em AGL a 30 m sobre
+terreno dado como estando ao nivel do mar voa para dentro da encosta, sem um
+aviso. A regra que fica: nao sabendo a cota, falha-se ou avisa-se, nunca se
+devolve um numero.
+
+## A autonomia nao e o percurso entre waypoints
+
+`calcularEstatisticas` conta so de waypoint a waypoint, porque e isso que a barra
+do Pilot 2 mostra e e contra esse numero que a aceleracao foi calibrada. Para a
+bateria falta a ida ate ao primeiro ponto e o regresso a casa, que numa rota que
+se afaste 4 km sao a maior parte do voo.
+
+`duracaoDoVooCompleto` soma os dois trocos e e essa que a validacao usa. A barra
+continua a mostrar o que o Pilot 2 mostra.
+
+## O que fica por confirmar no dialeto Pilot 2
+
+Este dialeto ainda nao tem um ficheiro real de referencia, ao contrario do Fly,
+que se reproduz byte a byte. Dois pontos ficam em aberto ate haver uma exportacao
+verdadeira do FlightHub 2 para o Mavic 3T:
+
+- `wpml:actionId` e numerado por grupo, e nao continuo ao longo do ficheiro como
+  no dialeto Fly. A especificacao publica diz "unico dentro do grupo", o que
+  ambas as formas cumprem;
+- `wpml:actionGroupId` vem do indice do waypoint, portanto salta numeros quando
+  ha waypoints sem accoes. E estritamente crescente e unico, que e o que a
+  especificacao pede.
+
+Nao se mexeu em nenhum dos dois: sem ficheiro de referencia, mudar seria trocar
+um palpite por outro.
+
+## Limitacoes assumidas
+
+`deslocamentoLocal` nao normaliza a diferenca de longitude, portanto um par de
+pontos de um lado e do outro do antimeridiano da a volta ao mundo em vez dos
+metros que os separam. A operacao e em Portugal continental e nao se acrescentou
+codigo para um caso que nao acontece, mas fica escrito.

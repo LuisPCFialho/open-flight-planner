@@ -274,3 +274,21 @@ describe('ida e volta no dialeto Pilot 2', () => {
     expect(rota.waypoints[0]?.altura).toBeCloseTo(415.9, 3)
   })
 })
+
+describe('ficheiro truncado', () => {
+  it('avisa quando nao ha waypoints nem ponto de descolagem, em vez de cair em (0,0)', async () => {
+    const rota = rotaDe50('mini5pro')
+    const gerado = gerarFly(rota, droneComId('mini5pro'))
+
+    // Um waylines.wpml valido mas sem nenhum Placemark, como um ficheiro que
+    // tenha ficado a meio da transferencia em obra.
+    const semPlacemarks = gerado.waylines.replace(/\s*<Placemark>[\s\S]*?<\/Placemark>/g, '')
+    const bytes = await criarKMZBytes({ template: gerado.template, waylines: semPlacemarks })
+
+    const { rota: lida, avisos } = importarKMZ(await lerKMZ(bytes), { projetoId: 'p1' })
+
+    expect(lida.waypoints).toHaveLength(0)
+    // Sem isto a rota ficava calada no Golfo da Guine.
+    expect(avisos.join(' ')).toMatch(/sem posicao conhecida|nao traz waypoints/)
+  })
+})

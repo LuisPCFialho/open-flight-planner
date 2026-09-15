@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest'
 import type { Rota } from './tipos.ts'
 import { rotaVazia, waypointNovo, acrescentarWaypoint } from './operacoes-rota.ts'
 import { deslocar } from './geodesia.ts'
-import { calcularEstatisticas, formatarDuracao, formatarDistancia } from './estatisticas.ts'
+import {
+  calcularEstatisticas,
+  duracaoDoVooCompleto,
+  formatarDuracao,
+  formatarDistancia,
+} from './estatisticas.ts'
 
 const DESCOLAGEM = { lat: 40.746552, lon: -8.41061, cotaTerreno: 361.6 }
 
@@ -127,5 +132,50 @@ describe('formatacao', () => {
 
   it('escreve a distancia com uma casa decimal', () => {
     expect(formatarDistancia(8385.24)).toBe('8385.2 m')
+  })
+})
+
+describe('velocidade impossivel', () => {
+  it('nao deixa a duracao sair infinita com velocidade zero', () => {
+    const rota = rotaEmLinha(5, 100, { velocidade: 0 })
+    const estatisticas = calcularEstatisticas(rota)
+
+    // Antes disto a barra mostrava "Infinity m NaN s" e a exportacao para o
+    // dialeto Pilot 2, que grava a duracao no ficheiro, rebentava.
+    expect(Number.isFinite(estatisticas.duracao)).toBe(true)
+    expect(formatarDuracao(estatisticas.duracao)).not.toMatch(/NaN|Infinity/)
+  })
+
+  it('tambem nao sai infinita com um unico waypoint parado', () => {
+    let rota = rotaEmLinha(3, 100, { velocidade: 10 })
+    rota = {
+      ...rota,
+      waypoints: rota.waypoints.map((w, i) => (i === 1 ? { ...w, velocidade: 0 } : w)),
+    }
+    expect(Number.isFinite(calcularEstatisticas(rota).duracao)).toBe(true)
+  })
+})
+
+describe('duracaoDoVooCompleto', () => {
+  it('conta a ida ao primeiro ponto e o regresso a casa', () => {
+    // Cinco waypoints de 200 m, todos a partir da descolagem e para nordeste.
+    const rota = rotaEmLinha(5, 200, { velocidade: 10 })
+    const soEntreWaypoints = calcularEstatisticas(rota).duracao
+    const voo = duracaoDoVooCompleto(rota)
+
+    // O primeiro waypoint esta em cima da descolagem, logo a ida e nula; o
+    // ultimo esta a 800 m, que a 10 m/s sao 80 s de regresso.
+    expect(voo - soEntreWaypoints).toBeCloseTo(80, 0)
+  })
+
+  it('nao conta regresso nenhum quando a rota acaba em pouso automatico', () => {
+    const rota = { ...rotaEmLinha(5, 200, { velocidade: 10 }), acaoFinal: 'autoLand' as const }
+    expect(duracaoDoVooCompleto(rota)).toBeCloseTo(calcularEstatisticas(rota).duracao, 6)
+  })
+
+  it('nao rebenta numa rota vazia nem com velocidade zero', () => {
+    const vazia = rotaEmLinha(0, 100)
+    expect(Number.isFinite(duracaoDoVooCompleto(vazia))).toBe(true)
+    expect(Number.isFinite(duracaoDoVooCompleto(rotaEmLinha(4, 100, { velocidade: 0 })))).toBe(true)
   })
 })

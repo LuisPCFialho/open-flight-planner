@@ -52,14 +52,24 @@ export function CampoNumerico({
     setRascunho(numero === null ? '' : numero.toFixed(casas))
   }, [numero, casas])
 
+  /**
+   * Os limites valem para todos os caminhos de entrada, nao so para o texto.
+   *
+   * Sem isto as setas e os botoes de incremento passavam por cima do minimo:
+   * bastava carregar em baixo no campo da velocidade, cujo minimo e 0,5 m/s, ate
+   * a por a zero. Dai em diante a duracao estimada saia infinita e a exportacao
+   * para o dialeto Pilot 2 rebentava com "numero invalido para WPML".
+   */
+  const limitar = (lido: number): number =>
+    Math.min(max ?? Infinity, Math.max(min ?? -Infinity, lido))
+
   const confirmar = (texto: string): void => {
     const lido = Number.parseFloat(texto.replace(',', '.'))
     if (!Number.isFinite(lido)) {
       setRascunho(numero === null ? '' : numero.toFixed(casas))
       return
     }
-    const limitado = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, lido))
-    aoAlterar(limitado)
+    aoAlterar(limitar(lido))
   }
 
   return (
@@ -89,7 +99,7 @@ export function CampoNumerico({
               e.preventDefault()
               const delta = (e.key === 'ArrowUp' ? 1 : -1) * passo * (e.shiftKey ? 10 : 1)
               if (aoIncrementar) aoIncrementar(delta)
-              else if (numero !== null) aoAlterar(numero + delta)
+              else if (numero !== null) aoAlterar(limitar(numero + delta))
             }
           }}
         />
@@ -105,7 +115,7 @@ export function CampoNumerico({
                 title={`${delta > 0 ? '+' : ''}${delta}${unidade ?? ''} a cada um`}
                 onClick={() => {
                   if (aoIncrementar) aoIncrementar(delta)
-                  else if (numero !== null) aoAlterar(numero + delta)
+                  else if (numero !== null) aoAlterar(limitar(numero + delta))
                 }}
               >
                 {delta > 0 ? `+${delta}` : delta}

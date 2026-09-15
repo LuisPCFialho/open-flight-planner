@@ -209,3 +209,109 @@ describe('fonte composta', () => {
     expect(new Set(cotas).size).toBeGreaterThan(1)
   })
 })
+
+describe('POLYLINE classica sem cota legivel', () => {
+  const base = wgs84ParaPtTm06({ lat: 40.75, lon: -8.41 })
+
+  /**
+   * DXF com uma POLYLINE ao estilo antigo: a cota vive no grupo 30 da entidade e
+   * os vertices vao a zero. O dxf-parser le esse grupo e deita-o fora, pelo que a
+   * cota real nunca chega ate nos.
+   */
+  function dxfComPolylineAntiga(cotaDaEntidade: number): string {
+    const vertice = (x: number, y: number): string =>
+      ['0', 'VERTEX', '8', 'CURVAS', '10', String(x), '20', String(y), '30', '0'].join('\n')
+
+    return [
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'POLYLINE', '8', 'CURVAS', '30', String(cotaDaEntidade), '70', '8',
+      vertice(base.x, base.y),
+      vertice(base.x + 50, base.y),
+      vertice(base.x + 100, base.y + 50),
+      '0', 'SEQEND',
+      '0', 'ENDSEC', '0', 'EOF', '',
+    ].join('\n')
+  }
+
+  it('recusa o ficheiro quando todas as cotas sairam a zero', () => {
+    // Sem isto a curva de nivel inteira entrava como estando ao nivel do mar, e
+    // uma rota em AGL por cima dela voava dezenas de metros abaixo do previsto.
+    expect(() => lerDXF(dxfComPolylineAntiga(420))).toThrow(DXFSemCotas)
+    expect(() => lerDXF(dxfComPolylineAntiga(420))).toThrow(/zero/)
+  })
+
+  it('avisa da polilinha sem cota quando o resto do ficheiro tem cotas boas', () => {
+    const boa = escreverDXFdeEnsaio([
+      {
+        a: { x: base.x, y: base.y, z: 300 },
+        b: { x: base.x + 100, y: base.y, z: 310 },
+        c: { x: base.x, y: base.y + 100, z: 320 },
+      },
+    ])
+
+    // Junta a superficie boa com a polilinha antiga, num so ficheiro.
+    const misturado = boa.replace(
+      '0\nENDSEC',
+      dxfComPolylineAntiga(420).split('2\nENTITIES\n')[1]?.replace('0\nENDSEC\n0\nEOF\n', '') +
+        '0\nENDSEC',
+    )
+
+    const lida = lerDXF(misturado)
+    expect(lida.triangulos.length).toBeGreaterThan(0)
+    expect(lida.avisos.join(' ')).toMatch(/POLYLINE/)
+  })
+
+  it('nao inventa avisos num ficheiro bem formado', () => {
+    const bom = escreverDXFdeEnsaio([
+      {
+        a: { x: base.x, y: base.y, z: 300 },
+        b: { x: base.x + 100, y: base.y, z: 310 },
+        c: { x: base.x, y: base.y + 100, z: 320 },
+      },
+    ])
+    expect(lerDXF(bom).avisos).toEqual([])
+  })
+})
+
+describe('fonte composta com uma fonte publica sem leitura em lote', () => {
+  const base = wgs84ParaPtTm06({ lat: 40.75, lon: -8.41 })
+
+  /** `cotas` e opcional na interface: esta fonte so sabe responder ponto a ponto. */
+  const soPontoAPonto: FonteTerreno = {
+    origem: 'terrarium',
+    cobre: () => true,
+    cota: async () => 999,
+    perfil: async (pontos) => pontos.map(() => 999),
+  }
+
+  function composta(): FonteComposta {
+    const dxf = escreverDXFdeEnsaio([
+      {
+        a: { x: base.x, y: base.y, z: 300 },
+        b: { x: base.x + 100, y: base.y, z: 300 },
+        c: { x: base.x, y: base.y + 100, z: 300 },
+      },
+    ])
+    return new FonteComposta(new FonteTerrenoDXF(lerDXF(dxf)), soPontoAPonto)
+  }
+
+  it('nao devolve zero para os pontos fora do levantamento', async () => {
+    // O `?.` em `publica.cotas?.()` devolvia `undefined` e cada ponto fora da
+    // area do DXF acabava com cota zero. Zero le-se como uma cota plausivel, e
+    // uma rota em AGL sobre terreno dado ao nivel do mar voa contra a encosta.
+    const inicio = ptTm06ParaWgs84({ x: base.x + 5000, y: base.y })
+    const fim = ptTm06ParaWgs84({ x: base.x + 5300, y: base.y })
+
+    const cotas = await composta().perfil([inicio, fim], 100)
+    expect(cotas.length).toBeGreaterThan(1)
+    expect(cotas.every((c) => c === 999)).toBe(true)
+  })
+
+  it('continua a preferir o levantamento onde ele existe', async () => {
+    const dentro = ptTm06ParaWgs84({ x: base.x + 20, y: base.y + 20 })
+    const aindaDentro = ptTm06ParaWgs84({ x: base.x + 30, y: base.y + 20 })
+
+    const cotas = await composta().perfil([dentro, aindaDentro], 5)
+    expect(cotas.every((c) => Math.abs(c - 300) < 0.01)).toBe(true)
+  })
+})

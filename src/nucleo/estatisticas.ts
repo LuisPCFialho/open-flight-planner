@@ -63,7 +63,16 @@ export function calcularEstatisticas(
     horizontal += distancia(anterior, waypoint)
     const troco = distancia3D(anterior, anterior.altura, waypoint, waypoint.altura)
     obliqua += troco
-    duracao += troco / velocidadeDe(rota, waypoint)
+
+    /*
+     * Uma velocidade nula ou negativa nao tem duracao que se estime, e dividir
+     * por ela punha um Infinity a alastrar: a barra mostrava "Infinity m NaN s"
+     * e a exportacao para Pilot 2, que escreve a duracao no ficheiro, rebentava
+     * com "numero invalido para WPML". O troco passa a nao contar para o tempo e
+     * quem reporta o problema e `validarVelocidades`, que o diz pelo nome.
+     */
+    const velocidade = velocidadeDe(rota, waypoint)
+    if (velocidade > 0) duracao += troco / velocidade
   }
 
   return {
@@ -73,6 +82,33 @@ export function calcularEstatisticas(
     numeroWaypoints: waypoints.length,
     numeroFotos: fotos,
   }
+}
+
+/**
+ * Duracao do voo inteiro, da descolagem ao pouso, em segundos.
+ *
+ * `calcularEstatisticas` conta so o que vai de waypoint a waypoint, porque e
+ * isso que a barra do Pilot 2 mostra e e contra esse numero que a aceleracao foi
+ * calibrada. Para a bateria isso nao chega: falta a ida ate ao primeiro ponto e
+ * o regresso a casa no fim, e numa rota que se afaste 4 km sao esses dois trocos
+ * que decidem se o aparelho volta.
+ *
+ * O calculo e grosseiro de proposito - distancia horizontal a velocidade global,
+ * sem subida nem vento - porque so serve para decidir se ha folga de bateria.
+ */
+export function duracaoDoVooCompleto(rota: Rota): number {
+  const base = calcularEstatisticas(rota).duracao
+  const primeiro = rota.waypoints[0]
+  const ultimo = rota.waypoints.at(-1)
+  if (!primeiro || !ultimo || !(rota.velocidadeGlobal > 0)) return base
+
+  const ida = distancia(rota.pontoDescolagem, primeiro)
+
+  let volta = 0
+  if (rota.acaoFinal === 'goHome') volta = distancia(ultimo, rota.pontoDescolagem)
+  else if (rota.acaoFinal === 'gotoFirstWaypoint') volta = distancia(ultimo, primeiro)
+
+  return base + (ida + volta) / rota.velocidadeGlobal
 }
 
 /** Formata segundos como o Pilot 2 os mostra: `23 m 27 s`. */

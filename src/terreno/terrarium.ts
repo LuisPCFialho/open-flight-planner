@@ -36,6 +36,14 @@ export type OpcoesTerrarium = {
   maxMosaicos?: number
   /** Injectavel para testar sem rede. */
   buscar?: typeof fetch
+  /**
+   * Tempo maximo por mosaico, em milissegundos.
+   *
+   * Existe porque isto corre em obra: numa ligacao que fica pendurada sem nunca
+   * responder, a validacao da rota ficava a espera para sempre e nao havia forma
+   * de saber que estava. Mais vale falhar e dizer que nao ha dados.
+   */
+  tempoLimiteMs?: number
 }
 
 type Mosaico = { pixels: Uint8ClampedArray; largura: number; altura: number }
@@ -48,6 +56,7 @@ export class FonteTerrariumAWS implements FonteTerreno {
   readonly #urlBase: string
   readonly #maxMosaicos: number
   readonly #buscar: typeof fetch
+  readonly #tempoLimiteMs: number
   /** Chave `z/x/y`. Guarda a promessa para nao pedir o mesmo mosaico duas vezes. */
   readonly #cache = new Map<string, Promise<Mosaico>>()
   /**
@@ -66,6 +75,7 @@ export class FonteTerrariumAWS implements FonteTerreno {
     this.#urlBase = opcoes.urlBase ?? URL_BASE_PREDEFINIDA
     this.#maxMosaicos = opcoes.maxMosaicos ?? 200
     this.#buscar = opcoes.buscar ?? globalThis.fetch.bind(globalThis)
+    this.#tempoLimiteMs = opcoes.tempoLimiteMs ?? 15000
   }
 
   /** Global, excepto nas calotes fora do alcance da projecao. */
@@ -237,7 +247,16 @@ export class FonteTerrariumAWS implements FonteTerreno {
 
     const promessa = this.#descarregar(chave)
       .then((mosaico) => {
-        this.#resolvidos.set(chave, mosaico)
+        /*
+         * So entra na leitura sincrona se ainda estiver em cache.
+         *
+         * Um lote de pedidos maior do que o limite de mosaicos despeja chaves
+         * cujo descarregamento ainda esta a decorrer. Sem esta verificacao, a
+         * promessa resolvia mais tarde e reinseria o mosaico num sitio que a
+         * limpeza ja nao alcanca, porque a limpeza percorre `#cache`: a memoria
+         * crescia sem tecto numa sessao longa de planeamento.
+         */
+        if (this.#cache.has(chave)) this.#resolvidos.set(chave, mosaico)
         return mosaico
       })
       .catch((erro: unknown) => {
@@ -258,11 +277,25 @@ export class FonteTerrariumAWS implements FonteTerreno {
 
   async #descarregar(chave: string): Promise<Mosaico> {
     const url = `${this.#urlBase}/${chave}.png`
-    const resposta = await this.#buscar(url)
-    if (!resposta.ok) {
-      throw new Error(`mosaico de terreno ${chave} indisponivel (HTTP ${resposta.status})`)
+    const controlo = new AbortController()
+    const alarme = setTimeout(() => controlo.abort(), this.#tempoLimiteMs)
+
+    try {
+      const resposta = await this.#buscar(url, { signal: controlo.signal })
+      if (!resposta.ok) {
+        throw new Error(`mosaico de terreno ${chave} indisponivel (HTTP ${resposta.status})`)
+      }
+      const imagem: ImagemRGBA = await this.#descodificador(await resposta.arrayBuffer())
+      return { pixels: imagem.pixels, largura: imagem.largura, altura: imagem.altura }
+    } catch (causa: unknown) {
+      if (causa instanceof Error && causa.name === 'AbortError') {
+        throw new Error(
+          `mosaico de terreno ${chave} sem resposta ao fim de ${this.#tempoLimiteMs / 1000} s`,
+        )
+      }
+      throw causa
+    } finally {
+      clearTimeout(alarme)
     }
-    const imagem: ImagemRGBA = await this.#descodificador(await resposta.arrayBuffer())
-    return { pixels: imagem.pixels, largura: imagem.largura, altura: imagem.altura }
   }
 }

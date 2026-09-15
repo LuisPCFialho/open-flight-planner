@@ -25,6 +25,8 @@ export type Topografia = {
   triangulos: TrianguloCotado[]
   /** Camadas encontradas com cotas, para se saber o que foi lido. */
   camadas: string[]
+  /** O que ficou por ler ou merece desconfianca, para mostrar a quem importa. */
+  avisos: string[]
   /** Envolvente em WGS84. */
   limites: { latMin: number; latMax: number; lonMin: number; lonMax: number } | null
 }
@@ -49,6 +51,7 @@ export function lerDXF(fonte: string): Topografia {
   const pontos: PontoCotado[] = []
   const triangulos: TrianguloCotado[] = []
   const camadas = new Set<string>()
+  let polilinhasSemCota = 0
 
   const converter = (vertice: VerticeDXF, cotaAlternativa?: number): PontoCotado | null => {
     if (!Number.isFinite(vertice.x) || !Number.isFinite(vertice.y)) return null
@@ -79,8 +82,26 @@ export function lerDXF(fonte: string): Topografia {
 
       case 'POLYLINE':
       case 'LWPOLYLINE': {
-        // Numa curva de nivel a cota vive na elevacao da polilinha, nao nos vertices.
-        for (const vertice of entidade.vertices ?? []) {
+        /*
+         * Numa curva de nivel a cota vive na elevacao da polilinha, nao nos
+         * vertices - mas so a LWPOLYLINE a traz ate aqui. Na POLYLINE classica,
+         * dos DXF antigos, o dxf-parser le o grupo 30 e deita-o fora, pelo que
+         * `elevation` chega sempre indefinida. Quando isso acontece e os
+         * vertices estao todos a z=0, a cota real perdeu-se pelo caminho: aceita-la
+         * poria a curva ao nivel do mar e uma rota em AGL por cima dela voaria
+         * dezenas de metros abaixo do que era suposto. Conta-se para se dizer.
+         */
+        const vertices = entidade.vertices ?? []
+        if (
+          entidade.type === 'POLYLINE' &&
+          entidade.elevation === undefined &&
+          vertices.length > 0 &&
+          vertices.every((v) => !v.z)
+        ) {
+          polilinhasSemCota++
+        }
+
+        for (const vertice of vertices) {
           const ponto = converter(vertice, entidade.elevation)
           if (ponto) {
             pontos.push(ponto)
@@ -110,7 +131,28 @@ export function lerDXF(fonte: string): Topografia {
     )
   }
 
-  return { pontos, triangulos, camadas: [...camadas].sort(), limites: envolvente(pontos, triangulos) }
+  // Um levantamento inteiro ao nivel do mar nao existe: o que existe e a cota
+  // ter-se perdido na leitura. Mais vale recusar do que planear por cima disto.
+  if (pontos.length > 0 && triangulos.length === 0 && pontos.every((p) => p.cota === 0)) {
+    throw new DXFSemCotas(
+      'todas as cotas do DXF sao zero, o que quer dizer que se perderam na leitura. Grava as curvas de nivel como LWPOLYLINE, ou a superficie como 3DFACE.',
+    )
+  }
+
+  const avisos =
+    polilinhasSemCota > 0
+      ? [
+          `${polilinhasSemCota} polilinha${polilinhasSemCota === 1 ? '' : 's'} do tipo POLYLINE sem cota nos vertices: a elevacao da entidade nao e legivel neste formato e essas curvas de nivel ficaram a zero. Grava-as como LWPOLYLINE.`,
+        ]
+      : []
+
+  return {
+    pontos,
+    triangulos,
+    camadas: [...camadas].sort(),
+    avisos,
+    limites: envolvente(pontos, triangulos),
+  }
 }
 
 function mesmoPonto(a: PontoCotado, b: PontoCotado): boolean {

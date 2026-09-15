@@ -82,7 +82,7 @@ export function importarKMZ(
 
   const takeOffRef = textoEm(config, 'wpml:takeOffRefPoint')
   const ondulacao = 55.6
-  const descolagem = lerPontoDescolagem(takeOffRef, waypoints, ondulacao)
+  const descolagem = lerPontoDescolagem(takeOffRef, waypoints, ondulacao, avisos)
   const cotaDescolagemConhecida = descolagem.cotaTerreno !== null
 
   const agora = Date.now()
@@ -124,6 +124,7 @@ function lerPontoDescolagem(
   takeOffRef: string | undefined,
   waypoints: readonly Waypoint[],
   ondulacao: number,
+  avisos: string[],
 ): { lat: number; lon: number; cotaTerreno: number | null } {
   if (takeOffRef) {
     const [lat, lon, hae] = takeOffRef.split(',').map((p) => Number.parseFloat(p.trim()))
@@ -138,7 +139,15 @@ function lerPontoDescolagem(
   }
 
   const primeiro = waypoints[0]
-  return { lat: primeiro?.lat ?? 0, lon: primeiro?.lon ?? 0, cotaTerreno: null }
+  if (!primeiro) {
+    // Sem waypoints e sem `takeOffRefPoint` nao ha de onde tirar a descolagem, e
+    // o zero por omissao poe a rota no Golfo da Guine sem ninguem dar por isso.
+    avisos.push(
+      'o ficheiro nao traz waypoints nem ponto de descolagem: a rota fica sem posicao conhecida',
+    )
+    return { lat: 0, lon: 0, cotaTerreno: null }
+  }
+  return { lat: primeiro.lat, lon: primeiro.lon, cotaTerreno: null }
 }
 
 const CURVA_DE: Record<string, TipoCurva> = {

@@ -14,6 +14,7 @@ import {
   rotaVazia,
   waypointNovo,
 } from './nucleo/operacoes-rota.ts'
+import { novoId } from './nucleo/ids.ts'
 import {
   acrescentarAccaoEmLote,
   alterarAccao,
@@ -147,6 +148,10 @@ export function App() {
         droneId: 'mini5pro',
         pontoDescolagem: { ...CENTRO_INICIAL, cotaTerreno: cotaDescolagem },
       })
+      // A verificacao vem antes da escrita, e nao depois: em modo estrito o
+      // React corre este efeito duas vezes, e gravar primeiro deixava na base de
+      // dados uma rota vazia orfa por cada projeto aberto pela primeira vez.
+      if (cancelado) return
       await gravarRota(nova)
       if (!cancelado) {
         carregar(nova)
@@ -168,12 +173,51 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregar, projetoAberto, rotaAberta])
 
-  // --- persistencia, com folga para nao gravar a cada pixel de arrasto -------
+  /*
+   * Persistencia, com folga para nao gravar a cada pixel de arrasto.
+   *
+   * A folga de 400 ms tinha um buraco: trocar de rota dentro desse intervalo
+   * cancelava o temporizador e a ultima edicao nunca chegava a ser pedida a base
+   * de dados. Nao havia promessa rejeitada, nao havia erro, a alteracao estava no
+   * ecra - e ao reabrir a rota tinha desaparecido. A rota pendente fica agora num
+   * `ref` para poder ser gravada a pedido, e nao so por tempo.
+   */
+  const porGravar = useRef<Rota | null>(null)
+
   useEffect(() => {
     if (!rota) return
-    const temporizador = setTimeout(() => void gravarRota(rota), 400)
+    porGravar.current = rota
+    const temporizador = setTimeout(() => {
+      porGravar.current = null
+      void gravarRota(rota)
+    }, 400)
     return () => clearTimeout(temporizador)
   }, [rota])
+
+  /** Grava ja o que estiver pendente. Chama-se antes de trocar de rota. */
+  const gravarPendente = useCallback(() => {
+    const pendente = porGravar.current
+    if (!pendente) return
+    porGravar.current = null
+    void gravarRota(pendente)
+  }, [])
+
+  /*
+   * Fechar o separador ou recarregar a pagina dentro da folga perdia a edicao
+   * pela mesma razao. `visibilitychange` e o unico momento em que o browser
+   * garante que ainda ha tempo de escrever; `beforeunload` ja nao o garante.
+   */
+  useEffect(() => {
+    const aoEsconder = (): void => {
+      if (document.visibilityState === 'hidden') gravarPendente()
+    }
+    document.addEventListener('visibilitychange', aoEsconder)
+    window.addEventListener('pagehide', gravarPendente)
+    return () => {
+      document.removeEventListener('visibilitychange', aoEsconder)
+      window.removeEventListener('pagehide', gravarPendente)
+    }
+  }, [gravarPendente])
 
   // --- cotas do terreno -----------------------------------------------------
   const posicoes = useMemo(() => {
@@ -265,23 +309,34 @@ export function App() {
 
   const voo = useVooVirtual({
     aoGravarWaypoint: (estadoVoo: EstadoVoo) => {
-      aplicar((atual) => {
-        const novo = waypointNovo({
-          lat: estadoVoo.posicao.lat,
-          lon: estadoVoo.posicao.lon,
-          altura: estadoVoo.altura,
-          index: atual.waypoints.length,
-        })
-        ultimoGravado.current = novo.id
-        // O waypoint fica com a atitude em que a aeronave estava, que e a razao
-        // de ser do voo virtual: enquadra-se e grava-se o que se esta a ver.
-        return acrescentarWaypoint(atual, {
-          ...novo,
+      /*
+       * O identificador nasce aqui fora, e nao dentro do updater.
+       *
+       * O React invoca os updaters duas vezes em modo estrito, e cada invocacao
+       * gerava um identificador novo: o `ref` acabava a apontar para um waypoint
+       * que nao era o que ficara na rota, e o Shift+F seguinte punha a foto num
+       * waypoint inexistente, em silencio. E o mesmo defeito que ja tinha feito
+       * o Shift+Espaco gravar dois waypoints, agora do lado da escrita.
+       */
+      const id = novoId()
+      ultimoGravado.current = id
+
+      aplicar((atual) =>
+        acrescentarWaypoint(atual, {
+          ...waypointNovo({
+            lat: estadoVoo.posicao.lat,
+            lon: estadoVoo.posicao.lon,
+            altura: estadoVoo.altura,
+            index: atual.waypoints.length,
+          }),
+          id,
+          // O waypoint fica com a atitude em que a aeronave estava, que e a razao
+          // de ser do voo virtual: enquadra-se e grava-se o que se esta a ver.
           gimbalPitch: estadoVoo.gimbalPitch,
           modoGuinada: 'fixed',
           guinada: estadoVoo.guinada,
-        })
-      })
+        }),
+      )
     },
     aoInserirFoto: () => {
       const id = ultimoGravado.current
@@ -529,6 +584,7 @@ export function App() {
           <SelectorRota
             rota={rota}
             aoAbrir={(id) => {
+              gravarPendente()
               voo.parar()
               seleccao.limpar()
               setRotaAberta(id)
@@ -538,6 +594,8 @@ export function App() {
               editor.alterarRota({ nome })
             }}
             aoCriar={() => {
+              gravarPendente()
+              voo.parar()
               tentar(
                 criarRota({
                   nome: `Rota ${new Date().toLocaleDateString('pt-PT')}`,
@@ -552,12 +610,18 @@ export function App() {
               )
             }}
             aoDuplicar={() => {
+              gravarPendente()
+              voo.parar()
               tentar(duplicarRota(rota.id), (copia) => {
                 seleccao.limpar()
                 setRotaAberta(copia.id)
               })
             }}
             aoApagar={() => {
+              // Nada de gravar o que se vai apagar: a gravacao pendente e desta
+              // rota, e deixa-la correr podia repo-la depois de apagada.
+              porGravar.current = null
+              voo.parar()
               tentar(
                 apagarRota(rota.id).then(() =>
                   bd.rotas.where('projetoId').equals(rota.projetoId).toArray(),
@@ -585,6 +649,8 @@ export function App() {
                 : null
             }
             aoImportar={(importada) => {
+              gravarPendente()
+              voo.parar()
               carregar(importada.rota)
               seleccao.limpar()
             }}
@@ -593,6 +659,7 @@ export function App() {
             type="button"
             title="Voltar a lista de projetos"
             onClick={() => {
+              gravarPendente()
               voo.parar()
               setRotaAberta(null)
               setProjetoAberto(null)
@@ -640,15 +707,24 @@ export function App() {
             title="Exportar KML para o Google Earth"
             disabled={rota.waypoints.length === 0}
             onClick={() => {
-              const texto = exportarKML(rota, { cotas, chave: chaveDaPosicao })
-              const url = URL.createObjectURL(new Blob([texto], { type: 'application/vnd.google-earth.kml+xml' }))
-              const ligacao = document.createElement('a')
-              ligacao.href = url
-              ligacao.download = `${rota.nome.replace(/[^\w-]+/g, '-').toLowerCase()}.kml`
-              document.body.appendChild(ligacao)
-              ligacao.click()
-              ligacao.remove()
-              setTimeout(() => URL.revokeObjectURL(url), 1000)
+              // Uma excepcao aqui dentro sairia de um `onClick` sem ninguem a
+              // apanha-la, e o que o utilizador via era o botao a nao fazer nada.
+              try {
+                const texto = exportarKML(rota, { cotas, chave: chaveDaPosicao })
+                const url = URL.createObjectURL(
+                  new Blob([texto], { type: 'application/vnd.google-earth.kml+xml' }),
+                )
+                const ligacao = document.createElement('a')
+                ligacao.href = url
+                ligacao.download = `${rota.nome.replace(/[^\w-]+/g, '-').toLowerCase()}.kml`
+                document.body.appendChild(ligacao)
+                ligacao.click()
+                ligacao.remove()
+                setTimeout(() => URL.revokeObjectURL(url), 1000)
+                setFalha(null)
+              } catch (causa: unknown) {
+                setFalha(causa instanceof Error ? causa.message : 'falha a exportar o KML')
+              }
             }}
           >
             KML

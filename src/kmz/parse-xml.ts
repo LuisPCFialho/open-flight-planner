@@ -5,8 +5,11 @@ import type { No, Texto } from './xml.ts'
  *
  * Proprio, e nao `DOMParser`, por dois motivos: os testes correm em Node, onde
  * `DOMParser` nao existe, e o mesmo codigo tem de ler os ficheiros no browser.
- * Cobre o que o WPML usa e nada mais: elementos, texto, atributos, comentarios e
- * a declaracao. Nao ha entidades personalizadas nem CDATA nestes ficheiros.
+ * Cobre elementos, texto, atributos, comentarios, CDATA e a declaracao.
+ *
+ * O CDATA e o `>` dentro de aspas nao aparecem no WPML da DJI, mas este mesmo
+ * leitor serve `importarKML`, que le KML de fora - do Google Earth ou de um
+ * topografo - onde um `<description>` com HTML dentro de CDATA e corrente.
  */
 
 export type NoLido = {
@@ -26,12 +29,38 @@ const ENTIDADES: Record<string, string> = {
 
 function desescapar(texto: string): string {
   return texto.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (todo, corpo: string) => {
-    if (corpo.startsWith('#x') || corpo.startsWith('#X')) {
-      return String.fromCodePoint(Number.parseInt(corpo.slice(2), 16))
-    }
-    if (corpo.startsWith('#')) return String.fromCodePoint(Number.parseInt(corpo.slice(1), 10))
-    return ENTIDADES[corpo] ?? todo
+    const codigo = corpo.startsWith('#x') || corpo.startsWith('#X')
+      ? Number.parseInt(corpo.slice(2), 16)
+      : corpo.startsWith('#')
+        ? Number.parseInt(corpo.slice(1), 10)
+        : null
+
+    if (codigo === null) return ENTIDADES[corpo] ?? todo
+    // Fora da gama Unicode, `fromCodePoint` atira um RangeError cru. Mais vale
+    // deixar a entidade como esta do que rebentar a leitura do ficheiro todo.
+    if (!Number.isFinite(codigo) || codigo < 0 || codigo > 0x10ffff) return todo
+    return String.fromCodePoint(codigo)
   })
+}
+
+/**
+ * Posicao do `>` que fecha a etiqueta, ignorando os que estejam dentro de aspas.
+ *
+ * `<Document id="a>b">` e XML valido, e procurar o primeiro `>` cortava a
+ * etiqueta a meio: o atributo desaparecia e o resto entrava como texto.
+ */
+function fimDaEtiqueta(fonte: string, inicio: number): number {
+  let aspas: string | null = null
+  for (let i = inicio; i < fonte.length; i++) {
+    const caracter = fonte[i]
+    if (aspas !== null) {
+      if (caracter === aspas) aspas = null
+      continue
+    }
+    if (caracter === '"' || caracter === "'") aspas = caracter
+    else if (caracter === '>') return i
+  }
+  return -1
 }
 
 export function lerXML(fonte: string): NoLido {
@@ -57,14 +86,32 @@ export function lerXML(fonte: string): NoLido {
       if (conteudo && actual !== undefined) actual.texto += desescapar(conteudo)
     }
 
+    // CDATA: o conteudo e texto cru, sem entidades a desescapar.
+    if (fonte.startsWith('<![CDATA[', abertura)) {
+      const fim = fonte.indexOf(']]>', abertura)
+      if (fim === -1) throw new Error('XML mal formado: CDATA sem fecho')
+      const actual = pilha.at(-1)
+      if (actual !== undefined) actual.texto += fonte.slice(abertura + 9, fim)
+      posicao = fim + 3
+      continue
+    }
+
+    // Comentario: acaba em `-->` e nao no primeiro `>`, que pode estar la dentro.
+    if (fonte.startsWith('<!--', abertura)) {
+      const fim = fonte.indexOf('-->', abertura)
+      if (fim === -1) throw new Error('XML mal formado: comentario sem fecho')
+      posicao = fim + 3
+      continue
+    }
+
     if (fonte.startsWith('<?', abertura) || fonte.startsWith('<!', abertura)) {
-      const fim = fonte.indexOf('>', abertura)
+      const fim = fimDaEtiqueta(fonte, abertura)
       if (fim === -1) break
       posicao = fim + 1
       continue
     }
 
-    const fecho = fonte.indexOf('>', abertura)
+    const fecho = fimDaEtiqueta(fonte, abertura)
     if (fecho === -1) throw new Error('XML mal formado: etiqueta sem fecho')
     const interior = fonte.slice(abertura + 1, fecho).trim()
 

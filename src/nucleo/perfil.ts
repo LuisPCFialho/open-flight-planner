@@ -141,8 +141,10 @@ export function calcularPerfil(
     amostras,
     waypoints: marcas,
     percursoTotal: amostras.at(-1)?.percurso ?? 0,
-    cotaMinima: Math.min(...cotas),
-    cotaMaxima: Math.max(...cotas),
+    // Com a lista vazia, `Math.min()` da Infinity e `Math.max()` da -Infinity.
+    // Os dois campos abaixo ja tinham esta guarda; estes dois nao tinham.
+    cotaMinima: cotas.length > 0 ? Math.min(...cotas) : 0,
+    cotaMaxima: cotas.length > 0 ? Math.max(...cotas) : 0,
     aglMinimo: agls.length > 0 ? Math.min(...agls) : 0,
     aglMaximo: agls.length > 0 ? Math.max(...agls) : 0,
   }

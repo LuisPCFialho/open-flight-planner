@@ -170,7 +170,11 @@ function placemarkTemplate(rota: Rota, waypoint: Waypoint, opcoes: OpcoesPilot2)
     valor('wpml:useGlobalTurnParam', 0),
     no('wpml:waypointTurnParam', [
       valor('wpml:waypointTurnMode', MODO_CURVA[waypoint.tipoCurva]),
-      valor('wpml:waypointTurnDampingDist', 0),
+      // O dialeto Fly ja escrevia este valor e o leitor ja o trazia de volta;
+      // aqui estava preso a zero, e uma rota de curvas suaves planeada para um
+      // Mavic 3T saia sem suavizacao nenhuma - a aeronave virava apertada em
+      // cada ponto em vez de fazer a curva que se tinha desenhado.
+      valor('wpml:waypointTurnDampingDist', Math.round(waypoint.distanciaAmortecimento)),
     ]),
     valor('wpml:useStraightLine', waypoint.tipoCurva === 'pararNoPonto' ? 0 : 1),
     no('wpml:waypointGimbalHeadingParam', [
@@ -213,7 +217,7 @@ function placemarkWaylines(rota: Rota, waypoint: Waypoint, opcoes: OpcoesPilot2)
     parametrosGuinada(rota, waypoint, poi, opcoes),
     no('wpml:waypointTurnParam', [
       valor('wpml:waypointTurnMode', MODO_CURVA[waypoint.tipoCurva]),
-      valor('wpml:waypointTurnDampingDist', 0),
+      valor('wpml:waypointTurnDampingDist', Math.round(waypoint.distanciaAmortecimento)),
     ]),
     valor('wpml:useStraightLine', waypoint.tipoCurva === 'pararNoPonto' ? 0 : 1),
     ...grupoDeAccoes(waypoint),
@@ -255,6 +259,14 @@ function parametrosGuinada(
   opcoes: OpcoesPilot2,
 ): No {
   const apontaPOI = waypoint.modoGuinada === 'towardPOI' && poi !== undefined
+
+  // Ver a nota igual no dialeto Fly: alvo em `0,0,0` com o modo `towardPOI` e um
+  // ficheiro incoerente que o aparelho aceita sem se queixar.
+  if (waypoint.modoGuinada === 'towardPOI' && !poi) {
+    throw new Error(
+      `o waypoint ${waypoint.index + 1} aponta a um ponto de interesse que nao existe na rota`,
+    )
+  }
 
   return no('wpml:waypointHeadingParam', [
     valor('wpml:waypointHeadingMode', MODO_GUINADA[waypoint.modoGuinada]),

@@ -1,7 +1,8 @@
 import type { Drone, LatLon, Rota } from './tipos.ts'
 import { distancia, paraASL } from './geodesia.ts'
-import { calcularEstatisticas, formatarDuracao } from './estatisticas.ts'
+import { duracaoDoVooCompleto, formatarDuracao } from './estatisticas.ts'
 import { accoesNaoSuportadas, NOME_DA_ACCAO } from './operacoes-accoes.ts'
+import { velocidadeDe } from './operacoes-rota.ts'
 import { interpolarAltura, percursoDosWaypoints } from './perfil.ts'
 import { waypointsComPOIPerdido } from './operacoes-poi.ts'
 
@@ -65,6 +66,7 @@ export function validarRota(rota: Rota, drone: Drone, contexto: ContextoValidaca
   return [
     ...validarAlturaAcimaDoSolo(rota, contexto),
     ...validarColisaoNosTrocos(rota, contexto),
+    ...validarVelocidades(rota, drone),
     ...validarAfastamento(rota),
     ...validarAutonomia(rota, drone),
     ...validarAccoes(rota, drone),
@@ -136,7 +138,26 @@ function validarAlturaAcimaDoSolo(rota: Rota, contexto: ContextoValidacao): Vali
  * com os dois waypoints folgados, e e por isso que nao chega validar os pontos.
  */
 function validarColisaoNosTrocos(rota: Rota, contexto: ContextoValidacao): Validacao[] {
-  if (!contexto.perfil || rota.waypoints.length < 2) return []
+  if (rota.waypoints.length < 2) return []
+
+  /*
+   * Sem perfil nao ha como verificar o que se passa entre waypoints, e calar-se
+   * seria dar a rota por boa. Os waypoints podem estar todos folgados e o troco
+   * entre dois deles ir contra um cabeco, que e precisamente o caso que esta
+   * verificacao existe para apanhar. Fica aviso e nao erro porque e uma janela
+   * passageira: o perfil chega assim que o motor de terreno responde.
+   */
+  if (!contexto.perfil) {
+    return [
+      {
+        id: 'colisao-por-verificar',
+        severidade: 'aviso',
+        titulo: 'A folga entre waypoints ainda nao foi verificada',
+        detalhe:
+          'Falta o perfil do terreno ao longo do percurso. Os waypoints podem estar folgados e um troco entre eles passar dentro do terreno.',
+      },
+    ]
+  }
 
   const { pontos, cotas } = contexto.perfil
   if (pontos.length !== cotas.length || pontos.length === 0) return []
@@ -211,6 +232,57 @@ function validarAfastamento(rota: Rota): Validacao[] {
   ]
 }
 
+/**
+ * Velocidades fora do que e voavel.
+ *
+ * Uma velocidade nula ou negativa nao e so absurda: a duracao estimada deixa de
+ * ter valor e o dialeto Pilot 2, que escreve a duracao dentro do ficheiro,
+ * recusa-se a gerar. Vale a pena dize-lo aqui, pelo nome, e nao deixar a
+ * exportacao rebentar com uma mensagem sobre XML.
+ */
+function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
+  const validacoes: Validacao[] = []
+
+  if (!(rota.velocidadeGlobal > 0)) {
+    validacoes.push({
+      id: 'velocidade-global-invalida',
+      severidade: 'erro',
+      titulo: 'A velocidade global da rota nao e voavel',
+      detalhe: `Esta a ${rota.velocidadeGlobal} m/s. Tem de ser maior do que zero.`,
+    })
+  }
+
+  const parados = rota.waypoints.filter((w) => w.velocidade !== undefined && !(w.velocidade > 0))
+  if (parados.length > 0) {
+    validacoes.push({
+      id: 'velocidade-waypoint-invalida',
+      severidade: 'erro',
+      titulo: `${parados.length} waypoint${parados.length === 1 ? '' : 's'} com velocidade nao voavel`,
+      detalhe: 'A velocidade propria de um waypoint tem de ser maior do que zero.',
+      waypoints: parados.map((w) => w.index),
+    })
+  }
+
+  const maxima = drone.velocidadeMaxWaypoint
+  if (maxima !== undefined) {
+    const rapidos = rota.waypoints.filter((w) => velocidadeDe(rota, w) > maxima)
+    if (rapidos.length > 0 || rota.velocidadeGlobal > maxima) {
+      validacoes.push({
+        id: 'velocidade-acima-do-maximo',
+        severidade: 'erro',
+        titulo: `Velocidade acima dos ${maxima} m/s do ${drone.nome}`,
+        detalhe:
+          rapidos.length > 0
+            ? `Afecta ${rapidos.length} waypoint${rapidos.length === 1 ? '' : 's'}.`
+            : 'A velocidade global da rota esta acima do maximo do aparelho.',
+        ...(rapidos.length > 0 ? { waypoints: rapidos.map((w) => w.index) } : {}),
+      })
+    }
+  }
+
+  return validacoes
+}
+
 function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
   const autonomia = drone.autonomiaMinutos
   if (autonomia === undefined) {
@@ -225,7 +297,9 @@ function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
     ]
   }
 
-  const { duracao } = calcularEstatisticas(rota)
+  // O voo completo, com a ida ao primeiro ponto e o regresso: e o que a bateria
+  // tem de dar, e nao apenas o percurso entre waypoints que a barra mostra.
+  const duracao = duracaoDoVooCompleto(rota)
   const limite = autonomia * 60 * MARGEM_AUTONOMIA
   if (duracao <= limite) return []
 
@@ -234,7 +308,7 @@ function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
       id: 'autonomia',
       severidade: 'erro',
       titulo: 'A rota nao cabe na autonomia',
-      detalhe: `Estimam-se ${formatarDuracao(duracao)} de voo, e a margem prudente para o ${drone.nome} sao ${formatarDuracao(limite)}, ou seja ${Math.round(MARGEM_AUTONOMIA * 100)}% de ${autonomia} minutos.`,
+      detalhe: `Estimam-se ${formatarDuracao(duracao)} de voo, contando a ida ao primeiro ponto e o regresso, e a margem prudente para o ${drone.nome} sao ${formatarDuracao(limite)}, ou seja ${Math.round(MARGEM_AUTONOMIA * 100)}% de ${autonomia} minutos.`,
     },
   ]
 }

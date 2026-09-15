@@ -1,7 +1,7 @@
 import type { Accao, Drone, POI, Rota, Waypoint } from '../nucleo/tipos.ts'
 import { deASL, paraASL } from '../nucleo/geodesia.ts'
 import { velocidadeDe } from '../nucleo/operacoes-rota.ts'
-import { coordenada, decimal, no, serializar, valor, valorIndentado, type No } from './xml.ts'
+import { coordenada, decimal, no, numero, serializar, valor, valorIndentado, type No } from './xml.ts'
 
 /**
  * Gerador do dialeto DJI Fly, namespace `http://www.uav.com/wpmz/1.0.2`.
@@ -179,7 +179,10 @@ function placemark(
     ...grupoDeAccoes(waypoint, contadores),
     no('wpml:waypointGimbalHeadingParam', [
       valor('wpml:waypointGimbalPitchAngle', decimal(waypoint.gimbalPitch, 1)),
-      valor('wpml:waypointGimbalYawAngle', Math.round(waypoint.gimbalYaw)),
+      // `numero` escreve inteiros sem casas, portanto o zero do ficheiro de
+      // referencia continua a sair `0` e nao `0.0`, mas uma guinada que o
+      // utilizador tenha posto a -95,4 deixa de ser arredondada a -95.
+      valor('wpml:waypointGimbalYawAngle', numero(waypoint.gimbalYaw, 1)),
     ]),
   ])
 }
@@ -191,6 +194,19 @@ function parametrosGuinada(
   opcoes: OpcoesFly,
 ): No {
   const apontaPOI = waypoint.modoGuinada === 'towardPOI' && poi !== undefined
+
+  /*
+   * Um waypoint que aponta a um POI inexistente saia com o modo `towardPOI` e o
+   * alvo em `0,0,0`: ficheiro internamente incoerente, aceite em silencio pelo
+   * aparelho e depois a rota nao faz o que se desenhou. So nao acontecia porque
+   * a validacao corre antes - mas o gerador tem de se defender sozinho, tal como
+   * ja se defende de uma rota em AGL sem cotas.
+   */
+  if (waypoint.modoGuinada === 'towardPOI' && !poi) {
+    throw new Error(
+      `o waypoint ${waypoint.index + 1} aponta a um ponto de interesse que nao existe na rota`,
+    )
+  }
 
   return no('wpml:waypointHeadingParam', [
     valor('wpml:waypointHeadingMode', MODO_GUINADA[waypoint.modoGuinada]),
@@ -248,7 +264,7 @@ function parametrosDaAccao(accao: Accao): No[] {
         valor('wpml:gimbalRollRotateAngle', 0),
         // Desligado em todos os ficheiros reais: a guinada do gimbal segue a aeronave.
         valor('wpml:gimbalYawRotateEnable', 0),
-        valor('wpml:gimbalYawRotateAngle', Math.round(accao.yaw)),
+        valor('wpml:gimbalYawRotateAngle', numero(accao.yaw, 1)),
         valor('wpml:gimbalRotateTimeEnable', 0),
         valor('wpml:gimbalRotateTime', 0),
         valor('wpml:payloadPositionIndex', 0),

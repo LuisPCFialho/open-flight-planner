@@ -30,6 +30,16 @@ export function useCotasTerreno(
    * como pedidas nunca mais seriam resolvidas.
    */
   const montado = useRef(true)
+  /**
+   * Conta as trocas de fonte.
+   *
+   * Importar topografia enquanto os mosaicos publicos ainda estao a responder
+   * punha a resposta antiga, de dezenas de metros de resolucao, a escrever por
+   * cima da cota do levantamento que acabara de chegar. Nada aparecia errado no
+   * ecra: a cota ficava so silenciosamente pior, e e dela que dependem o AGL e a
+   * deteccao de colisao.
+   */
+  const geracao = useRef(0)
   useEffect(() => {
     montado.current = true
     return () => {
@@ -43,6 +53,7 @@ export function useCotasTerreno(
    * isto a rota ficava com as cotas antigas ate alguem lhe mexer.
    */
   useEffect(() => {
+    geracao.current += 1
     pedidas.current.clear()
     setCotas(new Map())
   }, [fonte])
@@ -57,11 +68,12 @@ export function useCotasTerreno(
 
     for (const chave of emFalta.keys()) pedidas.current.add(chave)
     const chaves = [...emFalta.keys()]
+    const minhaGeracao = geracao.current
     setEmCurso((n) => n + 1)
 
     Promise.all([...emFalta.values()].map((p) => fonte.cota(p.lat, p.lon)))
       .then((valores) => {
-        if (!montado.current) return
+        if (!montado.current || geracao.current !== minhaGeracao) return
         setCotas((anteriores) => {
           const novas = new Map(anteriores)
           for (const [i, chave] of chaves.entries()) {
@@ -74,8 +86,10 @@ export function useCotasTerreno(
       })
       .catch((causa: unknown) => {
         // Sem cache do falhanco: uma quebra de rede nao pode deixar o ponto sem cota para sempre.
-        for (const chave of chaves) pedidas.current.delete(chave)
-        if (!montado.current) return
+        if (geracao.current === minhaGeracao) {
+          for (const chave of chaves) pedidas.current.delete(chave)
+        }
+        if (!montado.current || geracao.current !== minhaGeracao) return
         setErro(causa instanceof Error ? causa.message : 'falha a obter cotas do terreno')
       })
       .finally(() => {

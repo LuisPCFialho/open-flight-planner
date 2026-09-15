@@ -206,11 +206,36 @@ export class FonteComposta implements FonteTerreno {
     const amostras = amostrarPercurso(pontos, passo)
     const doLevantamento = amostras.map((p) => this.topografia.cotaSincrona(p.lat, p.lon))
 
-    // Uma unica chamada a fonte publica para tudo o que falta, e nao uma por ponto.
     const emFalta = amostras.filter((_, i) => doLevantamento[i] === null)
-    const publicas = emFalta.length > 0 ? await this.publica.cotas?.(emFalta) : []
+
+    /*
+     * `cotas` e opcional na interface, e aqui estava a ser chamado com `?.`: uma
+     * fonte que so implementasse `cota` ponto a ponto devolvia `undefined`, e
+     * cada ponto fora do levantamento acabava com cota zero. Zero e uma cota
+     * perfeitamente plausivel para quem le, e uma rota em AGL sobre terreno dado
+     * como estando ao nivel do mar voa para dentro da encosta. Fora do
+     * levantamento pergunta-se a fonte publica, com o metodo em lote se ela o
+     * tiver e ponto a ponto se nao tiver, e nunca se inventa um valor.
+     */
+    const publicas =
+      emFalta.length === 0
+        ? []
+        : this.publica.cotas
+          ? await this.publica.cotas(emFalta)
+          : await Promise.all(emFalta.map((p) => this.publica.cota(p.lat, p.lon)))
+
+    if (publicas.length !== emFalta.length) {
+      throw new Error(
+        `a fonte ${this.publica.origem} devolveu ${publicas.length} cotas para ${emFalta.length} pontos`,
+      )
+    }
 
     let proxima = 0
-    return doLevantamento.map((cota) => cota ?? publicas?.[proxima++] ?? 0)
+    return doLevantamento.map((cota) => {
+      if (cota !== null) return cota
+      const publica = publicas[proxima++]
+      if (publica === undefined) throw new Error('cota em falta fora do levantamento topografico')
+      return publica
+    })
   }
 }

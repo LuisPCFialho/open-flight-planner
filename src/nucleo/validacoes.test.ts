@@ -311,3 +311,124 @@ describe('temErros', () => {
     expect(temErros([])).toBe(false)
   })
 })
+
+describe('velocidades impossiveis', () => {
+  it('trata a velocidade global nula como erro, pelo nome', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 100,
+      altura: 60,
+      terreno: () => 200,
+    })
+    const validacoes = validarRota(
+      { ...rota, velocidadeGlobal: 0 },
+      droneComId('mini5pro'),
+      contexto,
+    )
+
+    const problema = comId(validacoes, 'velocidade-global-invalida')
+    expect(problema?.severidade).toBe('erro')
+    // O que o utilizador via antes era a exportacao a falhar com uma mensagem
+    // sobre XML invalido, sem relacao nenhuma com a causa.
+    expect(temErros(validacoes)).toBe(true)
+  })
+
+  it('aponta os waypoints com velocidade propria nao voavel', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 100,
+      altura: 60,
+      terreno: () => 200,
+    })
+    const comParados = {
+      ...rota,
+      waypoints: rota.waypoints.map((w, i) => (i === 2 ? { ...w, velocidade: 0 } : w)),
+    }
+
+    const problema = comId(
+      validarRota(comParados, droneComId('mini5pro'), contexto),
+      'velocidade-waypoint-invalida',
+    )
+    expect(problema?.severidade).toBe('erro')
+    expect(problema?.waypoints).toEqual([2])
+  })
+
+  it('deixa passar uma rota com velocidade normal', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 100,
+      altura: 60,
+      terreno: () => 200,
+      velocidade: 6,
+    })
+    const validacoes = validarRota(rota, droneComId('mini5pro'), contexto)
+    expect(comId(validacoes, 'velocidade-global-invalida')).toBeUndefined()
+    expect(comId(validacoes, 'velocidade-waypoint-invalida')).toBeUndefined()
+  })
+})
+
+describe('colisao entre waypoints por verificar', () => {
+  it('avisa quando falta o perfil, em vez de dar a rota por boa em silencio', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 100,
+      altura: 60,
+      terreno: () => 200,
+    })
+    const semPerfil: ContextoValidacao = { cotas: contexto.cotas, chave: contexto.chave }
+
+    const aviso = comId(validarRota(rota, droneComId('mini5pro'), semPerfil), 'colisao-por-verificar')
+    expect(aviso?.severidade).toBe('aviso')
+    // Aviso e nao erro: o perfil chega assim que o motor de terreno responde.
+    expect(temErros(validarRota(rota, droneComId('mini5pro'), semPerfil))).toBe(false)
+  })
+
+  it('cala-se assim que o perfil existe', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 100,
+      altura: 60,
+      terreno: () => 200,
+    })
+    expect(
+      comId(validarRota(rota, droneComId('mini5pro'), contexto), 'colisao-por-verificar'),
+    ).toBeUndefined()
+  })
+})
+
+describe('autonomia', () => {
+  /** O Mini 5 Pro nao tem autonomia preenchida; aqui inventa-se uma para ensaiar. */
+  const comAutonomia = (minutos: number): Drone => ({
+    ...droneComId('mini5pro'),
+    autonomiaMinutos: minutos,
+  })
+
+  it('conta o regresso a casa, e nao so o percurso entre waypoints', () => {
+    // Quatro waypoints de 1000 m para leste a 10 m/s: 3000 m de percurso e mais
+    // 3000 m de regresso desde o ultimo ponto ate a descolagem.
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 1000,
+      altura: 60,
+      terreno: () => 200,
+      velocidade: 10,
+    })
+
+    // 10 minutos de autonomia dao 420 s de margem prudente. So o percurso sao
+    // cerca de 327 s, que cabem; com o regresso passam de 600 s, que nao cabem.
+    const problema = comId(validarRota(rota, comAutonomia(10), contexto), 'autonomia')
+    expect(problema?.severidade).toBe('erro')
+    expect(problema?.detalhe).toContain('regresso')
+  })
+
+  it('nao se queixa quando a rota cabe com folga', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 3,
+      troco: 100,
+      altura: 60,
+      terreno: () => 200,
+      velocidade: 10,
+    })
+    expect(comId(validarRota(rota, comAutonomia(30), contexto), 'autonomia')).toBeUndefined()
+  })
+})
