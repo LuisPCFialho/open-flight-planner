@@ -15,7 +15,7 @@ export const DRONES: readonly Drone[] = [
     dialeto: 'fly',
     droneEnumValue: 68,
     droneSubEnumValue: 0,
-    camara: { temZoom: false },
+    camara: { temZoom: false, fovHorizontalGraus: 82, proporcao: 4 / 3 },
     accoesSuportadas: [
       'tirarFoto',
       'iniciarGravacao',
@@ -40,7 +40,7 @@ export const DRONES: readonly Drone[] = [
     droneSubEnumValue: 1,
     payloadEnumValue: 67,
     payloadSubEnumValue: 0,
-    camara: { temZoom: true },
+    camara: { temZoom: true, fovHorizontalGraus: 84, proporcao: 4 / 3 },
     accoesSuportadas: [
       'tirarFoto',
       'iniciarGravacao',

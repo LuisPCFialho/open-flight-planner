@@ -11,9 +11,13 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LatLon, Rota } from '../nucleo/tipos.ts'
 import { estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
+import type { Enquadramento } from '../nucleo/camara.ts'
 
 const FONTE_SEGMENTOS = 'rota-segmentos'
 const CAMADA_SEGMENTOS = 'rota-terreno'
+const FONTE_ENQUADRAMENTO = 'enquadramento'
+const CAMADA_ENQUADRAMENTO_AREA = 'enquadramento-area'
+const CAMADA_ENQUADRAMENTO_LINHA = 'enquadramento-linha'
 
 export type CursorTerreno = { lat: number; lon: number; cotaTerreno: number | null }
 
@@ -25,6 +29,10 @@ export type PropsMapa = {
   modo3D: boolean
   /** Enquanto activo, clicar no mapa cria um ponto de interesse em vez de um waypoint. */
   modoPOI: boolean
+  /** O que a camara do waypoint seleccionado vai apanhar, projectado no terreno. */
+  enquadramento: Enquadramento | null
+  /** Posicao da aeronave em voo virtual, para o mapa a seguir. */
+  seguir: { posicao: LatLon; guinada: number } | null
   centroInicial: LatLon
   aoAdicionarWaypoint: (lat: number, lon: number) => void
   aoInserirWaypoint: (posicao: number, lat: number, lon: number) => void
@@ -97,6 +105,24 @@ export function Mapa(props: PropsMapa) {
           'line-width': 2,
           'line-opacity': 0.85,
         },
+      })
+
+      instancia.addSource(FONTE_ENQUADRAMENTO, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      instancia.addLayer({
+        id: CAMADA_ENQUADRAMENTO_AREA,
+        type: 'fill',
+        source: FONTE_ENQUADRAMENTO,
+        filter: ['==', ['geometry-type'], 'Polygon'],
+        paint: { 'fill-color': '#f0b429', 'fill-opacity': 0.22 },
+      })
+      instancia.addLayer({
+        id: CAMADA_ENQUADRAMENTO_LINHA,
+        type: 'line',
+        source: FONTE_ENQUADRAMENTO,
+        paint: { 'line-color': '#f0b429', 'line-width': 1.2, 'line-opacity': 0.9 },
       })
 
       const camada = new CamadaRota3D()
@@ -175,6 +201,18 @@ export function Mapa(props: PropsMapa) {
     desenhar(instancia, camada, marcadores.current, marcadoresPOI.current, props, callbacks)
   })
 
+  // Em voo virtual o mapa acompanha a aeronave, como no Pilot 2.
+  useEffect(() => {
+    const instancia = mapa.current
+    const seguir = props.seguir
+    if (!instancia || !pronto.current || !seguir) return
+
+    instancia.jumpTo({
+      center: [seguir.posicao.lon, seguir.posicao.lat],
+      bearing: seguir.guinada,
+    })
+  }, [props.seguir])
+
   // O cursor diz de imediato que o proximo clique cria um POI, nao um waypoint.
   useEffect(() => {
     const instancia = mapa.current
@@ -208,8 +246,71 @@ function desenhar(
   if (fonte) fonte.setData(segmentosGeoJSON(props.rota))
 
   camada.definirPontos(props.pontos3D)
+
+  const fonteEnquadramento = instancia.getSource(FONTE_ENQUADRAMENTO) as GeoJSONSource | undefined
+  if (fonteEnquadramento) fonteEnquadramento.setData(enquadramentoGeoJSON(props))
+
   sincronizarMarcadores(instancia, marcadores, props, callbacks)
   sincronizarPOIs(instancia, marcadoresPOI, props, callbacks)
+}
+
+/**
+ * Poligono do que a foto vai apanhar, mais as arestas da piramide de visao desde
+ * a aeronave ate aos cantos.
+ */
+function enquadramentoGeoJSON(props: PropsMapa): FeatureCollection {
+  const enquadramento = props.enquadramento
+  if (!enquadramento) return { type: 'FeatureCollection', features: [] }
+
+  const cantos = enquadramento.cantos.filter((c) => c !== null)
+  if (cantos.length < 3) return { type: 'FeatureCollection', features: [] }
+
+  const anel = cantos.map((c) => [c.ponto.lon, c.ponto.lat])
+  const primeiro = anel[0]
+  if (primeiro) anel.push(primeiro)
+
+  const features: Feature[] = [
+    { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [anel] } },
+  ]
+
+  const aeronave = props.seguir?.posicao ?? posicaoDoSeleccionado(props)
+  if (aeronave) {
+    for (const canto of cantos) {
+      features.push({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [aeronave.lon, aeronave.lat],
+            [canto.ponto.lon, canto.ponto.lat],
+          ],
+        },
+      })
+    }
+  }
+
+  const centro = enquadramento.centro
+  if (aeronave && centro) {
+    features.push({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [aeronave.lon, aeronave.lat],
+          [centro.ponto.lon, centro.ponto.lat],
+        ],
+      },
+    })
+  }
+
+  return { type: 'FeatureCollection', features }
+}
+
+function posicaoDoSeleccionado(props: PropsMapa): LatLon | null {
+  const waypoint = props.rota.waypoints.find((w) => props.seleccionados.has(w.id))
+  return waypoint ? { lat: waypoint.lat, lon: waypoint.lon } : null
 }
 
 /**

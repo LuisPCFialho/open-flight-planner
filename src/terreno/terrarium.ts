@@ -50,6 +50,15 @@ export class FonteTerrariumAWS implements FonteTerreno {
   readonly #buscar: typeof fetch
   /** Chave `z/x/y`. Guarda a promessa para nao pedir o mesmo mosaico duas vezes. */
   readonly #cache = new Map<string, Promise<Mosaico>>()
+  /**
+   * Os mesmos mosaicos ja resolvidos, para leitura sincrona.
+   *
+   * A projeccao do enquadramento da camara marcha centenas de raios contra o
+   * terreno e precisa da cota a cada passo. Esperar por uma promessa por passo
+   * tornava isso inutilizavel, por isso ha `precarregar` para trazer a area toda
+   * de uma vez e `cotaSincrona` para a ler depois.
+   */
+  readonly #resolvidos = new Map<string, Mosaico>()
 
   constructor(opcoes: OpcoesTerrarium) {
     this.#descodificador = opcoes.descodificador
@@ -86,6 +95,58 @@ export class FonteTerrariumAWS implements FonteTerreno {
 
   async perfil(pontos: readonly LatLon[], passo: number): Promise<number[]> {
     return this.cotas(amostrarPercurso(pontos, passo))
+  }
+
+  /**
+   * Traz para memoria todos os mosaicos que cobrem o rectangulo dado, para
+   * `cotaSincrona` poder responder sem esperar.
+   */
+  async precarregar(centro: LatLon, raioEmMetros: number): Promise<void> {
+    const grausLat = raioEmMetros / 111320
+    const grausLon = grausLat / Math.max(0.05, Math.cos((centro.lat * Math.PI) / 180))
+
+    const cantos: LatLon[] = []
+    for (const dLat of [-grausLat, 0, grausLat]) {
+      for (const dLon of [-grausLon, 0, grausLon]) {
+        cantos.push({ lat: centro.lat + dLat, lon: centro.lon + dLon })
+      }
+    }
+
+    const chaves = new Set<string>()
+    for (const canto of cantos) {
+      for (const chave of this.#mosaicosParaBilinear(canto.lat, canto.lon)) chaves.add(chave)
+    }
+    await Promise.all([...chaves].map((chave) => this.#mosaico(chave)))
+  }
+
+  /**
+   * Cota lida directamente da memoria, ou `null` se o mosaico ainda nao chegou.
+   * Usar depois de `precarregar`.
+   */
+  cotaSincrona(lat: number, lon: number): number | null {
+    const { px, py } = this.#pixelGlobal(lat, lon)
+    const fx = px - 0.5
+    const fy = py - 0.5
+    const x0 = Math.floor(fx)
+    const y0 = Math.floor(fy)
+    const tx = fx - x0
+    const ty = fy - y0
+
+    const q00 = this.#cotaDoPixelSincrona(x0, y0)
+    const q10 = this.#cotaDoPixelSincrona(x0 + 1, y0)
+    const q01 = this.#cotaDoPixelSincrona(x0, y0 + 1)
+    const q11 = this.#cotaDoPixelSincrona(x0 + 1, y0 + 1)
+    if (q00 === null || q10 === null || q01 === null || q11 === null) return null
+
+    const cima = q00 + (q10 - q00) * tx
+    const baixo = q01 + (q11 - q01) * tx
+    return cima + (baixo - cima) * ty
+  }
+
+  #cotaDoPixelSincrona(pxGlobal: number, pyGlobal: number): number | null {
+    const mosaico = this.#resolvidos.get(this.#chaveDoPixel(pxGlobal, pyGlobal))
+    if (!mosaico) return null
+    return this.#lerPixel(mosaico, pxGlobal, pyGlobal)
   }
 
   // --- interno ---------------------------------------------------------------
@@ -150,8 +211,11 @@ export class FonteTerrariumAWS implements FonteTerreno {
 
   async #cotaDoPixel(pxGlobal: number, pyGlobal: number): Promise<number> {
     const mosaico = await this.#mosaico(this.#chaveDoPixel(pxGlobal, pyGlobal))
-    const n = 2 ** this.#zoom
-    const larguraGlobal = n * LADO_MOSAICO
+    return this.#lerPixel(mosaico, pxGlobal, pyGlobal)
+  }
+
+  #lerPixel(mosaico: Mosaico, pxGlobal: number, pyGlobal: number): number {
+    const larguraGlobal = 2 ** this.#zoom * LADO_MOSAICO
     const x = ((Math.floor(pxGlobal) % larguraGlobal) + larguraGlobal) % larguraGlobal
     const y = Math.max(0, Math.min(larguraGlobal - 1, Math.floor(pyGlobal)))
 
@@ -171,17 +235,23 @@ export class FonteTerrariumAWS implements FonteTerreno {
       return emCache
     }
 
-    const promessa = this.#descarregar(chave).catch((erro: unknown) => {
-      // Um mosaico que falhou nao fica em cache, para a tentativa seguinte poder repetir.
-      this.#cache.delete(chave)
-      throw erro
-    })
+    const promessa = this.#descarregar(chave)
+      .then((mosaico) => {
+        this.#resolvidos.set(chave, mosaico)
+        return mosaico
+      })
+      .catch((erro: unknown) => {
+        // Um mosaico que falhou nao fica em cache, para a tentativa seguinte poder repetir.
+        this.#cache.delete(chave)
+        throw erro
+      })
     this.#cache.set(chave, promessa)
 
     while (this.#cache.size > this.#maxMosaicos) {
       const maisAntigo = this.#cache.keys().next().value
       if (maisAntigo === undefined) break
       this.#cache.delete(maisAntigo)
+      this.#resolvidos.delete(maisAntigo)
     }
     return promessa
   }

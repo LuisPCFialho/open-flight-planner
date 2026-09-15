@@ -1112,3 +1112,161 @@ button,
     display: none;
   }
 }
+
+/* --- vista de camara em primeira pessoa ------------------------------------ */
+
+.vista-camara {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 280px;
+  aspect-ratio: 4 / 3;
+  z-index: 3;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.5);
+}
+
+.vista-camara-mapa {
+  position: absolute;
+  inset: 0;
+}
+
+.vista-camara-moldura {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vista-camara-moldura .terco {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.terco.vertical { top: 0; bottom: 0; width: 1px; }
+.terco.vertical.um { left: 33.33%; }
+.terco.vertical.dois { left: 66.66%; }
+.terco.horizontal { left: 0; right: 0; height: 1px; }
+.terco.horizontal.um { top: 33.33%; }
+.terco.horizontal.dois { top: 66.66%; }
+
+.vista-camara-moldura .mira {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 1px solid rgba(240, 180, 41, 0.9);
+  border-radius: 2px;
+}
+
+.vista-camara-leituras {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 7px;
+  background: rgba(11, 14, 17, 0.82);
+  color: var(--texto-suave);
+  font-size: 10px;
+}
+
+/* --- HUD do voo virtual ---------------------------------------------------- */
+
+.hud-voo {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 14px;
+  background: rgba(11, 14, 17, 0.9);
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.55);
+}
+
+.hud-bloco {
+  display: grid;
+  gap: 1px 8px;
+  align-items: baseline;
+}
+
+.hud-bloco.hud-altura,
+.hud-bloco.hud-atitude {
+  justify-items: center;
+}
+
+.hud-rotulo {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--texto-suave);
+}
+
+.hud-valor {
+  font-size: 12px;
+}
+
+.hud-valor.grande { font-size: 17px; }
+.hud-valor.enorme { font-size: 24px; color: var(--rota); line-height: 1.1; }
+
+.hud-teclas {
+  grid-template-columns: repeat(3, auto);
+  gap: 2px;
+}
+
+.hud-verticais {
+  grid-template-columns: auto;
+  gap: 2px;
+}
+
+.tecla {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--borda-forte);
+  border-radius: 3px;
+  background: var(--fundo-elevado);
+  color: var(--texto-suave);
+  font-family: var(--fonte-numerica);
+  font-size: 10px;
+}
+
+.hud-accoes {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.hud-ajuda {
+  font-size: 10px;
+  color: var(--texto-suave);
+  max-width: 220px;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.hud-bloco.hud-altura {
+  min-width: 88px;
+}
+
+.hud-voo .hud-valor,
+.hud-voo .hud-rotulo {
+  white-space: nowrap;
+}
+
+.hud-accoes button {
+  justify-content: center;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
 import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
@@ -25,6 +25,8 @@ import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
 import { useEditorRota } from './estado/useEditorRota.ts'
 import { useSeleccao } from './estado/useSeleccao.ts'
 import { usePerfilTerreno } from './estado/usePerfilTerreno.ts'
+import { useEnquadramento } from './estado/useEnquadramento.ts'
+import { useVooVirtual, type EstadoVoo } from './estado/useVooVirtual.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { criarProjeto, gravarRota, listarProjetos, listarRotas } from './dados/bd.ts'
@@ -38,6 +40,8 @@ import { ConfiguracoesRota } from './ui/ConfiguracoesRota.tsx'
 import { BarraFicheiro } from './ui/BarraFicheiro.tsx'
 import { PerfilTerreno } from './ui/PerfilTerreno.tsx'
 import { PainelValidacoes } from './ui/PainelValidacoes.tsx'
+import { VistaCamara } from './ui/VistaCamara.tsx'
+import { HudVoo } from './ui/HudVoo.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
@@ -183,6 +187,75 @@ export function App() {
 
   const exportacaoBloqueada = temErros(validacoes)
 
+  // --- voo virtual ----------------------------------------------------------
+  const ultimoGravado = useRef<string | null>(null)
+
+  const voo = useVooVirtual({
+    aoGravarWaypoint: (estadoVoo: EstadoVoo) => {
+      aplicar((atual) => {
+        const novo = waypointNovo({
+          lat: estadoVoo.posicao.lat,
+          lon: estadoVoo.posicao.lon,
+          altura: estadoVoo.altura,
+          index: atual.waypoints.length,
+        })
+        ultimoGravado.current = novo.id
+        // O waypoint fica com a atitude em que a aeronave estava, que e a razao
+        // de ser do voo virtual: enquadra-se e grava-se o que se esta a ver.
+        return acrescentarWaypoint(atual, {
+          ...novo,
+          gimbalPitch: estadoVoo.gimbalPitch,
+          modoGuinada: 'fixed',
+          guinada: estadoVoo.guinada,
+        })
+      })
+    },
+    aoInserirFoto: () => {
+      const id = ultimoGravado.current
+      if (!id) return
+      aplicar((atual) => acrescentarAccaoEmLote(atual, [id], 'tirarFoto'))
+    },
+  })
+
+  /** Alvo da vista de camara: a aeronave em voo, ou o waypoint seleccionado. */
+  const alvoCamara = useMemo(() => {
+    if (!rota) return null
+
+    if (voo.activo) {
+      const cota = cotas.get(chaveDaPosicao(voo.estado.posicao)) ?? rota.pontoDescolagem.cotaTerreno
+      return {
+        posicao: voo.estado.posicao,
+        alturaASL: paraASL(voo.estado.altura, rota.modoAltitude, {
+          cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
+          cotaTerreno: cota,
+        }),
+        guinada: voo.estado.guinada,
+        gimbalPitch: voo.estado.gimbalPitch,
+      }
+    }
+
+    const waypoint = seleccao.waypoints.length === 1 ? seleccao.waypoints[0] : undefined
+    if (!waypoint) return null
+    const cota = cotas.get(chaveDaPosicao(waypoint))
+    if (cota === undefined) return null
+
+    return {
+      posicao: { lat: waypoint.lat, lon: waypoint.lon },
+      alturaASL: paraASL(waypoint.altura, rota.modoAltitude, {
+        cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
+        cotaTerreno: cota,
+      }),
+      guinada: waypoint.guinada ?? 0,
+      gimbalPitch: waypoint.gimbalPitch,
+    }
+  }, [rota, voo.activo, voo.estado, seleccao.waypoints, cotas])
+
+  const { enquadramento, aCarregar: enquadramentoACarregar } = useEnquadramento(
+    alvoCamara,
+    drone ?? droneComId('mini5pro'),
+    fonteTerreno,
+  )
+
   // --- alteracoes -----------------------------------------------------------
   const aoAdicionarWaypoint = useCallback(
     (lat: number, lon: number) => {
@@ -290,6 +363,9 @@ export function App() {
   // --- atalhos --------------------------------------------------------------
   useEffect(() => {
     const aoTeclar = (evento: KeyboardEvent): void => {
+      // Em voo virtual o teclado e todo dele: W, A, S, D e as setas pilotam.
+      if (voo.activo) return
+
       const alvo = evento.target
       if (
         alvo instanceof HTMLInputElement ||
@@ -336,7 +412,7 @@ export function App() {
 
     window.addEventListener('keydown', aoTeclar)
     return () => window.removeEventListener('keydown', aoTeclar)
-  }, [editor, seleccao, eliminarSeleccionados, acrescentarAccao])
+  }, [editor, seleccao, eliminarSeleccionados, acrescentarAccao, voo.activo])
 
   if (arranque) {
     return (
@@ -404,6 +480,28 @@ export function App() {
           </button>
           <button
             type="button"
+            className={voo.activo ? 'activo' : ''}
+            title="Pilotar a aeronave pelo mapa e gravar waypoints com a atitude em que esta"
+            onClick={() => {
+              if (voo.activo) {
+                voo.parar()
+                return
+              }
+              const ultimo = rota.waypoints.at(-1)
+              voo.arrancar({
+                posicao: ultimo
+                  ? { lat: ultimo.lat, lon: ultimo.lon }
+                  : { lat: rota.pontoDescolagem.lat, lon: rota.pontoDescolagem.lon },
+                altura: ultimo?.altura ?? 60,
+                guinada: ultimo?.guinada ?? 0,
+                gimbalPitch: ultimo?.gimbalPitch ?? -30,
+              })
+            }}
+          >
+            Voo virtual
+          </button>
+          <button
+            type="button"
             title="Desfazer (Ctrl+Z)"
             disabled={!editor.podeDesfazer}
             onClick={editor.desfazer}
@@ -450,6 +548,8 @@ export function App() {
             seleccionados={seleccao.ids}
             modo3D={modo3D}
             modoPOI={modoPOI}
+            enquadramento={enquadramento}
+            seguir={voo.activo ? { posicao: voo.estado.posicao, guinada: voo.estado.guinada } : null}
             centroInicial={CENTRO_INICIAL}
             aoAdicionarWaypoint={aoAdicionarWaypoint}
             aoInserirWaypoint={aoInserirWaypoint}
@@ -468,6 +568,26 @@ export function App() {
               aoAlterarRota={editor.alterarRota}
               aoMudarModoAltitude={mudarModoAltitude}
               aoFechar={() => setConfiguracoesAbertas(false)}
+            />
+          ) : null}
+
+          {alvoCamara ? (
+            <VistaCamara
+              posicao={alvoCamara.posicao}
+              alturaASL={alvoCamara.alturaASL}
+              enquadramento={enquadramento}
+              aCarregar={enquadramentoACarregar}
+            />
+          ) : null}
+
+          {voo.activo && alvoCamara ? (
+            <HudVoo
+              estado={voo.estado}
+              modoAltitude={rota.modoAltitude}
+              alturaASL={alvoCamara.alturaASL}
+              cotaTerreno={cotas.get(chaveDaPosicao(voo.estado.posicao)) ?? null}
+              aoGravar={voo.gravar}
+              aoParar={voo.parar}
             />
           ) : null}
 

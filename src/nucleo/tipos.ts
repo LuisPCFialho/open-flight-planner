@@ -118,6 +118,8 @@ export type Projeto = {
 export type Camara = {
   /** Graus. Marcado como a confirmar enquanto nao for medido em ficheiro real. */
   fovHorizontalGraus?: number
+  /** Largura a dividir pela altura do sensor. 4:3 na maioria das camaras DJI. */
+  proporcao?: number
   megapixeis?: number
   temZoom: boolean
 }
