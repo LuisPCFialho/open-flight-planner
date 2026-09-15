@@ -164,3 +164,58 @@ percurso apareceria 55,6 m abaixo do sitio em Portugal continental.
 
 A ordem em `coordinates` e longitude, latitude, altura, ao contrario do
 `waypointPoiPoint` do WPML, que e latitude, longitude, altura.
+
+## O que o KMZ real da obra de Sever do Vouga corrigiu
+
+`OBRA_SEVER_v4_fotos_e_video_1.kmz`, 64 waypoints, 50 fotos, um arranque e uma
+paragem de video, extraido de um DJI RC 2 com Mini 5 Pro. Esta em
+`docs/esquemas/fly-1.0.2-obra-sever-*` e e a referencia de conformidade do
+dialeto Fly. Corrigiu oito coisas que estavam adivinhadas:
+
+**1. `startRecord` e `stopRecord` confirmados.** Os nomes estavam certos, mas os
+parametros nao: levam so `payloadPositionIndex`. O `useGlobalPayloadLensIndex`
+que a foto leva nao aparece aqui.
+
+**2. Formato dos numeros.** A DJI escreve alturas, velocidades e inclinacoes
+sempre com uma casa decimal, mesmo quando e redonda: `8.0`, `-20.0`, `60.8`.
+Angulos de guinada, contadores e distancias de amortecimento saem inteiros.
+Emitir `8` onde o aparelho escreve `8.0` nao torna o ficheiro invalido, mas
+tambem nao ha razao para divergir de quem define o formato.
+
+**3. Coordenadas com quinze algarismos significativos**, e nao com um numero
+fixo de casas decimais: `-8.41066700000000`, `40.7465720000000`. E o que
+`toPrecision(15)` da.
+
+**4. `actionGroupId` e `actionId` sao continuos ao longo da rota inteira**, de 1
+a N, e nao reiniciam em cada waypoint. Neste ficheiro vao a 64 e a 116.
+
+**5. `waypointHeadingAngleEnable` e sempre 0**, mesmo nos 50 waypoints que
+apontam a um POI. Estava a escrever 1 nesses.
+
+**6. `useStraightLine` e sempre 0**, tambem nos waypoints de passagem. Estava a
+liga-lo ao tipo de curva.
+
+**7. `waypointTurnDampingDist` nao e sempre zero.** Nos 12 waypoints de passagem
+vale 12 m. E um campo proprio do waypoint, nao um valor derivado, e passou a
+existir no modelo como `distanciaAmortecimento`.
+
+**8. `gimbalYawRotateEnable` e sempre 0**, tambem quando ha angulo de guinada do
+gimbal. Estava a liga-lo quando o angulo nao era zero.
+
+As combinacoes observadas no ficheiro, que dao a gramatica do dialeto:
+
+| quantos | accoes | curva | amortecimento | guinada |
+|---:|---|---|---:|---|
+| 50 | gimbalRotate, takePhoto | para no ponto | 0 | towardPOI |
+| 10 | gimbalRotate | passa | 12 | followWayline |
+| 2 | gimbalRotate | para no ponto | 0 | followWayline |
+| 1 | gimbalRotate, startRecord | passa | 12 | followWayline |
+| 1 | gimbalRotate, stopRecord | passa | 12 | followWayline |
+
+O `gimbalRotate` vem sempre antes do `takePhoto`: aponta-se e so depois se
+dispara.
+
+O primeiro ficheiro de referencia, `fly-1.0.2-template.kml` e
+`fly-1.0.2-waylines.wpml`, foi transcrito a mao e tem os numeros normalizados,
+com `50` onde o aparelho escreve `50.0` e `waypointHeadingAngleEnable` a 1. Serve
+para confirmar a estrutura, nao a formatacao.

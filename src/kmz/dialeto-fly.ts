@@ -1,7 +1,7 @@
 import type { Accao, Drone, POI, Rota, Waypoint } from '../nucleo/tipos.ts'
 import { deASL, paraASL } from '../nucleo/geodesia.ts'
 import { velocidadeDe } from '../nucleo/operacoes-rota.ts'
-import { no, numero, serializar, valor, type No } from './xml.ts'
+import { coordenada, decimal, no, serializar, valor, type No } from './xml.ts'
 
 /**
  * Gerador do dialeto DJI Fly, namespace `http://www.uav.com/wpmz/1.0.2`.
@@ -19,11 +19,19 @@ export const NS_FLY = 'http://www.uav.com/wpmz/1.0.2'
 const NS_KML = 'http://www.opengis.net/kml/2.2'
 
 /**
- * Valores de `actionActuatorFunc` observados no ficheiro real. As restantes
- * accoes usam os nomes da especificacao da DJI e ainda nao foram confirmadas
- * contra um ficheiro deste dialeto. Ver `accoesPorConfirmar`.
+ * Valores de `actionActuatorFunc` ja vistos em ficheiros reais deste dialeto.
+ *
+ * `takePhoto` e `gimbalRotate` vieram do primeiro ficheiro de referencia;
+ * `startRecord` e `stopRecord` da rota OBRA_SEVER_v4, com fotos e video.
+ * As restantes usam nomes da especificacao da DJI e ainda nao foram confirmadas.
  */
-const FUNCOES_CONFIRMADAS = new Set(['takePhoto', 'gimbalRotate', 'gimbalEvenlyRotate'])
+const FUNCOES_CONFIRMADAS = new Set([
+  'takePhoto',
+  'gimbalRotate',
+  'gimbalEvenlyRotate',
+  'startRecord',
+  'stopRecord',
+])
 
 export type OpcoesFly = {
   /** Cota ortometrica do terreno por posicao, necessaria quando a rota esta em AGL. */
@@ -84,7 +92,7 @@ function missionConfig(rota: Rota, drone: Drone): No {
     valor('wpml:finishAction', rota.acaoFinal),
     valor('wpml:exitOnRCLost', 'executeLostAction'),
     valor('wpml:executeRCLostAction', rota.acaoPerdaSinal),
-    valor('wpml:globalTransitionalSpeed', numero(rota.velocidadeGlobal, 1)),
+    valor('wpml:globalTransitionalSpeed', decimal(rota.velocidadeGlobal, 1)),
     no('wpml:droneInfo', [
       valor('wpml:droneEnumValue', drone.droneEnumValue),
       valor('wpml:droneSubEnumValue', drone.droneSubEnumValue),
@@ -140,24 +148,36 @@ const FUNCAO_DA_ACCAO: Record<Accao['tipo'], string> = {
   zoom: 'zoom',
 }
 
-function placemark(rota: Rota, waypoint: Waypoint, opcoes: OpcoesFly): No {
+/**
+ * Os identificadores de grupo e de accao correm de 1 a N ao longo da rota
+ * inteira, e nao reiniciam em cada waypoint.
+ */
+type Contadores = { grupo: number; accao: number }
+
+function placemark(
+  rota: Rota,
+  waypoint: Waypoint,
+  opcoes: OpcoesFly,
+  contadores: Contadores,
+): No {
   const poi = waypoint.poiId ? rota.pois.find((p) => p.id === waypoint.poiId) : undefined
 
   return no('Placemark', [
-    no('Point', [valor('coordinates', `${numero(waypoint.lon, 14)},${numero(waypoint.lat, 14)}`)]),
+    no('Point', [valor('coordinates', `${coordenada(waypoint.lon)},${coordenada(waypoint.lat)}`)]),
     valor('wpml:index', waypoint.index),
-    valor('wpml:executeHeight', numero(alturaRelativa(rota, waypoint, opcoes), 3)),
-    valor('wpml:waypointSpeed', numero(velocidadeDe(rota, waypoint), 1)),
+    valor('wpml:executeHeight', decimal(alturaRelativa(rota, waypoint, opcoes), 1)),
+    valor('wpml:waypointSpeed', decimal(velocidadeDe(rota, waypoint), 1)),
     parametrosGuinada(rota, waypoint, poi, opcoes),
     no('wpml:waypointTurnParam', [
       valor('wpml:waypointTurnMode', MODO_CURVA[waypoint.tipoCurva]),
-      valor('wpml:waypointTurnDampingDist', 0),
+      valor('wpml:waypointTurnDampingDist', Math.round(waypoint.distanciaAmortecimento)),
     ]),
-    valor('wpml:useStraightLine', waypoint.tipoCurva === 'pararNoPonto' ? 0 : 1),
-    ...grupoDeAccoes(waypoint),
+    // Zero em todos os ficheiros reais, tambem nos waypoints de passagem.
+    valor('wpml:useStraightLine', 0),
+    ...grupoDeAccoes(waypoint, contadores),
     no('wpml:waypointGimbalHeadingParam', [
-      valor('wpml:waypointGimbalPitchAngle', numero(waypoint.gimbalPitch, 1)),
-      valor('wpml:waypointGimbalYawAngle', numero(waypoint.gimbalYaw, 1)),
+      valor('wpml:waypointGimbalPitchAngle', decimal(waypoint.gimbalPitch, 1)),
+      valor('wpml:waypointGimbalYawAngle', Math.round(waypoint.gimbalYaw)),
     ]),
   ])
 }
@@ -172,7 +192,7 @@ function parametrosGuinada(
 
   return no('wpml:waypointHeadingParam', [
     valor('wpml:waypointHeadingMode', MODO_GUINADA[waypoint.modoGuinada]),
-    valor('wpml:waypointHeadingAngle', numero(waypoint.guinada ?? 0, 1)),
+    valor('wpml:waypointHeadingAngle', Math.round(waypoint.guinada ?? 0)),
     // Atencao a ordem: aqui e latitude, longitude, altura, ao contrario de
     // `coordinates`, que e longitude, latitude.
     valor(
@@ -181,23 +201,24 @@ function parametrosGuinada(
         ? `${poi.lat.toFixed(6)},${poi.lon.toFixed(6)},${alturaRelativa(rota, poi, opcoes).toFixed(6)}`
         : '0.000000,0.000000,0.000000',
     ),
-    valor('wpml:waypointHeadingAngleEnable', apontaPOI || waypoint.modoGuinada === 'fixed' ? 1 : 0),
+    // Zero em todos os ficheiros reais, mesmo nos waypoints que apontam a um POI.
+    valor('wpml:waypointHeadingAngleEnable', 0),
     valor('wpml:waypointHeadingPathMode', 'followBadArc'),
     valor('wpml:waypointHeadingPoiIndex', 0),
   ])
 }
 
-function grupoDeAccoes(waypoint: Waypoint): No[] {
+function grupoDeAccoes(waypoint: Waypoint, contadores: Contadores): No[] {
   if (waypoint.acoes.length === 0) return []
 
   return [
     no('wpml:actionGroup', [
-      valor('wpml:actionGroupId', waypoint.index + 1),
+      valor('wpml:actionGroupId', ++contadores.grupo),
       valor('wpml:actionGroupStartIndex', waypoint.index),
       valor('wpml:actionGroupEndIndex', waypoint.index),
       valor('wpml:actionGroupMode', 'parallel'),
       no('wpml:actionTrigger', [valor('wpml:actionTriggerType', 'reachPoint')]),
-      ...waypoint.acoes.map((accao, i) => elementoAccao(accao, i + 1)),
+      ...waypoint.acoes.map((accao) => elementoAccao(accao, ++contadores.accao)),
     ]),
   ]
 }
@@ -220,31 +241,31 @@ function parametrosDaAccao(accao: Accao): No[] {
         valor('wpml:gimbalHeadingYawBase', 'aircraft'),
         valor('wpml:gimbalRotateMode', 'absoluteAngle'),
         valor('wpml:gimbalPitchRotateEnable', 1),
-        valor('wpml:gimbalPitchRotateAngle', numero(accao.pitch, 1)),
+        valor('wpml:gimbalPitchRotateAngle', decimal(accao.pitch, 1)),
         valor('wpml:gimbalRollRotateEnable', 1),
         valor('wpml:gimbalRollRotateAngle', 0),
-        valor('wpml:gimbalYawRotateEnable', accao.yaw === 0 ? 0 : 1),
-        valor('wpml:gimbalYawRotateAngle', numero(accao.yaw, 1)),
+        // Desligado em todos os ficheiros reais: a guinada do gimbal segue a aeronave.
+        valor('wpml:gimbalYawRotateEnable', 0),
+        valor('wpml:gimbalYawRotateAngle', Math.round(accao.yaw)),
         valor('wpml:gimbalRotateTimeEnable', 0),
         valor('wpml:gimbalRotateTime', 0),
         valor('wpml:payloadPositionIndex', 0),
       ]
 
-    // As restantes usam nomes da especificacao da DJI, ainda nao vistos num
-    // ficheiro real deste dialeto. Ver `accoesPorConfirmar`.
+    // Confirmadas na rota OBRA_SEVER_v4: so levam a posicao do payload, sem
+    // `useGlobalPayloadLensIndex`, ao contrario do que a foto leva.
     case 'iniciarGravacao':
-      return [valor('wpml:payloadPositionIndex', 0), valor('wpml:useGlobalPayloadLensIndex', 0)]
     case 'pararGravacao':
       return [valor('wpml:payloadPositionIndex', 0)]
     case 'rodarAeronave':
       return [
-        valor('wpml:aircraftHeading', numero(accao.heading, 1)),
+        valor('wpml:aircraftHeading', decimal(accao.heading, 1)),
         valor('wpml:aircraftPathMode', 'counterClockwise'),
       ]
     case 'pairar':
-      return [valor('wpml:hoverTime', numero(accao.segundos, 1))]
+      return [valor('wpml:hoverTime', decimal(accao.segundos, 1))]
     case 'zoom':
-      return [valor('wpml:payloadPositionIndex', 0), valor('wpml:focalLength', numero(accao.fator, 1))]
+      return [valor('wpml:payloadPositionIndex', 0), valor('wpml:focalLength', decimal(accao.fator, 1))]
   }
 }
 
@@ -259,7 +280,12 @@ function pasta(rota: Rota, opcoes: OpcoesFly): No {
     // percurso. Emitir uma estimativa aqui so criava divergencia com o aparelho.
     valor('wpml:distance', 0),
     valor('wpml:duration', 0),
-    valor('wpml:autoFlightSpeed', numero(rota.velocidadeGlobal, 1)),
-    ...rota.waypoints.map((waypoint) => placemark(rota, waypoint, opcoes)),
+    valor('wpml:autoFlightSpeed', decimal(rota.velocidadeGlobal, 1)),
+    ...placemarks(rota, opcoes),
   ])
+}
+
+function placemarks(rota: Rota, opcoes: OpcoesFly): No[] {
+  const contadores: Contadores = { grupo: 0, accao: 0 }
+  return rota.waypoints.map((waypoint) => placemark(rota, waypoint, opcoes, contadores))
 }

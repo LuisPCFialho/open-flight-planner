@@ -186,6 +186,7 @@ function lerWaypoint(placemark: NoLido, ordem: number, pois: POI[], avisos: stri
     gimbalPitch: numeroEm(gimbal, 'wpml:waypointGimbalPitchAngle') ?? -30,
     gimbalYaw: numeroEm(gimbal, 'wpml:waypointGimbalYawAngle') ?? 0,
     tipoCurva,
+    distanciaAmortecimento: numeroEm(turno, 'wpml:waypointTurnDampingDist') ?? 0,
     acoes: lerAccoes(placemark, ordem, avisos),
   }
 

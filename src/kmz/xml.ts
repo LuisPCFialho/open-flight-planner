@@ -39,6 +39,27 @@ export function numero(valorNumerico: number, casas = 6): string {
   return texto.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
 }
 
+/**
+ * Numero com casas decimais fixas, como a DJI os escreve.
+ *
+ * Alturas, velocidades e inclinacoes saem sempre com uma casa, mesmo quando e
+ * zero: `8.0`, `-20.0`, `60.8`. Outros campos saem inteiros. Nao e so estetica,
+ * e o que faz o ficheiro gerado ser identico ao que o aparelho produz.
+ */
+export function decimal(valor: number, casas: number): string {
+  if (!Number.isFinite(valor)) throw new Error(`numero invalido para WPML: ${valor}`)
+  return valor.toFixed(casas)
+}
+
+/**
+ * Coordenada com 15 algarismos significativos, que e a forma que o DJI Fly
+ * escreve: `-8.41066700000000`, `40.7465720000000`.
+ */
+export function coordenada(valor: number): string {
+  if (!Number.isFinite(valor)) throw new Error(`coordenada invalida para WPML: ${valor}`)
+  return valor.toPrecision(15)
+}
+
 export function escapar(texto: string): string {
   return texto
     .replace(/&/g, '&amp;')

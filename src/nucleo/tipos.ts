@@ -63,6 +63,13 @@ export type Waypoint = {
   gimbalPitch: number
   gimbalYaw: number
   tipoCurva: TipoCurva
+  /**
+   * Raio de amortecimento da curva, em metros.
+   *
+   * Zero quando a aeronave para no ponto. Num waypoint de passagem e a distancia
+   * a que a curva comeca a ser cortada, e vem escrita em `waypointTurnDampingDist`.
+   */
+  distanciaAmortecimento: number
   acoes: Accao[]
 }
 

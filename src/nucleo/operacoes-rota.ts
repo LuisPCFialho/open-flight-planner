@@ -54,6 +54,7 @@ export function waypointNovo(dados: {
     gimbalPitch: -30,
     gimbalYaw: 0,
     tipoCurva: 'pararNoPonto',
+    distanciaAmortecimento: 0,
     acoes: [],
   }
 }
