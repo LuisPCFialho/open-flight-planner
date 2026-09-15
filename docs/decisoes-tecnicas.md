@@ -353,3 +353,36 @@ um palpite por outro.
 pontos de um lado e do outro do antimeridiano da a volta ao mundo em vez dos
 metros que os separam. A operacao e em Portugal continental e nao se acrescentou
 codigo para um caso que nao acontece, mas fica escrito.
+
+## A rotacao do gimbal conta-se a partir do nariz
+
+O `gimbalHeadingYawBase` dos ficheiros reais e `aircraft`. O azimute para onde a
+camara olha e, portanto, a soma do rumo da aeronave com a rotacao do gimbal, e e
+essa soma que vai para a projeccao do enquadramento. A previsao usava so o rumo,
+o que mostrava o que a aeronave tinha pela frente e nao o que a foto ia apanhar.
+
+No voo virtual, as quatro setas sao agora do gimbal e so dele. Antes as da
+esquerda e da direita rodavam a aeronave, duplicando o Q e o E, e o `gimbalYaw`
+nao tinha comando nenhum apesar de existir no modelo e de ser escrito no
+ficheiro.
+
+## O passo do voo vive no nucleo
+
+Nao e arrumacao. Dentro do ciclo de animacao nao ha como exercitar aquela
+logica: com a janela por tras de outra o `requestAnimationFrame` nao corre - zero
+fotogramas em 600 ms, com `document.visibilityState` a dizer `visible` - e o
+MapLibre nem chega a carregar o estilo. Foi ao escrever os testes da funcao pura
+que apareceu a velocidade em diagonal, 41% mais alta do que a direito.
+
+## Um LinearRing e um contorno, nao uma linha
+
+O leitor de KML tratava um `LinearRing` solto como linha aberta, e nao via
+poligonos nenhuns: procurava-o como filho directo do `Placemark`, quando num
+`Polygon` ele vive em `outerBoundaryIs/LinearRing`, dois niveis abaixo.
+
+Um `LinearRing` e fechado por definicao. Passou a ser contorno, que e o que um
+ficheiro de limites de parcela traz.
+
+O ponto de fecho que o KML repete nao se guarda: um contorno de quatro cantos
+ficava com cinco pontos e o ultimo por cima do primeiro, o que estraga a conta da
+area. Para o GeoJSON, que exige o anel fechado, ele e reposto ao desenhar.
