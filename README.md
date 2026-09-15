@@ -40,8 +40,10 @@ aceite em silencio e depois a rota nao voa.
 O dialeto sai do drone escolhido na rota, nunca de uma opcao a parte, e a
 importacao decide-o pelo namespace declarado no ficheiro.
 
-Os ficheiros de referencia reais estao em [docs/esquemas](docs/esquemas), e os
-testes comparam a saida com eles etiqueta a etiqueta.
+Os ficheiros de referencia reais estao em [docs/esquemas](docs/esquemas). Para o
+dialeto Fly a conformidade e verificada contra `OBRA_SEVER_v4`, um KMZ de 64
+waypoints com 50 fotos e um video extraido de um DJI RC 2: importar esse ficheiro
+e voltar a exporta-lo devolve os dois ficheiros identicos **byte a byte**.
 
 ## O que a ferramenta faz
 
@@ -93,7 +95,7 @@ docs/
 - O `template.kml` e o `waylines.wpml` completos de uma exportacao real do
   FlightHub 2. O gerador do dialeto Pilot 2 tem a ordem de alguns elementos
   escrita a partir da especificacao publica, e esta assinalado no codigo.
-- As accoes `hover`, `rotateYaw`, `startRecord` e `stopRecord` no dialeto Fly:
-  o ficheiro de referencia so trazia `takePhoto` e `gimbalRotate`. A aplicacao
-  avisa ao exportar quando a rota as usa.
+- As accoes `hover` e `rotateYaw` no dialeto Fly. As de foto, gimbal e video
+  estao confirmadas contra ficheiros reais. A aplicacao avisa ao exportar quando
+  a rota usa alguma das que faltam.
 - Campo de visao, velocidade maxima e autonomia de cada drone, em `src/drones.ts`.

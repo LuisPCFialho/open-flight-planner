@@ -1,7 +1,7 @@
 import type { Accao, Drone, POI, Rota, Waypoint } from '../nucleo/tipos.ts'
 import { deASL, paraASL } from '../nucleo/geodesia.ts'
 import { velocidadeDe } from '../nucleo/operacoes-rota.ts'
-import { coordenada, decimal, no, serializar, valor, type No } from './xml.ts'
+import { coordenada, decimal, no, serializar, valor, valorIndentado, type No } from './xml.ts'
 
 /**
  * Gerador do dialeto DJI Fly, namespace `http://www.uav.com/wpmz/1.0.2`.
@@ -163,7 +163,9 @@ function placemark(
   const poi = waypoint.poiId ? rota.pois.find((p) => p.id === waypoint.poiId) : undefined
 
   return no('Placemark', [
-    no('Point', [valor('coordinates', `${coordenada(waypoint.lon)},${coordenada(waypoint.lat)}`)]),
+    no('Point', [
+      valorIndentado('coordinates', `${coordenada(waypoint.lon)},${coordenada(waypoint.lat)}`),
+    ]),
     valor('wpml:index', waypoint.index),
     valor('wpml:executeHeight', decimal(alturaRelativa(rota, waypoint, opcoes), 1)),
     valor('wpml:waypointSpeed', decimal(velocidadeDe(rota, waypoint), 1)),

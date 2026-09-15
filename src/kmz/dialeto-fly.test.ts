@@ -63,6 +63,15 @@ describe('conformidade com o KMZ da obra de Sever do Vouga', () => {
     expect(importada.rota.modoAltitude).toBe('ALT')
   })
 
+  it('reconstroi os dois ficheiros byte a byte', () => {
+    const { original, importada } = idaEVolta()
+    // Sem instantes injectados: a importacao preserva os do proprio ficheiro.
+    const gerado = gerarFly(importada.rota, droneComId('mini5pro'))
+
+    expect(gerado.template).toBe(original.template)
+    expect(gerado.waylines).toBe(original.waylines)
+  })
+
   it('reconstroi o template.kml sem uma etiqueta fora do sitio', () => {
     const { original, gerado } = idaEVolta()
     const divergencias = compararXML(lerXML(original.template), lerXML(gerado.template))

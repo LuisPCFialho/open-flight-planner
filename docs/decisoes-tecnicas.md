@@ -219,3 +219,23 @@ O primeiro ficheiro de referencia, `fly-1.0.2-template.kml` e
 `fly-1.0.2-waylines.wpml`, foi transcrito a mao e tem os numeros normalizados,
 com `50` onde o aparelho escreve `50.0` e `waypointHeadingAngleEnable` a 1. Serve
 para confirmar a estrutura, nao a formatacao.
+
+### Duas diferencas so de formatacao, tambem corrigidas
+
+O aparelho escreve as coordenadas em linha propria, indentadas, e so as
+coordenadas. E indiferente para o XML, mas nao ha razao para divergir de quem
+define o formato.
+
+```xml
+<Point>
+  <coordinates>
+    -8.41066700000000,40.7465720000000
+  </coordinates>
+</Point>
+```
+
+E o `createTime` do `template.kml` e preservado na importacao: reexportar uma
+rota lida de um ficheiro tem de dar o mesmo ficheiro, nao um com a data de hoje.
+
+Com isto, importar o `OBRA_SEVER_v4` e voltar a exporta-lo devolve os dois
+ficheiros **identicos byte a byte**, e ha um teste que o garante.

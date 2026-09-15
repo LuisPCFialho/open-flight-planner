@@ -49,6 +49,14 @@ export function importarKMZ(
   const documento = filho(raiz, 'Document')
   const avisos: string[] = []
 
+  /*
+   * O momento de criacao vive no template.kml e e preservado: reexportar uma
+   * rota importada deve dar o mesmo ficheiro, e nao um com a data de hoje.
+   */
+  const template = filho(lerXML(conteudo.template), 'Document')
+  const criadoNoAparelho = numeroEm(template, 'wpml:createTime')
+  const alteradoNoAparelho = numeroEm(template, 'wpml:updateTime')
+
   const config = filho(documento, 'wpml:missionConfig')
   const droneEnum = numeroEm(config, 'wpml:droneInfo/wpml:droneEnumValue')
   const droneSub = numeroEm(config, 'wpml:droneInfo/wpml:droneSubEnumValue')
@@ -95,8 +103,8 @@ export function importarKMZ(
     ondulacaoGeoide: ondulacao,
     waypoints,
     pois,
-    criadaEm: agora,
-    alteradaEm: agora,
+    criadaEm: criadoNoAparelho ?? agora,
+    alteradaEm: alteradoNoAparelho ?? agora,
   }
 
   if (modoAltura !== 'relativeToStartPoint' && modoAltura !== 'EGM96' && modoAltura !== 'WGS84') {

@@ -7,7 +7,18 @@
  * depois a rota nao voa.
  */
 
-export type No = { nome: string; atributos?: Record<string, string>; filhos: (No | Texto)[] }
+export type No = {
+  nome: string
+  atributos?: Record<string, string>
+  filhos: (No | Texto)[]
+  /**
+   * Escreve o texto em linha propria, indentado.
+   *
+   * O DJI Fly faz isto nas coordenadas e so nelas. E indiferente para o XML, mas
+   * o objectivo aqui e produzir o mesmo ficheiro que o aparelho produz.
+   */
+  textoIndentado?: boolean
+}
 export type Texto = { texto: string }
 
 export function no(
@@ -22,6 +33,11 @@ export function no(
 /** Elemento com um unico valor de texto. */
 export function valor(nome: string, conteudo: string | number): No {
   return { nome, filhos: [{ texto: String(conteudo) }] }
+}
+
+/** Elemento cujo texto vai numa linha propria, indentado. */
+export function valorIndentado(nome: string, conteudo: string | number): No {
+  return { nome, filhos: [{ texto: String(conteudo) }], textoIndentado: true }
 }
 
 /**
@@ -90,6 +106,10 @@ function escreverNo(elemento: No, nivel: number): string {
   // Um unico filho de texto fica na mesma linha, como nos ficheiros da DJI.
   const primeiro = elemento.filhos[0]
   if (elemento.filhos.length === 1 && primeiro && 'texto' in primeiro) {
+    if (elemento.textoIndentado) {
+      const dentro = '  '.repeat(nivel + 1)
+      return `${avanco}<${elemento.nome}${atributos}>\n${dentro}${escapar(primeiro.texto)}\n${avanco}</${elemento.nome}>`
+    }
     return `${avanco}<${elemento.nome}${atributos}>${escapar(primeiro.texto)}</${elemento.nome}>`
   }
 
