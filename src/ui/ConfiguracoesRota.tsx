@@ -153,6 +153,24 @@ export function ConfiguracoesRota({
         </section>
 
         <section className="grupo">
+          <h3>Limites acima do solo</h3>
+          <CampoNumerico
+            rotulo="Altura minima acima do solo"
+            valor={rota.alturaMinimaAcimaDoSolo}
+            unidade=" m"
+            min={1}
+            max={120}
+            incrementos={[10, 5]}
+            aoAlterar={(v) => aoAlterarRota({ alturaMinimaAcimaDoSolo: v })}
+          />
+          <p className="nota">
+            30 m serve o registo fotografico de obra. A inspeccao de paineis faz-se entre
+            20 e 40 m, e com o limite em 30 m uma rota dessas nao chegaria a exportar.
+            O maximo de 120 m nao se mexe: e regulamentar.
+          </p>
+        </section>
+
+        <section className="grupo">
           <h3>Aeronave</h3>
           <CampoSelecao
             rotulo="Drone"

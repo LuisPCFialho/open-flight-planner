@@ -88,6 +88,15 @@ export type Rota = {
   acaoPerdaSinal: AccaoPerdaSinal
   alturaRTH: number
   /**
+   * Altura minima acima do solo aceite nesta rota, em metros.
+   *
+   * 30 m serve o registo fotografico de obra. A inspeccao de paineis
+   * fotovoltaicos faz-se rotineiramente entre 20 e 40 m, e com um limite fixo
+   * uma rota dessas nunca chegaria a exportar. O maximo de 120 m nao e
+   * configuravel porque e regulamentar.
+   */
+  alturaMinimaAcimaDoSolo: number
+  /**
    * Ondulacao do geoide em metros, HAE menos ASL.
    * Confirmada em 55,6 m em Sever do Vouga, ver docs/observacoes-pilot2-simulador.md.
    */

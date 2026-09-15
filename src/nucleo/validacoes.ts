@@ -24,9 +24,20 @@ export type Validacao = {
   waypoints?: number[]
 }
 
-/** Intervalo seguro acima do solo, em metros. */
-export const AGL_MINIMO = 30
+/**
+ * Limites de altura acima do solo, em metros.
+ *
+ * O minimo e o valor de partida de uma rota nova: cada rota leva o seu em
+ * `alturaMinimaAcimaDoSolo`, porque a inspeccao de paineis voa mais baixo do
+ * que o registo de obra. O maximo nao e configuravel: e regulamentar.
+ */
+export const AGL_MINIMO_PREDEFINIDO = 30
 export const AGL_MAXIMO = 120
+
+/** Altura minima aceite nesta rota. */
+export function aglMinimoDe(rota: Rota): number {
+  return rota.alturaMinimaAcimaDoSolo
+}
 
 /** Passo de amostragem na deteccao de colisao entre waypoints. */
 export const PASSO_COLISAO = 10
@@ -80,11 +91,13 @@ function validarAlturaAcimaDoSolo(rota: Rota, contexto: ContextoValidacao): Vali
   const baixos: { indice: number; agl: number }[] = []
   const altos: { indice: number; agl: number }[] = []
 
+  const minimo = aglMinimoDe(rota)
+
   for (const waypoint of rota.waypoints) {
     const cota = contexto.cotas.get(contexto.chave(waypoint))
     if (cota === undefined) continue
     const agl = alturaASL(rota, waypoint, cota) - cota
-    if (agl < AGL_MINIMO) baixos.push({ indice: waypoint.index, agl })
+    if (agl < minimo) baixos.push({ indice: waypoint.index, agl })
     else if (agl > AGL_MAXIMO) altos.push({ indice: waypoint.index, agl })
   }
 
@@ -95,7 +108,7 @@ function validarAlturaAcimaDoSolo(rota: Rota, contexto: ContextoValidacao): Vali
     validacoes.push({
       id: 'agl-baixo',
       severidade: 'erro',
-      titulo: `${baixos.length} waypoint${baixos.length === 1 ? '' : 's'} abaixo de ${AGL_MINIMO} m do solo`,
+      titulo: `${baixos.length} waypoint${baixos.length === 1 ? '' : 's'} abaixo de ${minimo} m do solo`,
       detalhe: `O mais baixo e o ${pior.indice + 1}, a ${pior.agl.toFixed(0)} m acima do terreno.`,
       waypoints: baixos.map((b) => b.indice),
     })
@@ -151,7 +164,7 @@ function validarColisaoNosTrocos(rota: Rota, contexto: ContextoValidacao): Valid
     if (aslVoo === null || cotaTerreno === undefined) continue
 
     const folga = aslVoo - cotaTerreno
-    if (folga < AGL_MINIMO && (!pior || folga < pior.folga)) {
+    if (folga < aglMinimoDe(rota) && (!pior || folga < pior.folga)) {
       pior = { distancia: acumulado, folga }
     }
   }
@@ -165,7 +178,7 @@ function validarColisaoNosTrocos(rota: Rota, contexto: ContextoValidacao): Valid
       titulo:
         pior.folga < 0
           ? 'A rota passa por baixo do terreno entre waypoints'
-          : `A rota passa a menos de ${AGL_MINIMO} m do solo entre waypoints`,
+          : `A rota passa a menos de ${aglMinimoDe(rota)} m do solo entre waypoints`,
       detalhe: `Folga minima de ${pior.folga.toFixed(0)} m aos ${pior.distancia.toFixed(0)} m de percurso. Os waypoints podem estar folgados e o troco entre eles nao.`,
     },
   ]

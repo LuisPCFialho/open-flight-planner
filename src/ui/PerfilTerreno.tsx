@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Perfil } from '../nucleo/perfil.ts'
-import { AGL_MAXIMO, AGL_MINIMO } from '../nucleo/validacoes.ts'
+import { AGL_MAXIMO } from '../nucleo/validacoes.ts'
 
 /**
  * Corte do terreno ao longo da rota, com a linha de voo por cima.
@@ -16,6 +16,8 @@ import { AGL_MAXIMO, AGL_MINIMO } from '../nucleo/validacoes.ts'
 
 type Props = {
   perfil: Perfil
+  /** Altura minima acima do solo desta rota. */
+  aglMinimo: number
   aCarregar: boolean
   erro: string | null
   /** Waypoint em destaque, para o marcar no corte. */
@@ -31,6 +33,7 @@ const MARGEM = { topo: 12, base: 22, esquerda: 52, direita: 12 }
 
 export function PerfilTerreno({
   perfil,
+  aglMinimo,
   aCarregar,
   erro,
   seleccionados,
@@ -83,7 +86,7 @@ export function PerfilTerreno({
               type="number"
               className="numerico"
               value={alturaNivelar}
-              min={5}
+              min={1}
               max={AGL_MAXIMO}
               onChange={(e) => {
                 const lido = Number.parseFloat(e.target.value)
@@ -114,7 +117,7 @@ export function PerfilTerreno({
         {perfil.amostras.map((a, i) => {
           const proxima = perfil.amostras[i + 1]
           if (!proxima) return null
-          const fora = a.acimaDoSolo < AGL_MINIMO || a.acimaDoSolo > AGL_MAXIMO
+          const fora = a.acimaDoSolo < aglMinimo || a.acimaDoSolo > AGL_MAXIMO
           if (!fora) return null
           return (
             <rect
@@ -139,7 +142,7 @@ export function PerfilTerreno({
         />
         <path
           d={perfil.amostras
-            .map((a, i) => `${i === 0 ? 'M' : 'L'} ${x(a.percurso)} ${y(a.cotaTerreno + AGL_MINIMO)}`)
+            .map((a, i) => `${i === 0 ? 'M' : 'L'} ${x(a.percurso)} ${y(a.cotaTerreno + aglMinimo)}`)
             .join(' ')}
           className="perfil-piso"
         />
@@ -150,7 +153,7 @@ export function PerfilTerreno({
           <g
             key={marca.indice}
             className={`perfil-waypoint ${seleccionados.has(marca.indice) ? 'seleccionado' : ''} ${
-              marca.acimaDoSolo < AGL_MINIMO || marca.acimaDoSolo > AGL_MAXIMO ? 'alerta' : ''
+              marca.acimaDoSolo < aglMinimo || marca.acimaDoSolo > AGL_MAXIMO ? 'alerta' : ''
             }`}
             onClick={() => aoSeleccionarWaypoint(marca.indice)}
           >
@@ -198,7 +201,7 @@ export function PerfilTerreno({
         <span className="legenda-voo">Linha de voo</span>
         <span className="legenda-terreno">Terreno</span>
         <span className="legenda-tecto">{AGL_MAXIMO} m acima do solo</span>
-        <span className="legenda-piso">{AGL_MINIMO} m acima do solo</span>
+        <span className="legenda-piso">{aglMinimo} m acima do solo</span>
         {aCarregar ? <span className="legenda-carregar">a actualizar...</span> : null}
       </footer>
     </div>

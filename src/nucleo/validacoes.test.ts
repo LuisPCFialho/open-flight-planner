@@ -81,6 +81,38 @@ describe('altura acima do solo', () => {
     expect(problema?.detalhe).toContain('20 m')
   })
 
+  it('respeita o minimo proprio da rota, para a inspeccao de paineis poder voar baixo', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 100,
+      altura: 25,
+      terreno: () => 200,
+    })
+
+    // Com o valor de partida de 30 m, uma rota de inspeccao a 25 m nao exportava.
+    expect(comId(validarRota(rota, droneComId('mini5pro'), contexto), 'agl-baixo')?.severidade).toBe(
+      'erro',
+    )
+
+    const paraInspeccao = { ...rota, alturaMinimaAcimaDoSolo: 20 }
+    const validacoes = validarRota(paraInspeccao, droneComId('mini5pro'), contexto)
+    expect(comId(validacoes, 'agl-baixo')).toBeUndefined()
+    expect(comId(validacoes, 'colisao-troco')).toBeUndefined()
+  })
+
+  it('o maximo de 120 m nao se mexe, porque e regulamentar', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 2,
+      troco: 100,
+      altura: 150,
+      terreno: () => 200,
+    })
+    const comMinimoBaixo = { ...rota, alturaMinimaAcimaDoSolo: 5 }
+    expect(
+      comId(validarRota(comMinimoBaixo, droneComId('mini5pro'), contexto), 'agl-alto')?.severidade,
+    ).toBe('erro')
+  })
+
   it('bloqueia waypoints acima de 120 m do solo', () => {
     const { rota, contexto } = cenario({
       numeroWaypoints: 3,

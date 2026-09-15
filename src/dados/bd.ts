@@ -19,6 +19,25 @@ class BaseDeDados extends Dexie {
       projetos: 'id, nome, cliente, criadoEm',
       rotas: 'id, projetoId, nome, alteradaEm',
     })
+
+    /*
+     * A altura minima acima do solo passou a ser por rota. As rotas gravadas
+     * antes disso ficam com os 30 m que era o valor fixo ate aqui, que e o mesmo
+     * criterio com que foram planeadas.
+     */
+    this.version(2)
+      .stores({
+        projetos: 'id, nome, cliente, criadoEm',
+        rotas: 'id, projetoId, nome, alteradaEm',
+      })
+      .upgrade((transaccao) =>
+        transaccao
+          .table<Rota>('rotas')
+          .toCollection()
+          .modify((rota) => {
+            rota.alturaMinimaAcimaDoSolo ??= 30
+          }),
+      )
   }
 }
 

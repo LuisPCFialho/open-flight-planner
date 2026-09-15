@@ -4,7 +4,7 @@ import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
 import { calcularPerfil } from './nucleo/perfil.ts'
-import { PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
+import { AGL_MAXIMO, PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
 import {
   acrescentarWaypoint,
   alterarWaypoint,
@@ -39,10 +39,6 @@ import { BarraFicheiro } from './ui/BarraFicheiro.tsx'
 import { PerfilTerreno } from './ui/PerfilTerreno.tsx'
 import { PainelValidacoes } from './ui/PainelValidacoes.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
-
-/** Intervalo seguro acima do solo, em metros. Fora dele o waypoint fica assinalado. */
-const AGL_MINIMO = 30
-const AGL_MAXIMO = 120
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
 const CENTRO_INICIAL: LatLon = { lat: 40.746552, lon: -8.41061 }
@@ -132,7 +128,9 @@ export function App() {
         waypoint,
         cotaTerreno: cotas.get(chaveDaPosicao(waypoint)) ?? null,
         acimaDoSolo,
-        alerta: acimaDoSolo !== null && (acimaDoSolo < AGL_MINIMO || acimaDoSolo > AGL_MAXIMO),
+        alerta:
+          acimaDoSolo !== null &&
+          (acimaDoSolo < rota.alturaMinimaAcimaDoSolo || acimaDoSolo > AGL_MAXIMO),
       }
     })
   }, [rota, cotas, alturasAGL])
@@ -515,6 +513,7 @@ export function App() {
               {abaInferior === 'perfil' ? (
                 <PerfilTerreno
                   perfil={perfil}
+                  aglMinimo={rota.alturaMinimaAcimaDoSolo}
                   aCarregar={amostrado.aCarregar}
                   erro={amostrado.erro}
                   seleccionados={new Set(seleccao.waypoints.map((w) => w.index))}

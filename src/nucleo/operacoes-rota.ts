@@ -29,6 +29,7 @@ export function rotaVazia(dados: {
     acaoFinal: 'goHome',
     acaoPerdaSinal: 'goBack',
     alturaRTH: 100,
+    alturaMinimaAcimaDoSolo: 30,
     ondulacaoGeoide: 55.6,
     waypoints: [],
     pois: [],

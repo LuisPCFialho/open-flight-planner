@@ -1,6 +1,7 @@
 import type { Accao, Dialeto, POI, Rota, TipoCurva, Waypoint } from '../nucleo/tipos.ts'
 import { novoId } from '../nucleo/ids.ts'
 import { DRONES } from '../drones.ts'
+import { AGL_MINIMO_PREDEFINIDO } from '../nucleo/validacoes.ts'
 import { filho, filhos, lerXML, numeroEm, textoEm, type NoLido } from './parse-xml.ts'
 import { NS_FLY } from './dialeto-fly.ts'
 import { NS_PILOT2 } from './dialeto-pilot2.ts'
@@ -90,6 +91,7 @@ export function importarKMZ(
     acaoFinal: (textoEm(config, 'wpml:finishAction') ?? 'goHome') as Rota['acaoFinal'],
     acaoPerdaSinal: (textoEm(config, 'wpml:executeRCLostAction') ?? 'goBack') as Rota['acaoPerdaSinal'],
     alturaRTH: numeroEm(config, 'wpml:globalRTHHeight') ?? 100,
+    alturaMinimaAcimaDoSolo: AGL_MINIMO_PREDEFINIDO,
     ondulacaoGeoide: ondulacao,
     waypoints,
     pois,
