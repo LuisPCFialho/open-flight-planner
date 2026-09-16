@@ -9,7 +9,8 @@ import {
 import type { Feature, FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LatLon, Rota } from '../nucleo/tipos.ts'
-import { contornoFechado } from '../nucleo/areas.ts'
+import { algumDentroDaVista, contornoFechado } from '../nucleo/areas.ts'
+import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
 import { estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
@@ -57,6 +58,8 @@ export type PropsMapa = {
   aoSeleccionar: (id: string, juntar: boolean) => void
   aoMoverCursor: (cursor: CursorTerreno | null) => void
   aoRemoverPOI: (id: string) => void
+  /** Avisa quando os waypoints saem ou voltam a entrar na janela visivel. */
+  aoMudarVisibilidadeDaRota: (visivel: boolean) => void
   aoErro: (mensagem: string) => void
 }
 
@@ -94,6 +97,53 @@ export function Mapa(props: PropsMapa) {
 
     instancia.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
     instancia.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left')
+
+    /*
+     * Rato como no Google Earth.
+     *
+     * A caixa de zoom do Shift e um habito de mapas 2D que o Earth nao tem; la,
+     * Shift e o botao do meio inclinam e rodam. O resto ja batia certo: esquerdo
+     * desloca, roda aproxima sobre o cursor, direito e Ctrl rodam e inclinam.
+     */
+    instancia.boxZoom.disable()
+
+    const tela = instancia.getCanvas()
+    let arrasto: { x: number; y: number } | null = null
+
+    const comecarArrasto = (evento: MouseEvent): void => {
+      if (!arrastoDeOrientacao(evento)) return
+      evento.preventDefault()
+      arrasto = { x: evento.clientX, y: evento.clientY }
+      // Sem isto o arrastar do mapa corre ao mesmo tempo e a vista foge.
+      instancia.dragPan.disable()
+    }
+
+    const moverArrasto = (evento: MouseEvent): void => {
+      if (!arrasto) return
+      const orientacao = orientacaoAposArrasto(
+        { rumo: instancia.getBearing(), inclinacao: instancia.getPitch() },
+        evento.clientX - arrasto.x,
+        evento.clientY - arrasto.y,
+        { minima: instancia.getMinPitch(), maxima: instancia.getMaxPitch() },
+      )
+      arrasto = { x: evento.clientX, y: evento.clientY }
+      instancia.setBearing(orientacao.rumo)
+      instancia.setPitch(orientacao.inclinacao)
+    }
+
+    const largarArrasto = (): void => {
+      if (!arrasto) return
+      arrasto = null
+      instancia.dragPan.enable()
+    }
+
+    tela.addEventListener('mousedown', comecarArrasto)
+    window.addEventListener('mousemove', moverArrasto)
+    window.addEventListener('mouseup', largarArrasto)
+    // O botao do meio abre o deslocamento automatico do Windows se nao for travado.
+    tela.addEventListener('auxclick', (evento) => {
+      if (evento.button === 1) evento.preventDefault()
+    })
 
     // Um mosaico que nao chega tem de ser visivel, nao pode dar um mapa preto sem explicacao.
     instancia.on('error', (evento) => {
@@ -207,6 +257,35 @@ export function Mapa(props: PropsMapa) {
       callbacks.current.aoAdicionarWaypoint(evento.lngLat.lat, evento.lngLat.lng)
     })
 
+    /*
+     * Saber se a rota ainda esta no ecra.
+     *
+     * So se avisa quando o valor muda: isto corre a cada fotograma de
+     * deslocamento, e mandar o mesmo valor a cada um punha a aplicacao inteira a
+     * redesenhar sem motivo.
+     */
+    let rotaVisivel: boolean | null = null
+    const verificarVisibilidade = (): void => {
+      const waypoints = callbacks.current.rota.waypoints
+      const limites = instancia.getBounds()
+      const sudoeste = limites.getSouthWest()
+      const nordeste = limites.getNorthEast()
+
+      const visivel =
+        waypoints.length === 0 ||
+        algumDentroDaVista(waypoints, {
+          sudoeste: { lat: sudoeste.lat, lon: sudoeste.lng },
+          nordeste: { lat: nordeste.lat, lon: nordeste.lng },
+        })
+
+      if (visivel === rotaVisivel) return
+      rotaVisivel = visivel
+      callbacks.current.aoMudarVisibilidadeDaRota(visivel)
+    }
+
+    instancia.on('move', verificarVisibilidade)
+    instancia.on('moveend', verificarVisibilidade)
+
     instancia.on('mousemove', (evento) => {
       const { lat, lng } = evento.lngLat
       const cota = instancia.queryTerrainElevation(evento.lngLat)
@@ -224,6 +303,9 @@ export function Mapa(props: PropsMapa) {
 
     return () => {
       pronto.current = false
+      tela.removeEventListener('mousedown', comecarArrasto)
+      window.removeEventListener('mousemove', moverArrasto)
+      window.removeEventListener('mouseup', largarArrasto)
       for (const marcador of marcadores.current.values()) marcador.remove()
       marcadores.current.clear()
       for (const marcador of marcadoresPOI.current.values()) marcador.remove()
@@ -257,6 +339,8 @@ export function Mapa(props: PropsMapa) {
     const camada = camada3D.current
     if (!instancia || !camada || !pronto.current) return
     desenhar(instancia, camada, marcadores.current, marcadoresPOI.current, props, callbacks)
+    // Acrescentar ou apagar waypoints muda a resposta com o mapa parado.
+    instancia.fire('moveend')
   })
 
   // Em voo virtual o mapa acompanha a aeronave, como no Pilot 2.

@@ -1,5 +1,6 @@
 import type { EstadoVoo } from '../estado/useVooVirtual.ts'
 import type { ModoAltitude } from '../nucleo/tipos.ts'
+import { PASSO_VELOCIDADE, VELOCIDADE_MAXIMA, VELOCIDADE_MINIMA } from '../nucleo/voo.ts'
 
 /**
  * Leituras do voo virtual, com a mesma informacao que o HUD do Pilot 2:
@@ -11,11 +12,23 @@ type Props = {
   modoAltitude: ModoAltitude
   alturaASL: number
   cotaTerreno: number | null
+  /** Metros por segundo a que a aeronave anda no voo virtual. */
+  velocidade: number
+  aoAlterarVelocidade: (nova: number) => void
   aoGravar: () => void
   aoParar: () => void
 }
 
-export function HudVoo({ estado, modoAltitude, alturaASL, cotaTerreno, aoGravar, aoParar }: Props) {
+export function HudVoo({
+  estado,
+  modoAltitude,
+  alturaASL,
+  cotaTerreno,
+  velocidade,
+  aoAlterarVelocidade,
+  aoGravar,
+  aoParar,
+}: Props) {
   const acimaDoSolo = cotaTerreno === null ? null : alturaASL - cotaTerreno
 
   return (
@@ -65,14 +78,29 @@ export function HudVoo({ estado, modoAltitude, alturaASL, cotaTerreno, aoGravar,
         <span className="tecla">Z</span>
       </div>
 
+      {/* Velocidade a que se anda a reconhecer, nao a velocidade da rota. */}
+      <div className="hud-bloco hud-velocidade">
+        <span className="hud-rotulo">Deslocacao</span>
+        <span className="hud-valor numerico">{velocidade.toFixed(0)} m/s</span>
+        <input
+          type="range"
+          min={VELOCIDADE_MINIMA}
+          max={VELOCIDADE_MAXIMA}
+          step={PASSO_VELOCIDADE}
+          value={velocidade}
+          title="Velocidade do voo virtual. Tambem se muda com as teclas + e -"
+          onChange={(evento) => aoAlterarVelocidade(Number.parseFloat(evento.target.value))}
+        />
+      </div>
+
       <div className="hud-bloco hud-accoes">
         <button type="button" onClick={aoGravar} title="Shift e espaco">
           Gravar waypoint
         </button>
         <span className="hud-ajuda">
           Setas apontam o gimbal e R recentra-o. Arrastar na vista da camara aponta
-          directamente. Alt abranda tudo para o ajuste fino. Shift+Space grava,
-          Shift+F junta foto, Esc sai.
+          directamente. Mais e menos mudam a velocidade, Alt abranda tudo para o
+          ajuste fino. Shift+Space grava, Shift+F junta foto, Esc sai.
         </span>
         <button type="button" onClick={aoParar}>
           Sair do voo

@@ -15,7 +15,11 @@ export const DRONES: readonly Drone[] = [
     dialeto: 'fly',
     droneEnumValue: 68,
     droneSubEnumValue: 0,
-    camara: { temZoom: false, fovHorizontalGraus: 82, proporcao: 4 / 3 },
+    // Valores do Fly More Combo Plus, confirmados pelo operador em 16/09/2026.
+    camara: { temZoom: false, fovHorizontalGraus: 84, proporcao: 4 / 3, megapixeis: 50 },
+    velocidadeMaxWaypoint: 15,
+    alturaMaxima: 4500,
+    autonomiaMinutos: 52,
     accoesSuportadas: [
       'tirarFoto',
       'iniciarGravacao',
@@ -24,13 +28,7 @@ export const DRONES: readonly Drone[] = [
       'rodarAeronave',
       'pairar',
     ],
-    porConfirmar: [
-      'camara.fovHorizontalGraus',
-      'camara.megapixeis',
-      'velocidadeMaxWaypoint',
-      'alturaMaxima',
-      'autonomiaMinutos',
-    ],
+    porConfirmar: [],
   },
   {
     id: 'mavic3t',

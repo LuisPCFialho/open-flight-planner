@@ -238,7 +238,18 @@ describe('afastamento e autonomia', () => {
       altura: 60,
       terreno: () => 200,
     })
-    const aviso = comId(validarRota(rota, droneComId('mini5pro'), contexto), 'autonomia-desconhecida')
+    /*
+     * O drone e construido aqui e nao tirado do catalogo.
+     *
+     * Este teste usava o Mini 5 Pro, que na altura ainda nao tinha autonomia
+     * preenchida. Assim que o operador a confirmou, o teste passou a falhar sem
+     * que nada do comportamento tivesse mudado: o que se quer verificar e o que
+     * acontece sem autonomia, nao o estado do catalogo.
+     */
+    const semAutonomia: Drone = { ...droneComId('mini5pro'), porConfirmar: ['autonomiaMinutos'] }
+    delete semAutonomia.autonomiaMinutos
+
+    const aviso = comId(validarRota(rota, semAutonomia, contexto), 'autonomia-desconhecida')
     expect(aviso?.severidade).toBe('aviso')
   })
 })

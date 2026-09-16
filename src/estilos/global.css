@@ -1483,3 +1483,63 @@ button,
     display: none;
   }
 }
+
+/* Regresso a rota, quando a navegacao levou a vista para longe dela. */
+.voltar-a-rota {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 6px 14px;
+  border: 1px solid var(--destaque);
+  border-radius: var(--raio);
+  background: var(--fundo-painel);
+  color: var(--texto);
+  font-family: var(--fonte);
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.45);
+}
+
+.voltar-a-rota:hover {
+  background: var(--fundo-elevado);
+}
+
+/* Tamanhos da vista da camara. Em voo quer-se grande; a planear, a um canto. */
+.vista-camara.grande {
+  width: min(58%, 720px);
+}
+
+.vista-camara.inteira {
+  right: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  border-width: 0;
+}
+
+.vista-camara-tamanho {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  z-index: 2;
+  padding: 3px 8px;
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  background: rgb(18 23 29 / 0.82);
+  color: var(--texto);
+  font-family: var(--fonte);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.vista-camara-tamanho:hover {
+  background: var(--fundo-elevado);
+}
+
+.hud-velocidade input[type='range'] {
+  width: 120px;
+}

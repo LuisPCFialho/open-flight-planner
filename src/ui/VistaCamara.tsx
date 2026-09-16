@@ -20,6 +20,21 @@ import { estiloBase, FONTE_TERRENO } from '../mapa/estilo.ts'
  * acompanha o cursor em vez de fugir a frente ou ficar para tras.
  */
 
+/** Quanto da zona do mapa a vista ocupa. */
+export type TamanhoCamara = 'normal' | 'grande' | 'inteira'
+
+const SEGUINTE: Record<TamanhoCamara, TamanhoCamara> = {
+  normal: 'grande',
+  grande: 'inteira',
+  inteira: 'normal',
+}
+
+const NOME: Record<TamanhoCamara, string> = {
+  normal: 'Normal',
+  grande: 'Grande',
+  inteira: 'Ecra inteiro',
+}
+
 type Props = {
   posicao: LatLon
   /** Altura de voo ortometrica. */
@@ -28,6 +43,8 @@ type Props = {
   aCarregar: boolean
   /** Campo de visao horizontal em graus, para o arrasto ser de um para um. */
   fovHorizontal: number
+  tamanho: TamanhoCamara
+  aoMudarTamanho: (tamanho: TamanhoCamara) => void
   /** Aponta o gimbal, em graus. Ausente fora do voo, e entao nao se arrasta. */
   aoApontar?: (deltaPitch: number, deltaYaw: number) => void
 }
@@ -38,6 +55,8 @@ export function VistaCamara({
   enquadramento,
   aCarregar,
   fovHorizontal,
+  tamanho,
+  aoMudarTamanho,
   aoApontar,
 }: Props) {
   const contentor = useRef<HTMLDivElement>(null)
@@ -99,7 +118,7 @@ export function VistaCamara({
 
   return (
     <div
-      className={`vista-camara${aoApontar ? ' apontavel' : ''}${aArrastar ? ' a-arrastar' : ''}`}
+      className={`vista-camara ${tamanho}${aoApontar ? ' apontavel' : ''}${aArrastar ? ' a-arrastar' : ''}`}
       title={aoApontar ? 'Arrastar aponta o gimbal' : undefined}
       onPointerDown={(evento) => {
         if (!aoApontar) return
@@ -139,6 +158,17 @@ export function VistaCamara({
         <span className="terco horizontal dois" />
         <span className="mira" />
       </div>
+
+      <button
+        type="button"
+        className="vista-camara-tamanho"
+        title={`Ver em ${NOME[SEGUINTE[tamanho]].toLowerCase()}`}
+        // O arrasto aponta o gimbal; sem isto carregar aqui tambem o mexia.
+        onPointerDown={(evento) => evento.stopPropagation()}
+        onClick={() => aoMudarTamanho(SEGUINTE[tamanho])}
+      >
+        {NOME[SEGUINTE[tamanho]]}
+      </button>
 
       <div className="vista-camara-leituras numerico">
         {centro ? (

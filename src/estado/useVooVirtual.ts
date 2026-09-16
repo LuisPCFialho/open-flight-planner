@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LatLon } from '../nucleo/tipos.ts'
-import { apontarGimbal, avancarVoo, type EstadoVoo } from '../nucleo/voo.ts'
+import {
+  apontarGimbal,
+  avancarVoo,
+  PASSO_VELOCIDADE,
+  VELOCIDADE,
+  velocidadeAjustada,
+  type EstadoVoo,
+} from '../nucleo/voo.ts'
 
 export type { EstadoVoo }
 
@@ -35,6 +42,9 @@ export type ComandosVoo = {
   gravar: () => void
   /** Aponta a camara, em graus. Serve o arrastar do rato na vista da camara. */
   apontar: (deltaPitch: number, deltaYaw: number) => void
+  /** Metros por segundo a que a aeronave se desloca no voo virtual. */
+  velocidade: number
+  alterarVelocidade: (nova: number) => void
 }
 
 const TECLAS = new Set([
@@ -54,6 +64,14 @@ export function useVooVirtual(opcoes: {
     gimbalPitch: -30,
     gimbalYaw: 0,
   })
+
+  const [velocidade, setVelocidade] = useState(VELOCIDADE)
+  const velocidadeRef = useRef(velocidade)
+  velocidadeRef.current = velocidade
+
+  const alterarVelocidade = useCallback((nova: number) => {
+    setVelocidade(velocidadeAjustada(nova, 0))
+  }, [])
 
   const premidas = useRef(new Set<string>())
   const callbacks = useRef(opcoes)
@@ -122,6 +140,17 @@ export function useVooVirtual(opcoes: {
         setEstado((anterior) => ({ ...anterior, gimbalYaw: 0 }))
         return
       }
+      // Mais e menos mudam a velocidade a que se anda a reconhecer o sitio.
+      if (tecla === '+' || tecla === '=') {
+        evento.preventDefault()
+        setVelocidade((v) => velocidadeAjustada(v, PASSO_VELOCIDADE))
+        return
+      }
+      if (tecla === '-' || tecla === '_') {
+        evento.preventDefault()
+        setVelocidade((v) => velocidadeAjustada(v, -PASSO_VELOCIDADE))
+        return
+      }
       if (tecla === 'alt') {
         // Sem isto o Alt passava o foco para o menu do browser a meio do voo.
         evento.preventDefault()
@@ -165,12 +194,14 @@ export function useVooVirtual(opcoes: {
       const teclas = premidas.current
       if (teclas.size === 0) return
 
-      setEstado((actual) => avancarVoo(actual, teclas, delta))
+      setEstado((actual) =>
+        avancarVoo(actual, teclas, delta, { velocidade: velocidadeRef.current }),
+      )
     }
 
     pedido = requestAnimationFrame(passo)
     return () => cancelAnimationFrame(pedido)
   }, [activo])
 
-  return { activo, estado, arrancar, parar, colocar, gravar, apontar }
+  return { activo, estado, arrancar, parar, colocar, gravar, apontar, velocidade, alterarVelocidade }
 }

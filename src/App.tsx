@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Area, LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
+import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
 import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
@@ -34,7 +34,7 @@ import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
 import { lerDXF } from './terreno/dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
 import { importarAreas } from './kmz/ficheiro.ts'
-import { areaDoContorno, centroDasAreas, formatarArea } from './nucleo/areas.ts'
+import { areaDoContorno, centroDasAreas, envolvente, formatarArea } from './nucleo/areas.ts'
 import {
   apagarRota,
   bd,
@@ -56,7 +56,7 @@ import { ConfiguracoesRota } from './ui/ConfiguracoesRota.tsx'
 import { BarraFicheiro } from './ui/BarraFicheiro.tsx'
 import { PerfilTerreno } from './ui/PerfilTerreno.tsx'
 import { PainelValidacoes } from './ui/PainelValidacoes.tsx'
-import { VistaCamara } from './ui/VistaCamara.tsx'
+import { VistaCamara, type TamanhoCamara } from './ui/VistaCamara.tsx'
 import { HudVoo } from './ui/HudVoo.tsx'
 import { EcraProjetos } from './ui/EcraProjetos.tsx'
 import { SelectorRota } from './ui/SelectorRota.tsx'
@@ -112,6 +112,8 @@ export function App() {
   const seleccao = useSeleccao(rota)
 
   const [modo3D, setModo3D] = useState(false)
+  const [rotaVisivel, setRotaVisivel] = useState(true)
+  const [tamanhoCamara, setTamanhoCamara] = useState<TamanhoCamara>('normal')
   const [modoPOI, setModoPOI] = useState(false)
   const [configuracoesAbertas, setConfiguracoesAbertas] = useState(false)
   const [abaInferior, setAbaInferior] = useState<'perfil' | 'validacoes' | null>('perfil')
@@ -712,12 +714,12 @@ export function App() {
                     // Leva a vista ate la, com a area toda enquadrada: o
                     // ficheiro importado e quase sempre de outro sitio do mapa.
                     const centro = centroDasAreas(areas)
-                    const envolvente = envolventeDasAreas(areas)
+                    const caixa = envolvente(areas.flatMap((a) => a.contorno))
                     if (centro) {
                       setCentrarEm({
                         posicao: centro,
                         pedido: Date.now(),
-                        ...(envolvente ? { envolvente } : {}),
+                        ...(caixa ? { envolvente: caixa } : {}),
                       })
                     }
                   })
@@ -887,6 +889,7 @@ export function App() {
             enquadramento={enquadramento}
             seguir={voo.activo ? { posicao: voo.estado.posicao, guinada: voo.estado.guinada } : null}
             centrarEm={centrarEm}
+            aoMudarVisibilidadeDaRota={setRotaVisivel}
             centroInicial={CENTRO_INICIAL}
             aoAdicionarWaypoint={aoAdicionarWaypoint}
             aoInserirWaypoint={aoInserirWaypoint}
@@ -908,6 +911,32 @@ export function App() {
             />
           ) : null}
 
+          {/*
+            * Perdeu-se a rota de vista: oferece-se o caminho de volta.
+            *
+            * Navegar em 3D leva mais longe do que se pensa, e sem isto so se
+            * volta procurando o sitio outra vez a mao.
+            */}
+          {!rotaVisivel && rota.waypoints.length > 0 && !voo.activo ? (
+            <button
+              type="button"
+              className="voltar-a-rota"
+              title="A rota ficou fora da vista"
+              onClick={() => {
+                const caixa = envolvente(rota.waypoints)
+                const primeiro = rota.waypoints[0]
+                if (!primeiro) return
+                setCentrarEm({
+                  posicao: { lat: primeiro.lat, lon: primeiro.lon },
+                  pedido: Date.now(),
+                  ...(caixa ? { envolvente: caixa } : {}),
+                })
+              }}
+            >
+              Centrar na rota
+            </button>
+          ) : null}
+
           {alvoCamara ? (
             <VistaCamara
               posicao={alvoCamara.posicao}
@@ -915,6 +944,8 @@ export function App() {
               enquadramento={enquadramento}
               aCarregar={enquadramentoACarregar}
               fovHorizontal={drone.camara.fovHorizontalGraus ?? 80}
+              tamanho={tamanhoCamara}
+              aoMudarTamanho={setTamanhoCamara}
               {...(voo.activo ? { aoApontar: voo.apontar } : {})}
             />
           ) : null}
@@ -925,6 +956,8 @@ export function App() {
               modoAltitude={rota.modoAltitude}
               alturaASL={alvoCamara.alturaASL}
               cotaTerreno={cotas.get(chaveDaPosicao(voo.estado.posicao)) ?? null}
+              velocidade={voo.velocidade}
+              aoAlterarVelocidade={voo.alterarVelocidade}
               aoGravar={voo.gravar}
               aoParar={voo.parar}
             />
@@ -1072,24 +1105,3 @@ function alturaPredefinida(rota: Rota): number {
   return rota.waypoints.at(-1)?.altura ?? 60
 }
 
-/** Envolvente de todas as areas, na forma que o `fitBounds` do mapa espera. */
-function envolventeDasAreas(areas: readonly Area[]): [[number, number], [number, number]] | null {
-  const pontos = areas.flatMap((area) => area.contorno)
-  const primeiro = pontos[0]
-  if (!primeiro) return null
-
-  let latMin = primeiro.lat
-  let latMax = primeiro.lat
-  let lonMin = primeiro.lon
-  let lonMax = primeiro.lon
-  for (const ponto of pontos) {
-    latMin = Math.min(latMin, ponto.lat)
-    latMax = Math.max(latMax, ponto.lat)
-    lonMin = Math.min(lonMin, ponto.lon)
-    lonMax = Math.max(lonMax, ponto.lon)
-  }
-  return [
-    [lonMin, latMin],
-    [lonMax, latMax],
-  ]
-}

@@ -4,8 +4,10 @@ import { deslocar } from './geodesia.ts'
 import {
   areaDoContorno,
   centroDasAreas,
+  algumDentroDaVista,
   centroDoContorno,
   contornoFechado,
+  envolvente,
   formatarArea,
   perimetroDoContorno,
 } from './areas.ts'
@@ -124,5 +126,50 @@ describe('fecho do anel para desenho', () => {
     expect(contornoFechado([])).toEqual([])
     expect(contornoFechado([CANTO])).toEqual([])
     expect(contornoFechado([CANTO, deslocar(CANTO, 90, 10)])).toEqual([])
+  })
+})
+
+describe('envolvente e visibilidade', () => {
+  const vista = {
+    sudoeste: { lat: 40.740, lon: -8.420 },
+    nordeste: { lat: 40.750, lon: -8.400 },
+  }
+
+  it('devolve os dois cantos na ordem que o mapa espera', () => {
+    const caixa = envolvente(quadrado(100))
+    if (!caixa) throw new Error('sem envolvente')
+    const [[lonMin, latMin], [lonMax, latMax]] = caixa
+
+    expect(lonMin).toBeLessThan(lonMax)
+    expect(latMin).toBeLessThan(latMax)
+    expect(latMin).toBeCloseTo(CANTO.lat, 6)
+  })
+
+  it('nao inventa envolvente sem pontos', () => {
+    expect(envolvente([])).toBeNull()
+  })
+
+  it('ve um ponto que esta dentro da janela', () => {
+    expect(algumDentroDaVista([{ lat: 40.745, lon: -8.410 }], vista)).toBe(true)
+  })
+
+  it('nao ve nada quando a rota ficou toda fora da janela', () => {
+    const longe = [
+      { lat: 41.2, lon: -8.6 },
+      { lat: 41.3, lon: -8.7 },
+    ]
+    expect(algumDentroDaVista(longe, vista)).toBe(false)
+  })
+
+  it('basta um waypoint dentro para a rota contar como visivel', () => {
+    const meio = [
+      { lat: 41.2, lon: -8.6 },
+      { lat: 40.745, lon: -8.410 },
+    ]
+    expect(algumDentroDaVista(meio, vista)).toBe(true)
+  })
+
+  it('uma rota sem waypoints nao esta dentro de vista nenhuma', () => {
+    expect(algumDentroDaVista([], vista)).toBe(false)
   })
 })

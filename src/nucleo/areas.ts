@@ -2,7 +2,8 @@ import type { Area, LatLon } from './tipos.ts'
 import { deslocamentoLocal } from './geodesia.ts'
 
 /**
- * Contas sobre as areas de referencia importadas de KMZ ou KML.
+ * Contas sobre extensoes no mapa: areas de referencia, envolventes, e se o que
+ * interessa ainda esta dentro da vista.
  *
  * A area sai da formula do sapateiro sobre deslocamentos locais em metros, com
  * origem no primeiro vertice. Para um parque fotovoltaico, que raramente passa
@@ -55,9 +56,14 @@ export function perimetroDoContorno(contorno: readonly LatLon[]): number {
   return total
 }
 
-/** Centro da envolvente do contorno, para levar a vista ate la. */
-export function centroDoContorno(contorno: readonly LatLon[]): LatLon | null {
-  const primeiro = contorno[0]
+/**
+ * Envolvente de um conjunto de pontos, na forma que o `fitBounds` do mapa
+ * espera: canto sudoeste e canto nordeste, cada um em longitude e latitude.
+ */
+export function envolvente(
+  pontos: readonly LatLon[],
+): [[number, number], [number, number]] | null {
+  const primeiro = pontos[0]
   if (!primeiro) return null
 
   let latMin = primeiro.lat
@@ -65,13 +71,45 @@ export function centroDoContorno(contorno: readonly LatLon[]): LatLon | null {
   let lonMin = primeiro.lon
   let lonMax = primeiro.lon
 
-  for (const ponto of contorno) {
+  for (const ponto of pontos) {
     latMin = Math.min(latMin, ponto.lat)
     latMax = Math.max(latMax, ponto.lat)
     lonMin = Math.min(lonMin, ponto.lon)
     lonMax = Math.max(lonMax, ponto.lon)
   }
+  return [
+    [lonMin, latMin],
+    [lonMax, latMax],
+  ]
+}
+
+/** Centro da envolvente do contorno, para levar a vista ate la. */
+export function centroDoContorno(contorno: readonly LatLon[]): LatLon | null {
+  const caixa = envolvente(contorno)
+  if (!caixa) return null
+
+  const [[lonMin, latMin], [lonMax, latMax]] = caixa
   return { lat: (latMin + latMax) / 2, lon: (lonMin + lonMax) / 2 }
+}
+
+/**
+ * Se algum dos pontos cai dentro da janela visivel.
+ *
+ * Serve para saber quando oferecer o regresso a rota: navegou-se para longe e os
+ * waypoints deixaram de estar no ecra, sem nada que os va buscar de volta a nao
+ * ser procurar o sitio outra vez a mao.
+ */
+export function algumDentroDaVista(
+  pontos: readonly LatLon[],
+  vista: { sudoeste: LatLon; nordeste: LatLon },
+): boolean {
+  return pontos.some(
+    (ponto) =>
+      ponto.lat >= vista.sudoeste.lat &&
+      ponto.lat <= vista.nordeste.lat &&
+      ponto.lon >= vista.sudoeste.lon &&
+      ponto.lon <= vista.nordeste.lon,
+  )
 }
 
 /** Centro da envolvente de varias areas de uma vez. */

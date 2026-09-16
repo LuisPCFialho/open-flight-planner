@@ -24,6 +24,18 @@ export type EstadoVoo = {
 
 /** Metros por segundo em translacao, graus por segundo em rotacao. */
 export const VELOCIDADE = 18
+
+/**
+ * Gama da velocidade de deslocacao no voo virtual.
+ *
+ * Nao e a velocidade da rota: e a que se anda a reconhecer o sitio. A devagar
+ * enquadra-se um alcado com cuidado, a depressa atravessa-se uma central de
+ * ponta a ponta sem esperar.
+ */
+export const VELOCIDADE_MINIMA = 2
+export const VELOCIDADE_MAXIMA = 60
+/** Passo de cada toque nas teclas de mais e menos. */
+export const PASSO_VELOCIDADE = 2
 export const VELOCIDADE_VERTICAL = 10
 export const ROTACAO = 70
 export const ROTACAO_GIMBAL = 45
@@ -63,7 +75,9 @@ export function avancarVoo(
   estado: EstadoVoo,
   teclas: ReadonlySet<string>,
   delta: number,
+  opcoes: { velocidade?: number } = {},
 ): EstadoVoo {
+  const velocidade = opcoes.velocidade ?? VELOCIDADE
   const fino = teclas.has('alt') ? FACTOR_FINO : 1
   let { posicao, altura, guinada, gimbalPitch, gimbalYaw } = estado
 
@@ -84,7 +98,7 @@ export function avancarVoo(
      * sozinho. Aqui so interessa a direccao, que sai do `atan2`.
      */
     const rumo = normalizarGraus(guinada + (Math.atan2(lado, frente) * 180) / Math.PI)
-    posicao = deslocar(posicao, rumo, VELOCIDADE * delta * fino)
+    posicao = deslocar(posicao, rumo, velocidade * delta * fino)
   }
 
   // Aeronave.
@@ -105,6 +119,11 @@ export function avancarVoo(
   gimbalYaw = limitar(gimbalYaw, -YAW_MAXIMO, YAW_MAXIMO)
 
   return { posicao, altura, guinada, gimbalPitch, gimbalYaw }
+}
+
+/** Velocidade de deslocacao depois de somar `delta`, dentro da gama aceite. */
+export function velocidadeAjustada(actual: number, delta: number): number {
+  return limitar(actual + delta, VELOCIDADE_MINIMA, VELOCIDADE_MAXIMA)
 }
 
 /** Aponta o gimbal por incrementos, com os mesmos limites. Serve o rato. */
