@@ -1,4 +1,5 @@
 import type { Area, Drone, LatLon, Rota } from '../nucleo/tipos.ts'
+import { descarregar, nomeSeguro } from '../descarregar.ts'
 import { distancia } from '../nucleo/geodesia.ts'
 import type { FonteTerreno } from '../terreno/fonte.ts'
 import { novoId } from '../nucleo/ids.ts'
@@ -31,14 +32,7 @@ export function gerarParaDrone(
 
 /** Nome de ficheiro seguro, derivado do nome da rota. */
 export function nomeDoFicheiro(rota: Rota): string {
-  const limpo = rota.nome
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^\w\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .toLowerCase()
-  return `${limpo || 'rota'}.kmz`
+  return nomeSeguro(rota.nome, 'kmz', 'rota')
 }
 
 export async function exportarKMZ(
@@ -47,18 +41,7 @@ export async function exportarKMZ(
   opcoes: OpcoesExportacao = {},
 ): Promise<void> {
   const blob = await criarKMZ(gerarParaDrone(rota, drone, opcoes))
-  const url = URL.createObjectURL(blob)
-  try {
-    const ligacao = document.createElement('a')
-    ligacao.href = url
-    ligacao.download = nomeDoFicheiro(rota)
-    document.body.appendChild(ligacao)
-    ligacao.click()
-    ligacao.remove()
-  } finally {
-    // Sem isto o blob fica em memoria ate a pagina fechar.
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
+  descarregar(blob, nomeDoFicheiro(rota))
 }
 
 export async function importarFicheiro(

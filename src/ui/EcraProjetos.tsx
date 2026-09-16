@@ -1,3 +1,4 @@
+import { descarregarTexto, nomeSeguro } from '../descarregar.ts'
 import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { Projeto } from '../nucleo/tipos.ts'
@@ -44,15 +45,11 @@ export function EcraProjetos({ aoAbrir }: Props) {
     const conteudo = await lerProjetoComRotas(projeto.id)
     if (!conteudo) return
 
-    const texto = JSON.stringify(paraFicheiro(conteudo), null, 2)
-    const url = URL.createObjectURL(new Blob([texto], { type: 'application/json' }))
-    const ligacao = document.createElement('a')
-    ligacao.href = url
-    ligacao.download = `${projeto.nome.replace(/[^\w-]+/g, '-').toLowerCase()}.json`
-    document.body.appendChild(ligacao)
-    ligacao.click()
-    ligacao.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    descarregarTexto(
+      JSON.stringify(paraFicheiro(conteudo), null, 2),
+      nomeSeguro(projeto.nome, 'json', 'projeto'),
+      'application/json',
+    )
   }
 
   const importar = async (ficheiro: File): Promise<void> => {

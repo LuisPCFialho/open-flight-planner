@@ -40,6 +40,7 @@ import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
+import { descarregarTexto, nomeSeguro } from './descarregar.ts'
 import { envolvente } from './nucleo/areas.ts'
 import {
   apagarRota,
@@ -61,6 +62,7 @@ import { ControlosVista } from './ui/ControlosVista.tsx'
 import { PainelCobertura } from './ui/PainelCobertura.tsx'
 import { Regua } from './ui/Regua.tsx'
 import { BotaoAreas, BotaoTopografia } from './ui/BotoesImportar.tsx'
+import { BarraModos } from './ui/BarraModos.tsx'
 import { useCanal } from './ui/canal.ts'
 import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
@@ -77,7 +79,6 @@ import { HudVoo } from './ui/HudVoo.tsx'
 import { PlayerReplay } from './ui/PlayerReplay.tsx'
 import { EcraProjetos } from './ui/EcraProjetos.tsx'
 import { SelectorRota } from './ui/SelectorRota.tsx'
-import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
 const CENTRO_INICIAL: LatLon = { lat: 40.746552, lon: -8.41061 }
@@ -748,17 +749,11 @@ export function App() {
               // Uma excepcao aqui dentro sairia de um `onClick` sem ninguem a
               // apanha-la, e o que o utilizador via era o botao a nao fazer nada.
               try {
-                const texto = exportarKML(rota, { cotas, chave: chaveDaPosicao })
-                const url = URL.createObjectURL(
-                  new Blob([texto], { type: 'application/vnd.google-earth.kml+xml' }),
+                descarregarTexto(
+                  exportarKML(rota, { cotas, chave: chaveDaPosicao }),
+                  nomeSeguro(rota.nome, 'kml', 'rota'),
+                  'application/vnd.google-earth.kml+xml',
                 )
-                const ligacao = document.createElement('a')
-                ligacao.href = url
-                ligacao.download = `${rota.nome.replace(/[^\w-]+/g, '-').toLowerCase()}.kml`
-                document.body.appendChild(ligacao)
-                ligacao.click()
-                ligacao.remove()
-                setTimeout(() => URL.revokeObjectURL(url), 1000)
                 setFalha(null)
               } catch (causa: unknown) {
                 setFalha(causa instanceof Error ? causa.message : 'falha a exportar o KML')
@@ -767,95 +762,19 @@ export function App() {
           >
             KML
           </button>
-          <button
-            type="button"
-            className={modoMapa === 'waypoint' ? 'activo' : ''}
-            title="Enquanto estiver ligado, clicar no mapa acrescenta um waypoint. Alt e clique num troço insere no meio."
-            onClick={() => alternarModo('waypoint')}
-          >
-            Criar waypoints
-          </button>
-          <button
-            type="button"
-            className={modoMapa === 'poi' ? 'activo' : ''}
-            title="Clicar no mapa cria um ponto de interesse"
-            onClick={() => alternarModo('poi')}
-          >
-            POI
-          </button>
-          <button
-            type="button"
-            className={modoMapa === 'medir' ? 'activo' : ''}
-            title="Medir distâncias e áreas no mapa, sem mexer na rota"
-            onClick={() => alternarModo('medir')}
-          >
-            Medir
-          </button>
-          <button
-            type="button"
-            className={voo.activo ? 'activo' : ''}
-            title="Pilotar a aeronave pelo mapa e gravar waypoints com a atitude em que está"
-            onClick={() => {
-              if (voo.activo) {
-                voo.parar()
-                return
-              }
-              const ultimo = rota.waypoints.at(-1)
-              voo.arrancar({
-                posicao: ultimo
-                  ? { lat: ultimo.lat, lon: ultimo.lon }
-                  : { lat: rota.pontoDescolagem.lat, lon: rota.pontoDescolagem.lon },
-                altura: ultimo?.altura ?? 60,
-                guinada: ultimo?.guinada ?? 0,
-                gimbalPitch: ultimo?.gimbalPitch ?? -30,
-                gimbalYaw: ultimo?.gimbalYaw ?? 0,
-              })
-            }}
-          >
-            Voo virtual
-          </button>
-          <button
-            type="button"
-            className={replay.activo ? 'activo' : ''}
-            disabled={rota.waypoints.length < 2}
-            title="Percorrer a rota no tempo, para ver o voo antes de o fazer"
-            onClick={() => {
-              if (replay.activo) {
-                replay.fechar()
-                return
-              }
-              // Os dois não correm ao mesmo tempo: são duas aeronaves no mesmo sítio.
-              if (voo.activo) voo.parar()
-              replay.abrir()
-            }}
-          >
-            Replay
-          </button>
-          <button
-            type="button"
-            title="Desfazer (Ctrl+Z)"
-            disabled={!editor.podeDesfazer}
-            onClick={editor.desfazer}
-          >
-            <IconeDesfazer />
-          </button>
-          <button
-            type="button"
-            title="Refazer (Ctrl+Shift+Z)"
-            disabled={!editor.podeRefazer}
-            onClick={editor.refazer}
-          >
-            <IconeRefazer />
-          </button>
-          <button
-            type="button"
-            className={modo3D ? 'activo' : ''}
-            onClick={() => setModo3D((v) => !v)}
-            title="Alternar entre 2D e 3D"
-          >
-            <IconeTerreno />
-            {modo3D ? '3D' : '2D'}
-          </button>
+          <BarraModos
+            rota={rota}
+            modoMapa={modoMapa}
+            aoAlternarModo={alternarModo}
+            voo={voo}
+            replay={replay}
+            modo3D={modo3D}
+            aoAlternar3D={() => setModo3D((v) => !v)}
+            podeDesfazer={editor.podeDesfazer}
+            podeRefazer={editor.podeRefazer}
+            aoDesfazer={editor.desfazer}
+            aoRefazer={editor.refazer}
+          />
         </div>
       </header>
 
