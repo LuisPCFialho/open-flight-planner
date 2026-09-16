@@ -138,19 +138,40 @@ export async function importarAreas(
     )
   }
 
+  /** Linhas que quase fecham mas ficaram de fora, para a mensagem de erro. */
+  const quaseFechadas: { nome: string; folga: number }[] = []
+
   if (areas.length === 0) {
     for (const linha of conteudo.linhas) {
       const contorno = linha.pontos.map((p) => ({ lat: p.lat, lon: p.lon }))
-      if (!pareceFechada(contorno)) continue
+      const folga = folgaDeFecho(contorno)
+
+      if (folga === null) {
+        if (contorno.length >= 4) {
+          const primeiro = contorno[0]
+          const ultimo = contorno.at(-1)
+          if (primeiro && ultimo) {
+            quaseFechadas.push({ nome: linha.nome, folga: distancia(primeiro, ultimo) })
+          }
+        }
+        continue
+      }
 
       areas.push({ id: novoId(), nome: linha.nome, contorno: semFecho(contorno) })
-      avisos.push(`"${linha.nome}" veio como linha e foi lida como contorno fechado`)
+      avisos.push(
+        folga > 0.5
+          ? `"${linha.nome}" veio como linha aberta por ${folga.toFixed(1)} m e foi fechada`
+          : `"${linha.nome}" veio como linha e foi lida como contorno fechado`,
+      )
     }
   }
 
   if (areas.length === 0) {
+    const pior = quaseFechadas.sort((a, b) => a.folga - b.folga)[0]
     throw new Error(
-      `${ficheiro.name} nao traz nenhum poligono nem linha fechada. Confirma que o desenho tem o limite desenhado como area ou como polilinha fechada, e nao so marcadores.`,
+      pior
+        ? `${ficheiro.name} traz "${pior.nome}" como linha aberta: faltam ${pior.folga.toFixed(0)} m para fechar o contorno. Fecha o desenho no ponto de partida e volta a exportar.`
+        : `${ficheiro.name} nao traz nenhum poligono nem linha fechada. Confirma que o desenho tem o limite desenhado como area ou como polilinha fechada, e nao so marcadores.`,
     )
   }
 
@@ -177,18 +198,50 @@ async function textoKML(bytes: Uint8Array, nomeDoFicheiro: string): Promise<stri
   return entrada.async('string')
 }
 
+/** Folga de fecho aceite, em metros e em fraccao do perimetro. */
+export const FECHO_ABSOLUTO = 5
+export const FECHO_RELATIVO = 0.02
+
 /**
  * Se a linha volta ao ponto de partida, dentro de uma tolerancia generosa.
  *
- * Um metro de folga cobre o desenho feito a mao que quase fecha. Sem isto, um
- * limite desenhado como polilinha ficava de fora por uma questao de etiqueta.
+ * A tolerancia e relativa ao perimetro, e nao um numero fixo. Um metro de folga
+ * - que era o criterio - parece razoavel ate se olhar para um caso real: um
+ * perimetro de central desenhado a mao no Google Earth Pro, 410 pontos e 3808 m
+ * de volta, fechava com 6,25 m de folga, ou seja 0,16% do percurso. Ficava de
+ * fora por uma questao de etiqueta, com uma mensagem a dizer que o ficheiro nao
+ * tinha poligonos nenhuns - o que nem era verdade.
+ *
+ * Isto e um rascunho da area a filmar, nao um levantamento cadastral: dois por
+ * cento de folga num contorno de referencia nao muda nenhuma decisao, e ser
+ * rigido recusa trabalho legitimo.
  */
-function pareceFechada(contorno: readonly LatLon[]): boolean {
-  if (contorno.length < 4) return false
+export function pareceFechada(contorno: readonly LatLon[]): boolean {
+  return folgaDeFecho(contorno) !== null
+}
+
+/**
+ * Metros que faltam para a linha fechar, ou `null` se ela nao fecha de todo.
+ *
+ * Serve tambem a mensagem de erro: dizer quantos metros faltam e o que permite
+ * a quem desenhou ir corrigir, em vez de ficar a adivinhar.
+ */
+export function folgaDeFecho(contorno: readonly LatLon[]): number | null {
+  if (contorno.length < 4) return null
   const primeiro = contorno[0]
   const ultimo = contorno.at(-1)
-  if (!primeiro || !ultimo) return false
-  return distancia(primeiro, ultimo) < 1
+  if (!primeiro || !ultimo) return null
+
+  let perimetro = 0
+  for (let i = 1; i < contorno.length; i++) {
+    const de = contorno[i - 1]
+    const para = contorno[i]
+    if (de && para) perimetro += distancia(de, para)
+  }
+
+  const folga = distancia(primeiro, ultimo)
+  const tolerancia = Math.max(FECHO_ABSOLUTO, perimetro * FECHO_RELATIVO)
+  return folga <= tolerancia ? folga : null
 }
 
 /** Tira o ponto de fecho, que nao se guarda. */

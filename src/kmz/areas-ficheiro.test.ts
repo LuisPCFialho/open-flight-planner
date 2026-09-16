@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import JSZip from 'jszip'
-import { importarAreas } from './ficheiro.ts'
+import { folgaDeFecho, importarAreas, pareceFechada } from './ficheiro.ts'
 import { areaDoContorno, formatarArea } from '../nucleo/areas.ts'
+import { deslocar } from '../nucleo/geodesia.ts'
 
 /**
  * Leitura do ficheiro que traz a area a filmar.
@@ -141,7 +142,21 @@ describe('limites desenhados como polilinha', () => {
       </coordinates></LineString></Placemark>
     </Document></kml>`
 
+    /*
+     * A mensagem diz de que linha se trata e quantos metros faltam: quem
+     * desenhou vai corrigir o desenho, e "o ficheiro nao traz poligonos" nao o
+     * levava la - alem de nem ser verdade, porque a linha esta la.
+     */
     await expect(importarAreas(ficheiroKML('acesso.kml', aberta))).rejects.toThrow(
+      /"Acesso" como linha aberta: faltam \d+ m/,
+    )
+  })
+
+  it('um ficheiro so com marcadores diz que nao traz contorno nenhum', async () => {
+    const soPontos = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+      <Placemark><name>Entrada</name><Point><coordinates>-8.41,40.74</coordinates></Point></Placemark>
+    </Document></kml>`
+    await expect(importarAreas(ficheiroKML('pontos.kml', soPontos))).rejects.toThrow(
       /nem linha fechada/,
     )
   })
@@ -159,5 +174,64 @@ describe('limites desenhados como polilinha', () => {
     const { areas } = await importarAreas(ficheiroKML('ambos.kml', ambos))
     expect(areas).toHaveLength(1)
     expect(areas[0]?.nome).toBe('Parcela')
+  })
+})
+
+describe('tolerancia de fecho', () => {
+  /** Anel de `lados` pontos e `raio` metros, com o fim a `folga` metros do inicio. */
+  function anelQuaseFechado(lados: number, raio: number, folga: number) {
+    const centro = { lat: 40.745, lon: -8.42 }
+    const pontos: { lat: number; lon: number }[] = []
+    for (let i = 0; i < lados; i++) {
+      pontos.push(deslocar(centro, (i / lados) * 360, raio))
+    }
+    // Fecha-se com um ponto a `folga` metros do primeiro.
+    const primeiro = pontos[0]
+    if (!primeiro) throw new Error('anel vazio')
+    pontos.push(folga === 0 ? primeiro : deslocar(primeiro, 90, folga))
+    return pontos
+  }
+
+  it('um contorno que fecha exactamente e aceite', () => {
+    expect(folgaDeFecho(anelQuaseFechado(40, 600, 0))).toBe(0)
+  })
+
+  it('aceita o perimetro real de Sever do Vouga, que fechava a olho', () => {
+    /*
+     * O caso que revelou o defeito: 3808 m de volta e 6,25 m de folga, ou seja
+     * 0,16% do percurso. Com o limite fixo de um metro era recusado, e com uma
+     * mensagem a dizer que o ficheiro nao tinha poligonos nenhuns.
+     */
+    const anel = anelQuaseFechado(410, 606, 6.25)
+    const folga = folgaDeFecho(anel)
+    expect(folga).not.toBeNull()
+    expect(folga ?? 0).toBeCloseTo(6.25, 0)
+  })
+
+  it('uma linha aberta de verdade continua a ser recusada', () => {
+    // Metade do raio de folga num anel pequeno: isto nao e um contorno.
+    expect(folgaDeFecho(anelQuaseFechado(8, 40, 120))).toBeNull()
+  })
+
+  it('a tolerancia acompanha o tamanho do contorno', () => {
+    // Dez metros de folga sao muito num talhao pequeno e nada num perimetro grande.
+    expect(folgaDeFecho(anelQuaseFechado(12, 25, 10))).toBeNull()
+    expect(folgaDeFecho(anelQuaseFechado(200, 600, 10))).not.toBeNull()
+  })
+
+  it('ha sempre uma folga absoluta, para os contornos pequenos', () => {
+    // Num quadrado de 10 m de lado, dois por cento seriam oito centimetros.
+    expect(folgaDeFecho(anelQuaseFechado(4, 7, 3))).not.toBeNull()
+  })
+
+  it('menos de quatro pontos nao e contorno nenhum', () => {
+    expect(folgaDeFecho([{ lat: 40, lon: -8 }, { lat: 40.001, lon: -8 }])).toBeNull()
+  })
+
+  it('pareceFechada concorda com folgaDeFecho', () => {
+    const bom = anelQuaseFechado(40, 600, 5)
+    const mau = anelQuaseFechado(8, 40, 120)
+    expect(pareceFechada(bom)).toBe(true)
+    expect(pareceFechada(mau)).toBe(false)
   })
 })
