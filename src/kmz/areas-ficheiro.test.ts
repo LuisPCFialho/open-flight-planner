@@ -110,3 +110,54 @@ describe('importar areas de referencia', () => {
     await expect(importarAreas(ficheiro)).rejects.toThrow(/nao tem nenhum \.kml/)
   })
 })
+
+describe('limites desenhados como polilinha', () => {
+  /** Quadrado de cerca de 100 m, com o ultimo ponto a fechar sobre o primeiro. */
+  const LINHA_FECHADA = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+    <Placemark><name>Limite CAD</name><LineString><coordinates>
+      -8.4110,40.7460 -8.4098,40.7460 -8.4098,40.7469 -8.4110,40.7469 -8.4110,40.7460
+    </coordinates></LineString></Placemark>
+  </Document></kml>`
+
+  it('le uma polilinha fechada como contorno', async () => {
+    // Muito desenho de limites sai de CAD como polilinha e nao como area.
+    const { areas, avisos } = await importarAreas(ficheiroKML('cad.kml', LINHA_FECHADA))
+
+    expect(areas).toHaveLength(1)
+    expect(areas[0]?.nome).toBe('Limite CAD')
+    expect(areas[0]?.contorno).toHaveLength(4)
+    expect(avisos.join(' ')).toMatch(/linha/)
+  })
+
+  it('a area lida da polilinha bate certo', async () => {
+    const { areas } = await importarAreas(ficheiroKML('cad.kml', LINHA_FECHADA))
+    expect(areaDoContorno(areas[0]?.contorno ?? [])).toBeGreaterThan(9000)
+  })
+
+  it('nao aceita uma linha que fica aberta', async () => {
+    const aberta = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+      <Placemark><name>Acesso</name><LineString><coordinates>
+        -8.4110,40.7460 -8.4098,40.7460 -8.4098,40.7469 -8.4080,40.7480
+      </coordinates></LineString></Placemark>
+    </Document></kml>`
+
+    await expect(importarAreas(ficheiroKML('acesso.kml', aberta))).rejects.toThrow(
+      /nem linha fechada/,
+    )
+  })
+
+  it('havendo poligonos, as linhas nao entram', async () => {
+    const ambos = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+      <Placemark><name>Caminho</name><LineString><coordinates>
+        -8.4110,40.7460 -8.4098,40.7460 -8.4098,40.7469 -8.4110,40.7469 -8.4110,40.7460
+      </coordinates></LineString></Placemark>
+      <Placemark><name>Parcela</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+        -8.4140,40.7430 -8.4130,40.7430 -8.4130,40.7440
+      </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+    </Document></kml>`
+
+    const { areas } = await importarAreas(ficheiroKML('ambos.kml', ambos))
+    expect(areas).toHaveLength(1)
+    expect(areas[0]?.nome).toBe('Parcela')
+  })
+})

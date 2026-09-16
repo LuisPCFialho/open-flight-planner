@@ -1,4 +1,5 @@
-import type { Area, Drone, Rota } from '../nucleo/tipos.ts'
+import type { Area, Drone, LatLon, Rota } from '../nucleo/tipos.ts'
+import { distancia } from '../nucleo/geodesia.ts'
 import type { FonteTerreno } from '../terreno/fonte.ts'
 import { novoId } from '../nucleo/ids.ts'
 import { gerarFly } from './dialeto-fly.ts'
@@ -123,14 +124,33 @@ export async function importarAreas(
     contorno: poligono.contorno,
   }))
 
-  if (areas.length === 0) {
-    throw new Error(
-      `${ficheiro.name} nao traz nenhum poligono. Confirma que o desenho tem areas fechadas e nao so linhas ou marcadores.`,
+  /*
+   * Sem poligonos, tenta-se as linhas.
+   *
+   * Muito desenho de limites sai como polilinha e nao como area, sobretudo o
+   * que vem de CAD passado a KML. Se a linha volta praticamente ao ponto de
+   * partida, e um contorno: recusa-la por causa da etiqueta seria recusar
+   * exactamente o ficheiro que se quer.
+   */
+  if (areas.length > 0 && conteudo.linhas.length > 0) {
+    avisos.push(
+      `${conteudo.linhas.length} linha(s) do ficheiro ficaram de fora: havendo areas fechadas, sao essas que contam`,
     )
   }
-  if (conteudo.linhas.length > 0) {
-    avisos.push(
-      `${conteudo.linhas.length} linha(s) aberta(s) do ficheiro foram ignoradas: so entram areas fechadas`,
+
+  if (areas.length === 0) {
+    for (const linha of conteudo.linhas) {
+      const contorno = linha.pontos.map((p) => ({ lat: p.lat, lon: p.lon }))
+      if (!pareceFechada(contorno)) continue
+
+      areas.push({ id: novoId(), nome: linha.nome, contorno: semFecho(contorno) })
+      avisos.push(`"${linha.nome}" veio como linha e foi lida como contorno fechado`)
+    }
+  }
+
+  if (areas.length === 0) {
+    throw new Error(
+      `${ficheiro.name} nao traz nenhum poligono nem linha fechada. Confirma que o desenho tem o limite desenhado como area ou como polilinha fechada, e nao so marcadores.`,
     )
   }
 
@@ -155,4 +175,25 @@ async function textoKML(bytes: Uint8Array, nomeDoFicheiro: string): Promise<stri
 
   if (!entrada) throw new Error(`${nomeDoFicheiro} e um KMZ mas nao tem nenhum .kml dentro`)
   return entrada.async('string')
+}
+
+/**
+ * Se a linha volta ao ponto de partida, dentro de uma tolerancia generosa.
+ *
+ * Um metro de folga cobre o desenho feito a mao que quase fecha. Sem isto, um
+ * limite desenhado como polilinha ficava de fora por uma questao de etiqueta.
+ */
+function pareceFechada(contorno: readonly LatLon[]): boolean {
+  if (contorno.length < 4) return false
+  const primeiro = contorno[0]
+  const ultimo = contorno.at(-1)
+  if (!primeiro || !ultimo) return false
+  return distancia(primeiro, ultimo) < 1
+}
+
+/** Tira o ponto de fecho, que nao se guarda. */
+function semFecho(contorno: readonly LatLon[]): LatLon[] {
+  const limpos = [...contorno]
+  if (limpos.length > 3) limpos.pop()
+  return limpos
 }

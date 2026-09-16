@@ -188,7 +188,7 @@ export function Mapa(props: PropsMapa) {
         id: CAMADA_AREAS_PREENCHIMENTO,
         type: 'fill',
         source: FONTE_AREAS,
-        paint: { 'fill-color': '#4fd973', 'fill-opacity': 0.12 },
+        paint: { 'fill-color': '#4fd973', 'fill-opacity': 0.14 },
       })
       instancia.addLayer({
         id: CAMADA_AREAS_CONTORNO,
@@ -197,8 +197,9 @@ export function Mapa(props: PropsMapa) {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#4fd973',
-          'line-width': 2,
-          'line-opacity': 0.9,
+          // Sobre ortofoto de mato e vinha, dois pixeis de linha perdem-se.
+          'line-width': 3,
+          'line-opacity': 1,
           'line-dasharray': [3, 2],
         },
       })
