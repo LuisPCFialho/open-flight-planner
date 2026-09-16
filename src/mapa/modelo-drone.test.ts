@@ -20,17 +20,19 @@ describe('malha do drone', () => {
     expect(malha.posicoes.length / 3).toBeLessThan(65536)
   })
 
-  it('tem detalhe a serio, sem chegar a peso de modelo importado', () => {
+  it('e leve, que e um requisito e nao um acaso', () => {
     /*
-     * O orcamento mudou quando o aparelho passou a desenhar-se so onde o
-     * utilizador escolheu, em vez de em cada waypoint: de poucas centenas de
-     * triangulos para alguns milhares. O modelo real da DJI eram 194 mil, e
-     * reduzido ao maximo nao descia dos 29 mil - continua a ser outra ordem de
-     * grandeza.
+     * O aparelho desenha-se a 46 pixeis. A essa medida uma fuselagem de doze
+     * lados e uma de dezoito sao o mesmo desenho: o que se ve e o contorno, que
+     * vem das seccoes e nao do numero de lados.
+     *
+     * O tecto esta apertado de proposito. Acrescentar lados e a maneira mais
+     * facil de gastar orcamento sem que se note nada no ecra, e as pas ja
+     * chegaram a valer metade do modelo todo sozinhas.
      */
     const triangulos = malha.indices.length / 3
-    expect(triangulos).toBeGreaterThan(1000)
-    expect(triangulos).toBeLessThan(8000)
+    expect(triangulos).toBeGreaterThan(800)
+    expect(triangulos).toBeLessThan(2000)
   })
 
   it('todos os indices apontam para vertices que existem', () => {

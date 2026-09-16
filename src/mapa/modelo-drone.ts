@@ -1,18 +1,23 @@
 /**
  * Malha de um quadricoptero da familia Mini, desenhada por codigo.
  *
- * Nao e o modelo da DJI - esse nao se pode redistribuir - mas ja nao e uma
- * silhueta: e um aparelho com fuselagem torneada, bracos conicos, motores,
- * quatro helices de duas pas cada, gimbal com lente e trem de pouso.
+ * Geometria propria, escrita aqui. Nao e o modelo do fabricante nem uma copia
+ * dele: esses nao se podem redistribuir, e um ficheiro binario de terceiros a
+ * ir parar a GPU tambem nao e coisa que se meta num projecto sem o ler. Nao
+ * leva marcas nem simbolos de ninguem.
  *
- * Deixou de ser uma questao de orcamento. Enquanto ia um aparelho em cada
- * waypoint, cada triangulo contava e o modelo tinha de caber em poucas centenas;
- * agora so se desenha onde o utilizador escolheu e na aeronave do leitor, ou
- * seja um ou dois de cada vez, e cabe o detalhe todo.
+ * O que se usa de facto sao as medidas publicadas, que sao numeros e nao
+ * desenho: corpo de 145 por 90 mm, 247 mm de diagonal entre motores, helices de
+ * 157 mm, bracos da frente mais abertos do que os de tras, e a camara pendurada
+ * a frente por baixo. O resto e a forma que qualquer quadricoptero dobravel
+ * desta classe tem, que e ditada pelo que ele faz.
  *
- * As proporcoes sao as do aparelho real: corpo de 145 por 90 mm, 247 mm de
- * diagonal entre motores, helices de 157 mm, bracos da frente mais abertos do
- * que os de tras, e a camara pendurada a frente por baixo.
+ * ## Orcamento
+ *
+ * Mil e quinhentos triangulos, e a conta e deliberada. O aparelho desenha-se a
+ * 46 pixeis: a essa medida uma fuselagem de doze lados e uma de dezoito sao o
+ * mesmo desenho, e o que se ve e o contorno - que vem das seccoes, e nao do
+ * numero de lados. As pas chegaram a valer metade do modelo todo sozinhas.
  *
  * Eixos locais: x para a direita, y para a frente (nariz), z para cima. Em
  * metros, a tamanho real. Quem desenha e que decide a escala.
@@ -264,14 +269,24 @@ function calcularNormaisDeAneis(aneis: readonly Vec3[][]): Vec3[][] {
 
 // --- pecas -------------------------------------------------------------------
 
-const LADOS_CORPO = 18
 /**
- * Pontos a volta do perfil de cada pa.
+ * Resolucao de cada peca.
  *
- * Dez chegam: uma pa e quase plana, e o que precisa de resolucao e ao longo da
- * envergadura, onde a corda e a torcao mudam, e nao a volta da seccao.
+ * O orcamento gasta-se onde ele se ve, que e a silhueta. Aos 46 pixeis a que
+ * isto se desenha, uma fuselagem de doze lados e uma de dezoito sao o mesmo
+ * desenho; o que se nota e a forma do contorno, e essa vem das seccoes e nao do
+ * numero de lados.
+ *
+ * As pas eram metade do orcamento todo - oito pas a doze aneis de dez lados
+ * cada uma. Com quatro lados a seccao fica um losango, que e um perfil pobre
+ * visto de perto e exactamente o mesmo visto de longe, que e como isto se ve.
  */
-const LADOS_PA = 10
+const LADOS_CORPO = 12
+const LADOS_PA = 4
+const LADOS_MOTOR = 8
+const LADOS_BRACO = 6
+const LADOS_LENTE = 10
+const LADOS_PERNA = 6
 
 /**
  * Seccoes da fuselagem, do rabo ao nariz.
@@ -334,7 +349,7 @@ function corpo(c: Construtor): void {
 
   // Os dois sensores de visao da frente, que sao o que se reconhece de longe.
   for (const lado of [-1, 1]) {
-    c.tuboEntre([lado * 0.015, 0.058, 0.004], [lado * 0.015, 0.0665, 0.004], 0.005, 0.0042, 8, PRETO)
+    c.tuboEntre([lado * 0.015, 0.058, 0.004], [lado * 0.015, 0.0665, 0.004], 0.005, 0.0042, 6, PRETO)
   }
 
   /*
@@ -370,7 +385,7 @@ function larguraDaPa(t: number): number {
  * nao encaixada.
  */
 function pa(c: Construtor, centro: Vec3, anguloBase: number, sentido: number): void {
-  const passos = 12
+  const passos = 6
   const raizRaio = 0.006
   const cordaMaxima = 0.0118
   const aneis: Vec3[][] = []
@@ -442,7 +457,7 @@ function bracoAchatado(
   // A largura mede-se na horizontal e a altura na vertical, e nao numa base
   // qualquer perpendicular ao eixo: o braco e chato em relacao ao mundo.
   const lateral = normalizar([eixo[1], -eixo[0], 0])
-  const passos = 4
+  const passos = 2
   const aneis: Vec3[][] = []
 
   for (let i = 0; i <= passos; i++) {
@@ -456,8 +471,8 @@ function bracoAchatado(
     const altura = alturaDe + (alturaPara - alturaDe) * t
 
     const anel: Vec3[] = []
-    for (let k = 0; k < 10; k++) {
-      const a = (k / 10) * Math.PI * 2
+    for (let k = 0; k < LADOS_BRACO; k++) {
+      const a = (k / LADOS_BRACO) * Math.PI * 2
       const l = Math.cos(a) * largura
       const h = Math.sin(a) * altura
       anel.push([centro[0] + lateral[0] * l, centro[1] + lateral[1] * l, centro[2] + h])
@@ -483,10 +498,8 @@ function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void 
    * atravessavam o corpo - via-se de lado e de frente, e nenhum aparelho e
    * assim.
    */
-  c.tuboEntre([mx, my, -0.001], [mx, my, 0.016], 0.0122, 0.0128, 14, CINZENTO_MEDIO)
-  c.tuboEntre([mx, my, 0.016], [mx, my, 0.0275], 0.0126, 0.0098, 14, CINZENTO_ESCURO)
-  // Porca do veio, onde a helice encaixa.
-  c.tuboEntre([mx, my, 0.0275], [mx, my, 0.0335], 0.0042, 0.0034, 8, PRETO)
+  c.tuboEntre([mx, my, -0.001], [mx, my, 0.015], 0.0122, 0.0128, LADOS_MOTOR, CINZENTO_MEDIO)
+  c.tuboEntre([mx, my, 0.015], [mx, my, 0.029], 0.0126, 0.0092, LADOS_MOTOR, CINZENTO_ESCURO)
 
   // Duas pas opostas. A fase de cada motor e diferente para nao ficarem alinhadas.
   const sentido = mx * my > 0 ? 1 : -1
@@ -502,7 +515,7 @@ function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void 
  */
 function gimbalECamara(c: Construtor): void {
   // Braco que desce do nariz e recua, como o encaixe real.
-  c.tuboEntre([0, 0.05, -0.014], [0, 0.056, -0.027], 0.0075, 0.0062, 10, CINZENTO_MEDIO)
+  c.tuboEntre([0, 0.05, -0.014], [0, 0.056, -0.027], 0.0075, 0.0062, LADOS_BRACO, CINZENTO_MEDIO)
 
   // Berco em U: dois bracos verticais e a travessa que os une por tras.
   for (const lado of [-1, 1]) {
@@ -511,7 +524,7 @@ function gimbalECamara(c: Construtor): void {
       [lado * 0.017, 0.06, -0.041],
       0.0036,
       0.0034,
-      8,
+      LADOS_BRACO,
       CINZENTO_ESCURO,
     )
   }
@@ -525,9 +538,9 @@ function gimbalECamara(c: Construtor): void {
    * E o unico contraste claro nesta zona toda, e e ele que marca onde a camara
    * aponta quando o aparelho sai com dez pixeis no ecra.
    */
-  c.tuboEntre([0, 0.0715, -0.0405], [0, 0.0765, -0.0405], 0.0122, 0.0118, 16, CINZENTO_MEDIO)
-  c.tuboEntre([0, 0.0765, -0.0405], [0, 0.082, -0.0405], 0.0105, 0.0098, 16, PRETO)
-  c.tuboEntre([0, 0.082, -0.0405], [0, 0.0826, -0.0405], 0.0086, 0.0086, 16, VIDRO)
+  c.tuboEntre([0, 0.0715, -0.0405], [0, 0.0765, -0.0405], 0.0122, 0.0118, LADOS_LENTE, CINZENTO_MEDIO)
+  c.tuboEntre([0, 0.0765, -0.0405], [0, 0.082, -0.0405], 0.0105, 0.0098, LADOS_LENTE, PRETO)
+  c.tuboEntre([0, 0.082, -0.0405], [0, 0.0826, -0.0405], 0.0086, 0.0086, LADOS_LENTE, VIDRO)
 }
 
 /**
@@ -544,7 +557,7 @@ function trem(c: Construtor): void {
       [lado * (MOTOR.x + 0.004), -MOTOR.tras - 0.005, -0.026],
       0.0056,
       0.0072,
-      8,
+      LADOS_PERNA,
       CINZENTO_ESCURO,
     )
     // A frente sao so dois tacos por baixo do braco, curtos.
@@ -553,7 +566,7 @@ function trem(c: Construtor): void {
       [lado * (MOTOR.x - 0.006), MOTOR.frente - 0.01, -0.014],
       0.0048,
       0.0056,
-      8,
+      LADOS_PERNA,
       CINZENTO_ESCURO,
     )
   }
