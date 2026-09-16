@@ -4,11 +4,7 @@ import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
 import { calcularPerfil } from './nucleo/perfil.ts'
-import {
-  aplicarModoAosWaypoints,
-  atitudeNoWaypoint,
-  guinadaEfectiva,
-} from './nucleo/camara-trajecto.ts'
+import { aplicarModoAosWaypoints, guinadaEfectiva } from './nucleo/camara-trajecto.ts'
 import { AGL_MAXIMO, PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
 import {
   acrescentarWaypoint,
@@ -37,13 +33,14 @@ import { usePerfilTerreno } from './estado/usePerfilTerreno.ts'
 import { useEnquadramento } from './estado/useEnquadramento.ts'
 import { useVooVirtual, type EstadoVoo } from './estado/useVooVirtual.ts'
 import { useReplay } from './estado/useReplay.ts'
+import { useAtalhos } from './estado/useAtalhos.ts'
+import { linhasDaRota, pontos3DdaRota } from './estado/derivados.ts'
+import { usePersistenciaDaRota } from './estado/usePersistencia.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
-import { lerDXF } from './terreno/dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
-import { importarAreas } from './kmz/ficheiro.ts'
-import { areaDoContorno, centroDasAreas, envolvente, formatarArea } from './nucleo/areas.ts'
+import { envolvente } from './nucleo/areas.ts'
 import {
   apagarRota,
   bd,
@@ -63,6 +60,7 @@ import { Bussola, type Orientacao } from './ui/Bussola.tsx'
 import { ControlosVista } from './ui/ControlosVista.tsx'
 import { PainelCobertura } from './ui/PainelCobertura.tsx'
 import { Regua } from './ui/Regua.tsx'
+import { BotaoAreas, BotaoTopografia } from './ui/BotoesImportar.tsx'
 import { useCanal } from './ui/canal.ts'
 import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
@@ -242,50 +240,12 @@ export function App() {
   }, [carregar, projetoAberto, rotaAberta])
 
   /*
-   * Persistencia, com folga para nao gravar a cada pixel de arrasto.
+   * Gravar a rota, com folga, e a pedido antes de trocar de rota.
    *
-   * A folga de 400 ms tinha um buraco: trocar de rota dentro desse intervalo
-   * cancelava o temporizador e a ultima edicao nunca chegava a ser pedida a base
-   * de dados. Nao havia promessa rejeitada, nao havia erro, a alteracao estava no
-   * ecra - e ao reabrir a rota tinha desaparecido. A rota pendente fica agora num
-   * `ref` para poder ser gravada a pedido, e nao so por tempo.
+   * Sem a gravacao a pedido, trocar de rota dentro da folga perdia a ultima
+   * edicao sem uma palavra. O detalhe esta em `usePersistencia`.
    */
-  const porGravar = useRef<Rota | null>(null)
-
-  useEffect(() => {
-    if (!rota) return
-    porGravar.current = rota
-    const temporizador = setTimeout(() => {
-      porGravar.current = null
-      void gravarRota(rota)
-    }, 400)
-    return () => clearTimeout(temporizador)
-  }, [rota])
-
-  /** Grava ja o que estiver pendente. Chama-se antes de trocar de rota. */
-  const gravarPendente = useCallback(() => {
-    const pendente = porGravar.current
-    if (!pendente) return
-    porGravar.current = null
-    void gravarRota(pendente)
-  }, [])
-
-  /*
-   * Fechar o separador ou recarregar a pagina dentro da folga perdia a edicao
-   * pela mesma razao. `visibilitychange` e o unico momento em que o browser
-   * garante que ainda ha tempo de escrever; `beforeunload` ja nao o garante.
-   */
-  useEffect(() => {
-    const aoEsconder = (): void => {
-      if (document.visibilityState === 'hidden') gravarPendente()
-    }
-    document.addEventListener('visibilitychange', aoEsconder)
-    window.addEventListener('pagehide', gravarPendente)
-    return () => {
-      document.removeEventListener('visibilitychange', aoEsconder)
-      window.removeEventListener('pagehide', gravarPendente)
-    }
-  }, [gravarPendente])
+  const { gravarPendente, esquecerPendente } = usePersistenciaDaRota(rota, gravarRota)
 
   // --- cotas do terreno -----------------------------------------------------
   const posicoes = useMemo(() => {
@@ -302,64 +262,15 @@ export function App() {
     [rota, cotas],
   )
 
-  const linhas = useMemo<LinhaWaypoint[]>(() => {
-    if (!rota) return []
-    return rota.waypoints.map((waypoint, i) => {
-      const acimaDoSolo = alturasAGL[i] ?? null
-      const cotaTerreno = cotas.get(chaveDaPosicao(waypoint)) ?? null
-      return {
-        waypoint,
-        cotaTerreno,
-        acimaDoSolo,
-        alerta:
-          acimaDoSolo !== null &&
-          (acimaDoSolo < rota.alturaMinimaAcimaDoSolo || acimaDoSolo > AGL_MAXIMO),
-        origemCota:
-          cotaTerreno === null
-            ? null
-            : fonteTerreno instanceof FonteComposta
-              ? fonteTerreno.origemEm(waypoint.lat, waypoint.lon)
-              : 'terrarium',
-      }
-    })
-  }, [rota, cotas, alturasAGL, fonteTerreno])
+  const linhas = useMemo<LinhaWaypoint[]>(
+    () => (rota ? linhasDaRota(rota, cotas, alturasAGL, fonteTerreno) : []),
+    [rota, cotas, alturasAGL, fonteTerreno],
+  )
 
-  const pontos3D = useMemo<PontoRota3D[]>(() => {
-    if (!rota) return []
-    const pontos: PontoRota3D[] = []
-    for (const [i, linha] of linhas.entries()) {
-      if (linha.cotaTerreno === null) continue
-      /*
-       * Os angulos vem do modo de camara da rota, e nao so do que esta gravado
-       * no waypoint. E o que faz o aparelho desenhado no mapa mostrar o que a
-       * camara vai mesmo fazer quando se escolhe seguir o proximo waypoint ou
-       * olhar para o terreno.
-       */
-      const atitude = atitudeNoWaypoint(rota, i)
-      pontos.push({
-        lat: linha.waypoint.lat,
-        lon: linha.waypoint.lon,
-        alturaVoo: paraASL(linha.waypoint.altura, rota.modoAltitude, {
-          cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
-          cotaTerreno: linha.cotaTerreno,
-        }),
-        cotaTerreno: linha.cotaTerreno,
-        guinada: atitude.guinada,
-        gimbalPitch: atitude.gimbalPitch,
-        gimbalYaw: atitude.gimbalYaw,
-        seleccionado: seleccao.ids.has(linha.waypoint.id),
-        alerta: linha.alerta,
-        /*
-         * O aparelho so se desenha onde o utilizador escolheu. Em todos os
-         * waypoints enchia o mapa: numa rota de cobertura sao dezenas,
-         * sobrepostos, e o que se via era um tapete de aparelhos em vez do
-         * terreno que se anda a estudar.
-         */
-        comAparelho: seleccao.ids.has(linha.waypoint.id),
-      })
-    }
-    return pontos
-  }, [rota, linhas, seleccao.ids])
+  const pontos3D = useMemo<PontoRota3D[]>(
+    () => (rota ? pontos3DdaRota(rota, linhas, seleccao.ids) : []),
+    [rota, linhas, seleccao.ids],
+  )
 
   /**
    * Intervalo aceite acima do solo. O minimo e da rota; o tecto e o legal.
@@ -710,59 +621,24 @@ export function App() {
   }, [rota, cotas])
 
   // --- atalhos --------------------------------------------------------------
-  useEffect(() => {
-    const aoTeclar = (evento: KeyboardEvent): void => {
-      // Em voo virtual o teclado e todo dele: W, A, S, D e as setas pilotam.
-      if (voo.activo) return
-
-      const alvo = evento.target
-      if (
-        alvo instanceof HTMLInputElement ||
-        alvo instanceof HTMLTextAreaElement ||
-        alvo instanceof HTMLSelectElement
-      ) {
-        return
-      }
-
-      const comando = evento.ctrlKey || evento.metaKey
-
-      if (comando && evento.key.toLowerCase() === 'z') {
-        evento.preventDefault()
-        if (evento.shiftKey) editor.refazer()
-        else editor.desfazer()
-        return
-      }
-      if (comando && evento.key.toLowerCase() === 'y') {
-        evento.preventDefault()
-        editor.refazer()
-        return
-      }
-      if (evento.shiftKey && evento.key.toLowerCase() === 'f') {
-        evento.preventDefault()
+  useAtalhos(
+    {
+      desfazer: editor.desfazer,
+      refazer: editor.refazer,
+      fotografar: () => {
         if (seleccao.ids.size > 0) acrescentarAccao('tirarFoto')
-        return
-      }
-      if (evento.key === 'Delete' || evento.key === 'Backspace') {
-        evento.preventDefault()
-        eliminarSeleccionados()
-        return
-      }
-      if (evento.key === 'Escape') {
+      },
+      eliminar: eliminarSeleccionados,
+      escapar: () => {
         // Escape volta sempre a navegar, seja qual for o modo em curso.
         setModoMapa('navegar')
         setConfiguracoesAbertas(false)
         seleccao.limpar()
-        return
-      }
-      if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
-        evento.preventDefault()
-        seleccao.mover(evento.key === 'ArrowDown' ? 1 : -1)
-      }
-    }
-
-    window.addEventListener('keydown', aoTeclar)
-    return () => window.removeEventListener('keydown', aoTeclar)
-  }, [editor, seleccao, eliminarSeleccionados, acrescentarAccao, voo.activo])
+      },
+      mover: seleccao.mover,
+    },
+    voo.activo,
+  )
 
   if (!projetoAberto) {
     return <EcraProjetos aoAbrir={setProjetoAberto} />
@@ -841,7 +717,7 @@ export function App() {
             aoApagar={() => {
               // Nada de gravar o que se vai apagar: a gravacao pendente e desta
               // rota, e deixa-la correr podia repo-la depois de apagada.
-              porGravar.current = null
+              esquecerPendente()
               voo.parar()
               tentar(
                 apagarRota(rota.id).then(() =>
@@ -888,55 +764,22 @@ export function App() {
           >
             Projetos
           </button>
-          <label
-            className={`botao-ficheiro ${rota.areas?.length ? 'activo' : ''}`}
-            title={
-              rota.areas?.length
-                ? `${rota.areas.length} área(s) de referência, ${formatarArea(rota.areas.reduce((total, a) => total + areaDoContorno(a.contorno), 0))} no total. Importar de novo substitui.`
-                : 'Importar KMZ ou KML com polígonos, para ter no mapa o contorno da área a filmar'
-            }
-          >
-            Área
-            <input
-              type="file"
-              accept=".kmz,.kml"
-              hidden
-              onChange={(evento) => {
-                const ficheiro = evento.target.files?.[0]
-                evento.target.value = ''
-                if (!ficheiro) return
-
-                void importarAreas(ficheiro)
-                  .then(({ areas, avisos }) => {
-                    editor.alterarRota({ areas })
-                    setFalha(null)
-
-                    const total = areas.reduce((soma, a) => soma + areaDoContorno(a.contorno), 0)
-                    setAvisoTopografia(
-                      [
-                        `${ficheiro.name}: ${areas.length} área(s), ${formatarArea(total)}`,
-                        ...avisos,
-                      ].join('. '),
-                    )
-
-                    // Leva a vista ate la, com a area toda enquadrada: o
-                    // ficheiro importado e quase sempre de outro sitio do mapa.
-                    const centro = centroDasAreas(areas)
-                    const caixa = envolvente(areas.flatMap((a) => a.contorno))
-                    if (centro) {
-                      setCentrarEm({
-                        posicao: centro,
-                        pedido: Date.now(),
-                        ...(caixa ? { envolvente: caixa } : {}),
-                      })
-                    }
-                  })
-                  .catch((causa: unknown) => {
-                    setFalha(causa instanceof Error ? causa.message : 'falha a ler as áreas')
-                  })
-              }}
-            />
-          </label>
+          <BotaoAreas
+            areas={rota.areas}
+            aoFalhar={setFalha}
+            aoImportar={({ areas, resumo, centro, caixa }) => {
+              editor.alterarRota({ areas })
+              setFalha(null)
+              setAvisoTopografia(resumo)
+              if (centro) {
+                setCentrarEm({
+                  posicao: centro,
+                  pedido: Date.now(),
+                  ...(caixa ? { envolvente: caixa } : {}),
+                })
+              }
+            }}
+          />
 
           {divisao && divisao.trocos.length > 1 ? (
             <button
@@ -980,41 +823,17 @@ export function App() {
             </button>
           ) : null}
 
-          <label
-            className={`botao-ficheiro ${topografia ? 'activo' : ''}`}
-            title={
-              topografia
-                ? `Topografia activa: ${topografia.topografia.camadas.join(', ')}`
-                : 'Importar topografia DXF em ETRS89 / PT-TM06'
-            }
-          >
-            DXF
-            <input
-              type="file"
-              accept=".dxf"
-              hidden
-              onChange={(evento) => {
-                const ficheiro = evento.target.files?.[0]
-                evento.target.value = ''
-                if (!ficheiro) return
-                void ficheiro
-                  .text()
-                  .then((texto) => {
-                    const lida = lerDXF(texto)
-                    setTopografia(new FonteTerrenoDXF(lida))
-                    setAvisoTopografia(
-                      `${ficheiro.name}: ${lida.triangulos.length} triangulos e ${lida.pontos.length} pontos cotados, nas camadas ${lida.camadas.join(', ')}`,
-                    )
-                  })
-                  .catch((causa: unknown) => {
-                    setTopografia(null)
-                    setAvisoTopografia(
-                      causa instanceof Error ? causa.message : 'não foi possível ler o DXF',
-                    )
-                  })
-              }}
-            />
-          </label>
+          <BotaoTopografia
+            topografia={topografia}
+            aoImportar={(fonte, resumo) => {
+              setTopografia(fonte)
+              setAvisoTopografia(resumo)
+            }}
+            aoFalhar={(mensagem) => {
+              setTopografia(null)
+              setAvisoTopografia(mensagem)
+            }}
+          />
           <button
             type="button"
             title="Exportar KML para o Google Earth"
