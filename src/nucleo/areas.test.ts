@@ -103,7 +103,7 @@ describe('formatacao', () => {
   })
 
   it('fala em metros quadrados abaixo disso', () => {
-    expect(formatarArea(850)).toBe('850 m2')
+    expect(formatarArea(850)).toBe('850 m²')
   })
 
   it('nao escreve NaN', () => {

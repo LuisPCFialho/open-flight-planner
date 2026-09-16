@@ -24,6 +24,11 @@ const CAMADA_ENQUADRAMENTO_LINHA = 'enquadramento-linha'
 /** Pixeis a partir dos quais se considera que houve arrasto e nao clique. */
 const LIMITE_ARRASTO = 4
 
+const FONTE_MEDICAO = 'medicao'
+const CAMADA_MEDICAO_LINHA = 'medicao-linha'
+const CAMADA_MEDICAO_AREA = 'medicao-area'
+const CAMADA_MEDICAO_PONTOS = 'medicao-pontos'
+
 const FONTE_AREAS = 'areas-referencia'
 const CAMADA_AREAS_PREENCHIMENTO = 'areas-preenchimento'
 const CAMADA_AREAS_CONTORNO = 'areas-contorno'
@@ -51,6 +56,10 @@ export type PropsMapa = {
   exageroVertical: number
   /** Sombreado do relevo por cima da ortofoto. */
   sombreado: boolean
+  /** Pontos da regua. Vazio quando nao se esta a medir. */
+  medicao: readonly LatLon[]
+  /** Com a regua ligada, o proximo clique mede em vez de criar um waypoint. */
+  aMedir: boolean
   /** O que a camara do waypoint seleccionado vai apanhar, projectado no terreno. */
   enquadramento: Enquadramento | null
   /** Posicao da aeronave em voo virtual, para o mapa a seguir. */
@@ -269,6 +278,43 @@ export function Mapa(props: PropsMapa) {
         type: 'line',
         source: FONTE_ENQUADRAMENTO,
         paint: { 'line-color': '#f0b429', 'line-width': 1.2, 'line-opacity': 0.9 },
+      })
+
+      /*
+       * A regua entra por ultimo entre as camadas do estilo, para ficar por
+       * cima de tudo o que e mapa. E uma sobreposicao de trabalho: enquanto se
+       * mede, e o que interessa ver.
+       */
+      instancia.addSource(FONTE_MEDICAO, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      instancia.addLayer({
+        id: CAMADA_MEDICAO_AREA,
+        type: 'fill',
+        source: FONTE_MEDICAO,
+        filter: ['==', ['geometry-type'], 'Polygon'],
+        paint: { 'fill-color': '#f0b429', 'fill-opacity': 0.18 },
+      })
+      instancia.addLayer({
+        id: CAMADA_MEDICAO_LINHA,
+        type: 'line',
+        source: FONTE_MEDICAO,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#f0b429', 'line-width': 2.5 },
+      })
+      instancia.addLayer({
+        id: CAMADA_MEDICAO_PONTOS,
+        type: 'circle',
+        source: FONTE_MEDICAO,
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 4,
+          'circle-color': '#f0b429',
+          'circle-stroke-color': '#0b0e11',
+          'circle-stroke-width': 1.5,
+        },
       })
 
       const camada = new CamadaRota3D()
@@ -530,6 +576,13 @@ export function Mapa(props: PropsMapa) {
     sincronizarPOIs(instancia, marcadoresPOI.current, props.rota.pois, callbacks)
   }, [props.rota.pois, pronto])
 
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto) return
+    const fonte = instancia.getSource(FONTE_MEDICAO) as GeoJSONSource | undefined
+    fonte?.setData(medicaoGeoJSON(props.medicao))
+  }, [props.medicao, pronto])
+
   // Em voo virtual o mapa acompanha a aeronave, como no Pilot 2.
   useEffect(() => {
     const instancia = mapa.current
@@ -573,8 +626,8 @@ export function Mapa(props: PropsMapa) {
   useEffect(() => {
     const instancia = mapa.current
     if (!instancia || !pronto) return
-    instancia.getCanvas().style.cursor = props.modoPOI ? 'crosshair' : ''
-  }, [props.modoPOI, pronto])
+    instancia.getCanvas().style.cursor = props.modoPOI || props.aMedir ? 'crosshair' : ''
+  }, [props.modoPOI, props.aMedir, pronto])
 
   return <div className="mapa" ref={contentor} />
 }
@@ -805,4 +858,41 @@ function sincronizarMarcadores(
     elemento.classList.toggle('seleccionado', seleccionado)
     elemento.setAttribute('aria-label', `Waypoint ${waypoint.index + 1}`)
   }
+}
+
+/**
+ * A regua desenhada: a linha quebrada, os vertices, e o poligono fechado a
+ * partir de tres pontos.
+ *
+ * O poligono desenha-se fechado mas a linha nao, porque o que se esta a medir e
+ * o caminho que se marcou; fechar a linha daria a entender que ha ali um lado
+ * que ainda nao se marcou.
+ */
+function medicaoGeoJSON(pontos: readonly LatLon[]): FeatureCollection {
+  const features: Feature[] = pontos.map((p) => ({
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+  }))
+
+  if (pontos.length >= 2) {
+    features.push({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: pontos.map((p) => [p.lon, p.lat]) },
+    })
+  }
+
+  if (pontos.length >= 3) {
+    const anel = pontos.map((p) => [p.lon, p.lat])
+    const primeiro = anel[0]
+    if (primeiro) anel.push(primeiro)
+    features.push({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Polygon', coordinates: [anel] },
+    })
+  }
+
+  return { type: 'FeatureCollection', features }
 }

@@ -54,6 +54,7 @@ import { Mapa } from './mapa/Mapa.tsx'
 import { LeituraCursor, useCanalCursor } from './ui/LeituraCursor.tsx'
 import { Bussola, type Orientacao } from './ui/Bussola.tsx'
 import { ControlosVista } from './ui/ControlosVista.tsx'
+import { Regua } from './ui/Regua.tsx'
 import { useCanal } from './ui/canal.ts'
 import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
@@ -140,6 +141,15 @@ export function App() {
   const canalOrientacao = useCanal<Orientacao>({ rumo: 0, inclinacao: 0 })
   const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
   const [exageroVertical, setExageroVertical] = useState(1)
+  /**
+   * A regua vive fora da rota e fora do historico.
+   *
+   * E um instrumento de medida, nao parte do plano: nao se exporta, nao se
+   * grava, e desfazer nao deve apagar pontos de medicao quando o que se queria
+   * era desfazer uma alteracao a rota.
+   */
+  const [medicao, setMedicao] = useState<readonly LatLon[]>([])
+  const [modoMedicao, setModoMedicao] = useState(false)
   const [sombreado, setSombreado] = useState(true)
   const [larguraEsquerda, setLarguraEsquerda] = useLarguraPersistida('painel-esquerdo', 240)
   const [larguraDireita, setLarguraDireita] = useLarguraPersistida('painel-direito', 300)
@@ -530,6 +540,10 @@ export function App() {
   // --- alteracoes -----------------------------------------------------------
   const aoAdicionarWaypoint = useCallback(
     (lat: number, lon: number) => {
+      if (modoMedicao) {
+        setMedicao((anteriores) => [...anteriores, { lat, lon }])
+        return
+      }
       if (modoPOI) {
         aplicar((atual) =>
           acrescentarPOI(
@@ -547,7 +561,7 @@ export function App() {
         ),
       )
     },
-    [aplicar, modoPOI],
+    [aplicar, modoPOI, modoMedicao],
   )
 
   const aoInserirWaypoint = useCallback(
@@ -941,6 +955,20 @@ export function App() {
           </button>
           <button
             type="button"
+            className={modoMedicao ? 'activo' : ''}
+            title="Medir distâncias e áreas no mapa, sem mexer na rota"
+            onClick={() => {
+              setModoMedicao((activo) => {
+                if (activo) setMedicao([])
+                return !activo
+              })
+              setModoPOI(false)
+            }}
+          >
+            Medir
+          </button>
+          <button
+            type="button"
             className={voo.activo ? 'activo' : ''}
             title="Pilotar a aeronave pelo mapa e gravar waypoints com a atitude em que está"
             onClick={() => {
@@ -1046,6 +1074,8 @@ export function App() {
             intervaloAcimaDoSolo={intervaloAGL}
             exageroVertical={exageroVertical}
             sombreado={sombreado}
+            medicao={medicao}
+            aMedir={modoMedicao}
               seleccionados={seleccao.ids}
               modo3D={modo3D}
               modoPOI={modoPOI}
@@ -1156,6 +1186,18 @@ export function App() {
 
             {replay.activo ? (
               <PlayerReplay replay={replay} totalWaypoints={rota.waypoints.length} />
+            ) : null}
+
+            {modoMedicao ? (
+              <Regua
+                pontos={medicao}
+                aoDesfazerPonto={() => setMedicao((pontos) => pontos.slice(0, -1))}
+                aoLimpar={() => setMedicao([])}
+                aoFechar={() => {
+                  setModoMedicao(false)
+                  setMedicao([])
+                }}
+              />
             ) : null}
 
 

@@ -85,9 +85,17 @@ button.activo {
   height: 100%;
 }
 
+/*
+ * A barra de cima tem tres grupos e ja nao lhe cabem todos os botoes de lado.
+ *
+ * O grupo da esquerda - as estatisticas - passava por cima do nome da rota
+ * quando a janela apertava, e o nome ficava ilegivel por baixo. Passa a poder
+ * encolher e a cortar-se, que sao leitura e nao comando; e os botoes da direita
+ * quebram para uma segunda linha em vez de se sobreporem ao resto.
+ */
 .barra-superior {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 6px 12px;
@@ -101,6 +109,7 @@ button.activo {
   gap: 8px;
   justify-content: center;
   min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
 }
 
@@ -116,6 +125,8 @@ button.activo {
 
 .accoes-superiores {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
 }
 
@@ -432,6 +443,8 @@ button.activo {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .painel-direito {
@@ -1747,4 +1760,40 @@ button,
 
 .botoes-repetir button {
   flex: 1;
+}
+
+/* --- regua ---------------------------------------------------------------- */
+
+.regua {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 12px;
+  background: rgba(11, 14, 17, 0.92);
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.55);
+}
+
+.regua-leitura {
+  display: grid;
+  gap: 1px;
+  /* Largura fixa: os numeros mudam a cada ponto e nao podem empurrar o resto. */
+  min-width: 92px;
+}
+
+.regua-rotulo {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+.regua-ajuda {
+  color: var(--texto-suave);
 }

@@ -125,7 +125,7 @@ export function centroDasAreas(areas: readonly Area[]): LatLon | null {
 export function formatarArea(metrosQuadrados: number): string {
   if (!Number.isFinite(metrosQuadrados)) return '--'
   if (metrosQuadrados >= 10000) return `${(metrosQuadrados / 10000).toFixed(2)} ha`
-  return `${Math.round(metrosQuadrados)} m2`
+  return `${Math.round(metrosQuadrados)} m²`
 }
 
 /**
