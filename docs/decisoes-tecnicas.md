@@ -476,3 +476,39 @@ Um aviso de diagnostico que custou tempo: `map.getStyle().layers` **nao lista
 camadas personalizadas**. O `getStyle` serializa a especificacao do estilo, e uma
 camada personalizada nao e serializavel. Para saber se ela la esta, usa-se
 `map.getLayer(id)`; para saber se esta a desenhar, conta-se `render`.
+
+## A cobertura de uma area, e porque o espacamento nao se escolhe
+
+Importar o limite da parcela e ficar a olhar para ele nao adianta nada: o que se
+quer a seguir e a rota que o cobre.
+
+O espacamento entre passagens nao e um numero que se escolha, e sai da camara e
+da altura. Uma foto a `h` metros com campo de visao `f` cobre `2 h tan(f/2)` de
+terreno, e a sobreposicao pedida diz que fraccao dessa largura se anda antes da
+passagem seguinte. Por isso o painel pede a altura e as duas sobreposicoes, e
+mostra o espacamento como consequencia - e nao ao contrario.
+
+Tres decisoes que ficam registadas:
+
+- **Trabalha-se num plano local rodado.** Rodar o poligono pelo rumo pedido e
+  mais simples do que rodar as rectas: com as passagens na horizontal, o corte
+  com o poligono e uma conta de uma linha e a ordem sai sozinha. O rumo entra
+  com menos noventa graus, porque as passagens saem ao longo do eixo x, que
+  aponta a leste, e o rumo conta-se do norte.
+
+- **Um corte pode dar mais do que um troco.** Numa parcela em L, ou com um
+  caminho a atravessa-la, a mesma passagem vem partida. Tratar o corte como um
+  so faria a aeronave atravessar o que nao e para cobrir, que num sitio a serio
+  pode ser a central do vizinho.
+
+- **A cobertura exige AGL.** O espacamento sai da altura acima do solo, e sobre
+  relevo a mesma cota absoluta da faixas de larguras diferentes a cada passagem.
+  O painel recusa gerar noutro modo e oferece a conversao.
+
+Os waypoints saem com a camara a prumo e o rumo fixo no sentido da passagem. Sem
+o rumo fixo a aeronave rodava a cada ponto para seguir a linha, e as fotos saiam
+com a orientacao a mudar de passagem para passagem.
+
+Verificado contra o perimetro real de Sever do Vouga: 23,91 ha, faixa de
+108 por 81 m a 60 m de altura, 32,4 m entre passagens, 26 passagens, 9,6 km de
+percurso e 461 fotos.

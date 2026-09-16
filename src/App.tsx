@@ -28,6 +28,7 @@ import {
 } from './nucleo/operacoes-accoes.ts'
 import { acrescentarPOI, poiNovo, removerPOI } from './nucleo/operacoes-poi.ts'
 import { repetirDeslocado, repetirEmSentidoContrario } from './nucleo/repeticao.ts'
+import { acrescentarCobertura } from './nucleo/cobertura.ts'
 import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
 import { useEditorRota } from './estado/useEditorRota.ts'
 import { useSeleccao } from './estado/useSeleccao.ts'
@@ -58,6 +59,7 @@ import { Mapa } from './mapa/Mapa.tsx'
 import { LeituraCursor, useCanalCursor } from './ui/LeituraCursor.tsx'
 import { Bussola, type Orientacao } from './ui/Bussola.tsx'
 import { ControlosVista } from './ui/ControlosVista.tsx'
+import { PainelCobertura } from './ui/PainelCobertura.tsx'
 import { Regua } from './ui/Regua.tsx'
 import { useCanal } from './ui/canal.ts'
 import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
@@ -163,6 +165,7 @@ export function App() {
   const canalOrientacao = useCanal<Orientacao>({ rumo: 0, inclinacao: 0 })
   const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
   const [exageroVertical, setExageroVertical] = useState(1)
+  const [coberturaAberta, setCoberturaAberta] = useState(false)
   /**
    * A regua vive fora da rota e fora do historico.
    *
@@ -924,6 +927,17 @@ export function App() {
           {rota.areas?.length ? (
             <button
               type="button"
+              className={coberturaAberta ? 'activo' : ''}
+              title="Gerar as passagens que cobrem a área importada"
+              onClick={() => setCoberturaAberta((aberto) => !aberto)}
+            >
+              Cobrir
+            </button>
+          ) : null}
+
+          {rota.areas?.length ? (
+            <button
+              type="button"
               title="Retirar as áreas de referência do mapa"
               onClick={() => editor.alterarRota({ areas: [] })}
             >
@@ -1166,6 +1180,27 @@ export function App() {
               sombreado={sombreado}
               aoMudarSombreado={setSombreado}
             />
+
+            {coberturaAberta && (rota.areas ?? []).length > 0 && drone ? (
+              <PainelCobertura
+                areas={rota.areas ?? []}
+                drone={drone}
+                waypointsExistentes={rota.waypoints.length}
+                modoAltitude={rota.modoAltitude}
+                aoMudarParaAGL={() => mudarModoAltitude('AGL')}
+                aoGerar={(cobertura, opcoesCobertura) => {
+                  aplicar((atual) =>
+                    acrescentarCobertura(atual, cobertura, {
+                      alturaAcimaDoSolo: opcoesCobertura.alturaAcimaDoSolo,
+                      comFoto: opcoesCobertura.umPontoPorFoto,
+                    }),
+                  )
+                  seleccao.limpar()
+                  setCoberturaAberta(false)
+                }}
+                aoFechar={() => setCoberturaAberta(false)}
+              />
+            ) : null}
 
             {configuracoesAbertas ? (
               <ConfiguracoesRota

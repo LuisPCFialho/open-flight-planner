@@ -1820,3 +1820,21 @@ button,
 .regua-ajuda {
   color: var(--texto-suave);
 }
+
+/* Leituras do que a cobertura vai dar, em duas colunas. */
+.leitura-cobertura {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.leitura-cobertura dt {
+  color: var(--texto-suave);
+}
+
+.leitura-cobertura dd {
+  margin: 0;
+  text-align: right;
+}
