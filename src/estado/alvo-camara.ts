@@ -108,9 +108,16 @@ export function aeronaveDoReplay(estado: EstadoReplay, alturaASL: number): Drone
     seleccionado: false,
     alerta: false,
     comAparelho: true,
-    // Maior e pintada de verde, para nao se confundir com os waypoints por onde passa.
-    aumento: 1.7,
-    tinta: [0.31, 0.85, 0.45, 0.55],
+    /*
+     * Maior, e com um toque de verde para nao se confundir com o aparelho
+     * seleccionado, que leva um toque de azul.
+     *
+     * O verde estava em 0,55 - mais de metade da cor do modelo era substituida,
+     * e o que se via no mapa era uma mancha verde com forma de drone em vez de
+     * um aparelho. E o tamanho que ja o distingue; a cor so tem de confirmar.
+     */
+    aumento: 1.6,
+    tinta: [0.35, 0.85, 0.5, 0.3],
   }
 }
 

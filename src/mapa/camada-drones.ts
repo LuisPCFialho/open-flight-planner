@@ -82,8 +82,20 @@ const PIXEIS_APARELHO = 46
 const MINIMO_MUNDO = 3
 const MAXIMO_MUNDO = 140
 
-const TINTA_SELECCAO: readonly [number, number, number, number] = [0.35, 0.72, 1, 0.75]
-const TINTA_ALERTA: readonly [number, number, number, number] = [0.95, 0.35, 0.3, 0.7]
+/**
+ * Cor que se mistura na do modelo, e quanto dela entra.
+ *
+ * O alfa e a parte que interessa, e estava em 0,75: tres quartos da cor do
+ * aparelho eram substituidos, e o que se via era uma mancha azul com forma de
+ * drone. A fuselagem torneada, as pas recurvadas e o aro da objectiva
+ * desapareciam todos por baixo da tinta.
+ *
+ * Um terco chega para dizer qual e o aparelho escolhido. O que distingue os dois
+ * aparelhos que podem estar no mapa ao mesmo tempo nao e so a cor - o do leitor
+ * e uma vez e meia maior - e por isso a cor nao tem de gritar.
+ */
+const TINTA_SELECCAO: readonly [number, number, number, number] = [0.35, 0.72, 1, 0.32]
+const TINTA_ALERTA: readonly [number, number, number, number] = [0.95, 0.35, 0.3, 0.38]
 const SEM_TINTA: readonly [number, number, number, number] = [0, 0, 0, 0]
 
 /**
