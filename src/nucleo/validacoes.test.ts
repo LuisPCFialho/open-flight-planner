@@ -443,3 +443,67 @@ describe('autonomia', () => {
     expect(comId(validarRota(rota, comAutonomia(30), contexto), 'autonomia')).toBeUndefined()
   })
 })
+
+describe('tecto do aparelho', () => {
+  /** Drone igual ao do catalogo, mas com o tecto que o teste quiser. */
+  function comTecto(alturaMaxima: number | undefined): Drone {
+    const base = droneComId('mini5pro')
+    if (alturaMaxima === undefined) {
+      const { alturaMaxima: _fora, ...resto } = base
+      return resto
+    }
+    return { ...base, alturaMaxima }
+  }
+
+  it('uma rota normal nao se queixa: o tecto nunca aperta numa central', () => {
+    // Terreno a 400 m e voo a 60 do solo: 460 m, muito abaixo dos 4500.
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 4,
+      troco: 120,
+      altura: 60,
+      terreno: () => 400,
+    })
+    expect(comId(validarRota(rota, comTecto(4500), contexto), 'acima-do-tecto')).toBeUndefined()
+  })
+
+  it('apanha o engano de um digito na altura', () => {
+    /*
+     * E para isto que serve: 4600 em vez de 460 e um dedo a mais no teclado, e
+     * de outra forma so se descobria com o aparelho a recusar voar.
+     */
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 3,
+      troco: 120,
+      altura: 4600,
+      modo: 'ASL',
+      terreno: () => 400,
+    })
+    const problema = comId(validarRota(rota, comTecto(4500), contexto), 'acima-do-tecto')
+    expect(problema?.severidade).toBe('erro')
+    expect(problema?.waypoints).toHaveLength(3)
+  })
+
+  it('diz qual e o ponto mais alto e a que cota vai', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 3,
+      troco: 120,
+      altura: 5000,
+      modo: 'ASL',
+      terreno: () => 400,
+    })
+    expect(comId(validarRota(rota, comTecto(4500), contexto), 'acima-do-tecto')?.detalhe).toMatch(
+      /5000 m acima do nível do mar/,
+    )
+  })
+
+  it('um aparelho sem tecto declarado nao gera queixa nenhuma', () => {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 3,
+      troco: 120,
+      altura: 9000,
+      modo: 'ASL',
+      terreno: () => 400,
+    })
+    expect(comId(validarRota(rota, comTecto(undefined), contexto), 'acima-do-tecto')).toBeUndefined()
+  })
+})

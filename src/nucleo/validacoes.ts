@@ -67,6 +67,7 @@ export function validarRota(rota: Rota, drone: Drone, contexto: ContextoValidaca
     ...validarAlturaAcimaDoSolo(rota, contexto),
     ...validarColisaoNosTrocos(rota, contexto),
     ...validarVelocidades(rota, drone),
+    ...validarTectoDoAparelho(rota, drone, contexto),
     ...validarAfastamento(rota),
     ...validarAutonomia(rota, drone),
     ...validarAccoes(rota, drone),
@@ -281,6 +282,44 @@ function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
   }
 
   return validacoes
+}
+
+/**
+ * Tecto de servico do aparelho, contado acima do nivel do mar.
+ *
+ * Numa central portuguesa este limite nunca aperta: o terreno anda pelos 400 m e
+ * voa-se a 60 do solo. O que ele apanha e o engano de um digito - 4600 em vez de
+ * 460 - ou uma rota importada com o modo de altitude trocado, que de outra forma
+ * so se descobria no aparelho a recusar voar.
+ */
+function validarTectoDoAparelho(
+  rota: Rota,
+  drone: Drone,
+  contexto: ContextoValidacao,
+): Validacao[] {
+  const tecto = drone.alturaMaxima
+  if (tecto === undefined) return []
+
+  const acima: { indice: number; asl: number }[] = []
+  for (const waypoint of rota.waypoints) {
+    const cota = contexto.cotas.get(contexto.chave(waypoint))
+    if (cota === undefined) continue
+    const asl = alturaASL(rota, waypoint, cota)
+    if (asl > tecto) acima.push({ indice: waypoint.index, asl })
+  }
+
+  if (acima.length === 0) return []
+
+  const pior = acima.reduce((a, b) => (a.asl > b.asl ? a : b))
+  return [
+    {
+      id: 'acima-do-tecto',
+      severidade: 'erro',
+      titulo: `${acima.length} waypoint${acima.length === 1 ? '' : 's'} acima do tecto do ${drone.nome}`,
+      detalhe: `O mais alto é o ${pior.indice + 1}, a ${pior.asl.toFixed(0)} m acima do nível do mar. O tecto do aparelho é ${tecto} m.`,
+      waypoints: acima.map((a) => a.indice),
+    },
+  ]
 }
 
 function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
