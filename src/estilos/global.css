@@ -1680,9 +1680,21 @@ button,
   color: var(--texto-suave);
 }
 
-.player-velocidades button {
-  padding: 3px 7px;
-  font-size: 11px;
+.player-velocidades {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-velocidade-barra {
+  width: 130px;
+}
+
+.player-velocidade-valor {
+  /* Largura fixa: `0,25x` e `50x` nao podem empurrar o botao de fechar. */
+  min-width: 44px;
+  text-align: right;
+  color: var(--texto-suave);
 }
 
 /* --- bussola -------------------------------------------------------------- */

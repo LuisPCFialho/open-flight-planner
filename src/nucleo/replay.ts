@@ -45,8 +45,48 @@ export type EstadoReplay = {
   atitude: Atitude
 }
 
-/** Multiplicadores de velocidade do leitor. */
-export const VELOCIDADES_REPLAY = [0.25, 0.5, 1, 2, 4, 8] as const
+/**
+ * Multiplicadores de velocidade do leitor.
+ *
+ * A escolha faz-se por indice nesta lista, e nao por um numero continuo: assim
+ * os valores sao sempre legiveis - 8x, e nao 7,6x - e o 1x apanha-se ao certo,
+ * que e para onde se volta a seguir a cada verificacao.
+ *
+ * Os degraus apertam em baixo e alargam em cima porque e assim que a velocidade
+ * se le: a diferenca entre 0,5x e 1x nota-se, a diferenca entre 40x e 41x nao.
+ * Uma cobertura de meia hora percorre-se em trinta e seis segundos a 50x.
+ */
+export const VELOCIDADES_REPLAY = [
+  0.25, 0.5, 1, 2, 4, 8, 12, 16, 20, 25, 30, 40, 50,
+] as const
+
+/** Onde o 1x esta na lista. E a velocidade com que o leitor abre. */
+export const VELOCIDADE_REAL = VELOCIDADES_REPLAY.indexOf(1)
+
+/** A velocidade do degrau `indice`, com os extremos presos aos limites. */
+export function velocidadeNoDegrau(indice: number): number {
+  const preso = Math.min(VELOCIDADES_REPLAY.length - 1, Math.max(0, Math.round(indice)))
+  return VELOCIDADES_REPLAY[preso] ?? 1
+}
+
+/**
+ * O degrau de uma velocidade, ou o mais proximo se ela nao estiver na lista.
+ *
+ * A meio caminho entre dois fica-se pelo mais lento, que e a escolha prudente.
+ */
+export function degrauDaVelocidade(velocidade: number): number {
+  let melhor = 0
+  for (const [i, v] of VELOCIDADES_REPLAY.entries()) {
+    const actual = VELOCIDADES_REPLAY[melhor] ?? 1
+    if (Math.abs(v - velocidade) < Math.abs(actual - velocidade)) melhor = i
+  }
+  return melhor
+}
+
+/** Como se escreve um multiplicador: `0,25x`, `1x`, `50x`. */
+export function formatarVelocidade(velocidade: number): string {
+  return `${velocidade.toString().replace('.', ',')}×`
+}
 
 /** Segundos que a aeronave passa parada num waypoint. */
 export function paragemNoWaypoint(

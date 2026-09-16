@@ -4,11 +4,16 @@ import { deslocar } from './geodesia.ts'
 import { rotaVazia, acrescentarWaypoint, waypointNovo } from './operacoes-rota.ts'
 import { calcularEstatisticas } from './estatisticas.ts'
 import {
+  degrauDaVelocidade,
   duracaoDoReplay,
   estadoNoInstante,
   formatarRelogio,
+  formatarVelocidade,
   paragemNoWaypoint,
   trechosDoReplay,
+  velocidadeNoDegrau,
+  VELOCIDADE_REAL,
+  VELOCIDADES_REPLAY,
 } from './replay.ts'
 
 const DESCOLAGEM = { lat: 40.746552, lon: -8.41061, cotaTerreno: 356 }
@@ -229,5 +234,59 @@ describe('relogio', () => {
 
   it('nao mostra tempo negativo', () => {
     expect(formatarRelogio(-5)).toBe('0:00')
+  })
+})
+
+describe('degraus de velocidade do leitor', () => {
+  it('a lista comeca abaixo do tempo real e vai ate 50x', () => {
+    expect(VELOCIDADES_REPLAY[0]).toBe(0.25)
+    expect(VELOCIDADES_REPLAY.at(-1)).toBe(50)
+  })
+
+  it('a lista sobe sempre, sem repetidos', () => {
+    // Um degrau fora de ordem punha a barra a andar para tras a meio.
+    for (let i = 1; i < VELOCIDADES_REPLAY.length; i++) {
+      expect(VELOCIDADES_REPLAY[i]!).toBeGreaterThan(VELOCIDADES_REPLAY[i - 1]!)
+    }
+  })
+
+  it('o tempo real esta na lista, e e onde o leitor abre', () => {
+    // Sem isto nao havia maneira de voltar ao certo a velocidade verdadeira.
+    expect(VELOCIDADES_REPLAY[VELOCIDADE_REAL]).toBe(1)
+  })
+
+  it('cada degrau da a sua velocidade', () => {
+    for (const [i, v] of VELOCIDADES_REPLAY.entries()) {
+      expect(velocidadeNoDegrau(i)).toBe(v)
+    }
+  })
+
+  it('um degrau fora dos limites fica preso ao extremo', () => {
+    expect(velocidadeNoDegrau(-5)).toBe(0.25)
+    expect(velocidadeNoDegrau(999)).toBe(50)
+  })
+
+  it('o degrau e a velocidade sao um do outro', () => {
+    for (const [i, v] of VELOCIDADES_REPLAY.entries()) {
+      expect(degrauDaVelocidade(v)).toBe(i)
+    }
+  })
+
+  it('uma velocidade fora da lista cai no degrau mais proximo', () => {
+    // Acontece com um valor gravado de uma versao anterior da lista.
+    expect(velocidadeNoDegrau(degrauDaVelocidade(3.5))).toBe(4)
+    expect(velocidadeNoDegrau(degrauDaVelocidade(45))).toBe(40)
+    expect(velocidadeNoDegrau(degrauDaVelocidade(100))).toBe(50)
+  })
+
+  it('a meio caminho entre dois degraus fica-se pelo mais lento', () => {
+    // Uma escolha, e a prudente: entre 2x e 4x, o 3 da 2x.
+    expect(velocidadeNoDegrau(degrauDaVelocidade(3))).toBe(2)
+  })
+
+  it('a velocidade escreve-se com virgula, que e como se le em portugues', () => {
+    expect(formatarVelocidade(0.25)).toBe('0,25×')
+    expect(formatarVelocidade(1)).toBe('1×')
+    expect(formatarVelocidade(50)).toBe('50×')
   })
 })

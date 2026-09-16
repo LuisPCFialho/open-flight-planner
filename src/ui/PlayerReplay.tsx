@@ -1,4 +1,10 @@
-import { formatarRelogio, VELOCIDADES_REPLAY } from '../nucleo/replay.ts'
+import {
+  degrauDaVelocidade,
+  formatarRelogio,
+  formatarVelocidade,
+  velocidadeNoDegrau,
+  VELOCIDADES_REPLAY,
+} from '../nucleo/replay.ts'
 import { IconeInicio, IconePausa, IconeReproduzir } from './icones.tsx'
 import type { Replay } from '../estado/useReplay.ts'
 
@@ -61,19 +67,35 @@ export function PlayerReplay({ replay, totalWaypoints }: Props) {
         {indice}/{totalWaypoints}
       </span>
 
-      <div className="alternador player-velocidades">
-        {VELOCIDADES_REPLAY.map((v) => (
-          <button
-            key={v}
-            type="button"
-            className={replay.velocidade === v ? 'activo' : ''}
-            onClick={() => replay.mudarVelocidade(v)}
-            title={`${v}× a velocidade real`}
-          >
-            {v}&times;
-          </button>
-        ))}
-      </div>
+      <label
+        className="player-velocidades"
+        title="Quantas vezes mais depressa do que a velocidade real. Uma cobertura de meia hora percorre-se em trinta e seis segundos a 50×."
+      >
+        <input
+          type="range"
+          className="player-velocidade-barra"
+          min={0}
+          max={VELOCIDADES_REPLAY.length - 1}
+          step={1}
+          list="degraus-de-velocidade"
+          value={degrauDaVelocidade(replay.velocidade)}
+          onChange={(evento) => replay.mudarVelocidade(velocidadeNoDegrau(Number(evento.target.value)))}
+          aria-label="Velocidade do leitor"
+          aria-valuetext={formatarVelocidade(replay.velocidade)}
+        />
+        {/*
+          * Os tracinhos do `datalist` marcam os degraus. Sao treze, e sem eles
+          * nao se percebe que a barra salta entre valores em vez de deslizar.
+          */}
+        <datalist id="degraus-de-velocidade">
+          {VELOCIDADES_REPLAY.map((v, i) => (
+            <option key={v} value={i} label={v === 1 ? '1×' : undefined} />
+          ))}
+        </datalist>
+        <span className="numerico player-velocidade-valor">
+          {formatarVelocidade(replay.velocidade)}
+        </span>
+      </label>
 
       <button type="button" className="player-botao" onClick={replay.fechar} title="Fechar o leitor">
         Fechar
