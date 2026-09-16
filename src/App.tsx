@@ -52,6 +52,7 @@ import { droneComId } from './drones.ts'
 import { Mapa } from './mapa/Mapa.tsx'
 import { LeituraCursor, useCanalCursor } from './ui/LeituraCursor.tsx'
 import { Bussola, type Orientacao } from './ui/Bussola.tsx'
+import { ControlosVista } from './ui/ControlosVista.tsx'
 import { useCanal } from './ui/canal.ts'
 import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
@@ -137,6 +138,8 @@ export function App() {
   /** Orientacao do mapa, pelo mesmo caminho e pela mesma razao que o cursor. */
   const canalOrientacao = useCanal<Orientacao>({ rumo: 0, inclinacao: 0 })
   const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
+  const [exageroVertical, setExageroVertical] = useState(1)
+  const [sombreado, setSombreado] = useState(true)
   const [larguraEsquerda, setLarguraEsquerda] = useLarguraPersistida('painel-esquerdo', 240)
   const [larguraDireita, setLarguraDireita] = useLarguraPersistida('painel-direito', 300)
   const [arranque, setArranque] = useState<string | null>(null)
@@ -313,6 +316,17 @@ export function App() {
     }
     return pontos
   }, [rota, linhas, seleccao.ids])
+
+  /**
+   * Intervalo aceite acima do solo. O minimo e da rota; o tecto e o legal.
+   *
+   * Memorizado porque vai para o mapa e decide a cor de cada troço: um objecto
+   * novo a cada render punha a geometria a ser reconstruida sem nada ter mudado.
+   */
+  const intervaloAGL = useMemo(
+    () => ({ minimo: rota?.alturaMinimaAcimaDoSolo ?? 30, maximo: AGL_MAXIMO }),
+    [rota?.alturaMinimaAcimaDoSolo],
+  )
 
   const estatisticas = useMemo(() => (rota ? calcularEstatisticas(rota) : null), [rota])
   const drone = useMemo(() => (rota ? droneComId(rota.droneId) : null), [rota])
@@ -1028,6 +1042,9 @@ export function App() {
               rota={rota}
               pontos3D={pontos3D}
               aeronave={aeronaveDoReplay}
+            intervaloAcimaDoSolo={intervaloAGL}
+            exageroVertical={exageroVertical}
+            sombreado={sombreado}
               seleccionados={seleccao.ids}
               modo3D={modo3D}
               modoPOI={modoPOI}
@@ -1061,6 +1078,14 @@ export function App() {
             />
 
             <Bussola canal={canalOrientacao} aoApontarANorte={() => setPedidoDeNorte(Date.now())} />
+
+            <ControlosVista
+              modo3D={modo3D}
+              exageroVertical={exageroVertical}
+              aoMudarExagero={setExageroVertical}
+              sombreado={sombreado}
+              aoMudarSombreado={setSombreado}
+            />
 
             {configuracoesAbertas ? (
               <ConfiguracoesRota

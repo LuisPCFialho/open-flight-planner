@@ -11,7 +11,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LatLon, Rota } from '../nucleo/tipos.ts'
 import { algumDentroDaVista, contornoFechado } from '../nucleo/areas.ts'
 import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
-import { estiloBase, FONTE_TERRENO } from './estilo.ts'
+import { CAMADA_SOMBREADO, estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
 import { CamadaDrones, type DroneNoMapa } from './camada-drones.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
@@ -45,6 +45,12 @@ export type PropsMapa = {
   modo3D: boolean
   /** Enquanto activo, clicar no mapa cria um ponto de interesse em vez de um waypoint. */
   modoPOI: boolean
+  /** Intervalo aceite acima do solo, que decide a cor de cada troço da rota. */
+  intervaloAcimaDoSolo: { minimo: number; maximo: number }
+  /** Quantas vezes se estica a altura do terreno em 3D. */
+  exageroVertical: number
+  /** Sombreado do relevo por cima da ortofoto. */
+  sombreado: boolean
   /** O que a camara do waypoint seleccionado vai apanhar, projectado no terreno. */
   enquadramento: Enquadramento | null
   /** Posicao da aeronave em voo virtual, para o mapa a seguir. */
@@ -432,13 +438,23 @@ export function Mapa(props: PropsMapa) {
     if (!instancia || !pronto) return
 
     if (props.modo3D) {
-      instancia.setTerrain({ source: FONTE_TERRENO, exaggeration: 1 })
+      instancia.setTerrain({ source: FONTE_TERRENO, exaggeration: props.exageroVertical })
       if (instancia.getPitch() < 30) instancia.easeTo({ pitch: 62, duration: 600 })
     } else {
       instancia.setTerrain(null)
       instancia.easeTo({ pitch: 0, bearing: 0, duration: 600 })
     }
-  }, [props.modo3D, pronto])
+  }, [props.modo3D, props.exageroVertical, pronto])
+
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto || !instancia.getLayer(CAMADA_SOMBREADO)) return
+    instancia.setLayoutProperty(
+      CAMADA_SOMBREADO,
+      'visibility',
+      props.sombreado ? 'visible' : 'none',
+    )
+  }, [props.sombreado, pronto])
 
   /*
    * --- redesenho, um efeito por coisa desenhada ------------------------------
@@ -465,18 +481,26 @@ export function Mapa(props: PropsMapa) {
     instancia.fire('moveend')
   }, [waypoints, pronto])
 
+  /*
+   * Em 2D nao ha terreno e portanto nao ha exagero: as camadas WebGL desenham
+   * as alturas verdadeiras.
+   */
+  const intervaloAGL = props.intervaloAcimaDoSolo
+  const exagero = props.modo3D ? props.exageroVertical : 1
+
   useEffect(() => {
     if (!pronto) return
-    camada3D.current?.definirPontos(props.pontos3D)
-  }, [props.pontos3D, pronto])
+    camada3D.current?.definirPontos(props.pontos3D, intervaloAGL, exagero)
+  }, [props.pontos3D, intervaloAGL, exagero, pronto])
 
   useEffect(() => {
     if (!pronto) return
     const aeronave = props.aeronave
     camadaDrones.current?.definirPontos(
       aeronave ? [...props.pontos3D, aeronave] : props.pontos3D,
+      exagero,
     )
-  }, [props.pontos3D, props.aeronave, pronto])
+  }, [props.pontos3D, props.aeronave, exagero, pronto])
 
   useEffect(() => {
     const instancia = mapa.current

@@ -169,6 +169,7 @@ export class CamadaDrones implements CustomLayerInterface {
   #origem: [number, number, number] = [0, 0, 0]
   /** Unidades Mercator por metro, a latitude da origem. */
   #metro = 0
+  #exagero = 1
   #precisaRecarregar = false
   #renders = 0
 
@@ -221,8 +222,13 @@ export class CamadaDrones implements CustomLayerInterface {
     }
   }
 
-  definirPontos(pontos: readonly DroneNoMapa[]): void {
+  /**
+   * `exagero` e o mesmo esticao vertical do terreno. Sem ele, com o exagero
+   * acima de um, o terreno sobe e os aparelhos ficam enterrados nele.
+   */
+  definirPontos(pontos: readonly DroneNoMapa[], exagero = 1): void {
     this.#pontos = pontos
+    this.#exagero = exagero > 0 ? exagero : 1
     this.#construirInstancias()
     this.#precisaRecarregar = true
     this.#mapa?.triggerRepaint()
@@ -295,7 +301,7 @@ export class CamadaDrones implements CustomLayerInterface {
   }
 
   #construirInstancias(): void {
-    const { dados, origem, metro } = construirInstancias(this.#pontos)
+    const { dados, origem, metro } = construirInstancias(this.#pontos, this.#exagero)
     this.#instancias = dados
     this.#origem = origem
     this.#metro = metro
@@ -374,7 +380,10 @@ function ligar(
  * grafica, e e onde os enganos custam caro: trocar um desvio ou uma unidade da
  * um erro que so se ve no ecra, e no ecra tudo se parece com tudo.
  */
-export function construirInstancias(pontos: readonly DroneNoMapa[]): {
+export function construirInstancias(
+  pontos: readonly DroneNoMapa[],
+  exagero = 1,
+): {
   dados: Float32Array<ArrayBuffer>
   origem: [number, number, number]
   metro: number
@@ -382,7 +391,10 @@ export function construirInstancias(pontos: readonly DroneNoMapa[]): {
   const primeiro = pontos[0]
   if (!primeiro) return { dados: new Float32Array(0), origem: [0, 0, 0], metro: 0 }
 
-  const ancora = MercatorCoordinate.fromLngLat([primeiro.lon, primeiro.lat], primeiro.alturaVoo)
+  const ancora = MercatorCoordinate.fromLngLat(
+    [primeiro.lon, primeiro.lat],
+    primeiro.alturaVoo * exagero,
+  )
   const origem: [number, number, number] = [ancora.x, ancora.y, ancora.z]
   const metro = ancora.meterInMercatorCoordinateUnits()
 
@@ -390,7 +402,7 @@ export function construirInstancias(pontos: readonly DroneNoMapa[]): {
   const grau = Math.PI / 180
 
   for (const [i, ponto] of pontos.entries()) {
-    const m = MercatorCoordinate.fromLngLat([ponto.lon, ponto.lat], ponto.alturaVoo)
+    const m = MercatorCoordinate.fromLngLat([ponto.lon, ponto.lat], ponto.alturaVoo * exagero)
     const tinta =
       ponto.tinta ??
       (ponto.alerta ? TINTA_ALERTA : ponto.seleccionado ? TINTA_SELECCAO : SEM_TINTA)

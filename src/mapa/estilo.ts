@@ -13,6 +13,7 @@ export const URL_ORTOFOTO =
 export const URL_TERRENO = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
 
 export const FONTE_TERRENO = 'terreno'
+export const CAMADA_SOMBREADO = 'sombreado'
 
 export function estiloBase(): StyleSpecification {
   return {
@@ -56,6 +57,29 @@ export function estiloBase(): StyleSpecification {
     layers: [
       { id: 'fundo', type: 'background', paint: { 'background-color': '#0b0e11' } },
       { id: 'ortofoto', type: 'raster', source: 'ortofoto' },
+      /*
+       * Sombreado do relevo por cima da ortofoto.
+       *
+       * A ortofoto de uma encosta de mato e um tapete verde sem forma: o vale e
+       * o cabeco leem-se igual, e e justamente a forma do terreno que decide
+       * onde a rota passa. O sombreado devolve-a, e em 2D e a unica maneira de a
+       * ver. Sai da mesma fonte de elevacao que ja ali esta, portanto nao custa
+       * mosaicos nenhuns.
+       *
+       * A opacidade e baixa: isto e para dar relevo a ortofoto, nao para a
+       * substituir por um mapa cinzento.
+       */
+      {
+        id: CAMADA_SOMBREADO,
+        type: 'hillshade',
+        source: FONTE_TERRENO,
+        paint: {
+          'hillshade-exaggeration': 0.45,
+          'hillshade-shadow-color': '#0a0f16',
+          'hillshade-highlight-color': '#f2f6fb',
+          'hillshade-accent-color': '#1b2a3a',
+        },
+      },
     ],
   }
 }

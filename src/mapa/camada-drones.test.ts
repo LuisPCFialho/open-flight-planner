@@ -130,3 +130,40 @@ describe('instancias dos drones', () => {
     for (const valor of dados) expect(Number.isFinite(valor)).toBe(true)
   })
 })
+
+describe('exagero vertical', () => {
+  it('sem exagero a altura vai tal e qual', () => {
+    const semExagero = construirInstancias([ponto(), ponto({ alturaVoo: 516 })], 1)
+    const aoNatural = construirInstancias([ponto(), ponto({ alturaVoo: 516 })])
+    expect(Array.from(semExagero.dados)).toEqual(Array.from(aoNatural.dados))
+  })
+
+  it('o exagero estica a altura na mesma proporcao do terreno', () => {
+    /*
+     * O `exaggeration` do MapLibre multiplica a cota do terreno, mas nao toca
+     * no que desenhamos por nossa conta. Sem isto, com o exagero a 1,4 um
+     * cabeco a 400 m aparecia a 560 e a rota ficava a ir por dentro dele.
+     */
+    const dobro = construirInstancias([ponto(), ponto({ alturaVoo: 516 })], 2)
+    const simples = construirInstancias([ponto(), ponto({ alturaVoo: 516 })], 1)
+
+    const zDobro = instancia(dobro.dados, 1).centro[2] ?? 0
+    const zSimples = instancia(simples.dados, 1).centro[2] ?? 0
+    expect(zDobro).toBeCloseTo(zSimples * 2, 12)
+  })
+
+  it('o exagero nao mexe na posicao horizontal', () => {
+    const esticado = construirInstancias([ponto(), ponto({ lon: -8.4 })], 2.5)
+    const normal = construirInstancias([ponto(), ponto({ lon: -8.4 })], 1)
+    expect(instancia(esticado.dados, 1).centro[0]).toBeCloseTo(
+      instancia(normal.dados, 1).centro[0] ?? 0,
+      12,
+    )
+  })
+
+  it('a origem tambem sobe, senao os desvios ficavam todos trocados', () => {
+    const esticado = construirInstancias([ponto({ alturaVoo: 400 })], 2)
+    const normal = construirInstancias([ponto({ alturaVoo: 400 })], 1)
+    expect(esticado.origem[2]).toBeCloseTo(normal.origem[2] * 2, 12)
+  })
+})

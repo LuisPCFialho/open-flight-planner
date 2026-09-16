@@ -1,5 +1,6 @@
 import { MercatorCoordinate, type CustomLayerInterface, type Map as MapaLibre } from 'maplibre-gl'
 import { ligarPrograma, matrizComTranslacao } from './webgl.ts'
+import { corDoTroco, corPorAlturaAcimaDoSolo, type Cor } from './cores-rota.ts'
 
 /**
  * Camada WebGL que desenha a rota a altitude verdadeira sobre o terreno.
@@ -33,8 +34,6 @@ export type PontoRota3D = {
   alerta: boolean
 }
 
-type Cor = readonly [number, number, number, number]
-
 /**
  * Subconjunto do que o MapLibre entrega ao render de uma camada personalizada.
  * So interessa a matriz de projeccao principal.
@@ -43,10 +42,9 @@ type OpcoesRender = {
   defaultProjectionData?: { mainMatrix: ArrayLike<number> }
 }
 
-const COR_ROTA: Cor = [0.31, 0.85, 0.45, 1]
-const COR_ROTA_ALERTA: Cor = [0.95, 0.35, 0.3, 1]
 const COR_VERTICAL: Cor = [0.85, 0.88, 0.92, 0.55]
-const COR_VERTICAL_ALERTA: Cor = [0.95, 0.35, 0.3, 0.7]
+/** A vertical leva a cor do ponto, mas mais apagada: e a linha, nao o aviso. */
+const OPACIDADE_VERTICAL = 0.6
 
 const VERTICE_FONTE = `#version 300 es
 precision highp float;
@@ -83,6 +81,18 @@ export class CamadaRota3D implements CustomLayerInterface {
   #pontos: readonly PontoRota3D[] = []
   /** Origem local em coordenadas Mercator, para os vertices irem em valores pequenos. */
   #origem: [number, number, number] = [0, 0, 0]
+  /** Intervalo aceite acima do solo, que decide a cor de cada troço. */
+  #intervalo = { minimo: 30, maximo: 120 }
+  /**
+   * O mesmo esticao vertical que o MapLibre aplica ao terreno.
+   *
+   * Tem de ser aplicado aqui tambem. O `exaggeration` multiplica a cota do
+   * terreno, mas nao toca em nada que o mapa nao desenhe: com o exagero a 1,4,
+   * um cabeco a 400 m aparece a 560 e a rota, que ficava nos seus 460 reais,
+   * passava a ir por dentro da montanha. Multiplicando as duas pelo mesmo
+   * factor, a relacao entre elas mantem-se, que e o que se esta a ler.
+   */
+  #exagero = 1
   #vertices = new Float32Array(0)
   #numLinhas = 0
   #numPontos = 0
@@ -145,9 +155,15 @@ export class CamadaRota3D implements CustomLayerInterface {
   }
 
   /** Substitui a rota desenhada. O trabalho pesado fica aqui, nao no render. */
-  definirPontos(pontos: readonly PontoRota3D[]): void {
+  definirPontos(
+    pontos: readonly PontoRota3D[],
+    intervalo: { minimo: number; maximo: number } = this.#intervalo,
+    exagero: number = this.#exagero,
+  ): void {
     this.#reconstrucoes++
     this.#pontos = pontos
+    this.#intervalo = intervalo
+    this.#exagero = exagero > 0 ? exagero : 1
     this.#construirVertices()
     this.#precisaRecarregar = true
     this.#mapa?.triggerRepaint()
@@ -198,8 +214,13 @@ export class CamadaRota3D implements CustomLayerInterface {
       return
     }
 
-    const voo = pontos.map((p) => MercatorCoordinate.fromLngLat([p.lon, p.lat], p.alturaVoo))
-    const solo = pontos.map((p) => MercatorCoordinate.fromLngLat([p.lon, p.lat], p.cotaTerreno))
+    const esticar = (cota: number): number => cota * this.#exagero
+    const voo = pontos.map((p) =>
+      MercatorCoordinate.fromLngLat([p.lon, p.lat], esticar(p.alturaVoo)),
+    )
+    const solo = pontos.map((p) =>
+      MercatorCoordinate.fromLngLat([p.lon, p.lat], esticar(p.cotaTerreno)),
+    )
 
     const primeiro = voo[0]
     if (!primeiro) return
@@ -212,12 +233,20 @@ export class CamadaRota3D implements CustomLayerInterface {
       destino.push(m.x - this.#origem[0], m.y - this.#origem[1], m.z - this.#origem[2], ...cor)
     }
 
-    // Verticais do waypoint ate ao solo. E a leitura que mostra logo um ponto baixo demais.
+    const acimaDoSolo = (ponto: PontoRota3D): number => ponto.alturaVoo - ponto.cotaTerreno
+
+    /*
+     * Verticais do waypoint ate ao solo, cada uma com a cor do seu ponto.
+     *
+     * E a leitura que mostra logo um ponto baixo demais: a linha e curta onde a
+     * folga e pouca, e a cor diz de que lado do limite se esta.
+     */
     for (const [i, ponto] of pontos.entries()) {
       const cima = voo[i]
       const baixo = solo[i]
       if (!cima || !baixo) continue
-      const cor = ponto.alerta ? COR_VERTICAL_ALERTA : COR_VERTICAL
+      const base = corPorAlturaAcimaDoSolo(acimaDoSolo(ponto), this.#intervalo)
+      const cor: Cor = [base[0], base[1], base[2], OPACIDADE_VERTICAL]
       empurrar(linhas, cima, cor)
       empurrar(linhas, baixo, cor)
     }
@@ -229,7 +258,7 @@ export class CamadaRota3D implements CustomLayerInterface {
       const pontoDe = pontos[i - 1]
       const pontoPara = pontos[i]
       if (!de || !para || !pontoDe || !pontoPara) continue
-      const cor = pontoDe.alerta || pontoPara.alerta ? COR_ROTA_ALERTA : COR_ROTA
+      const cor = corDoTroco(acimaDoSolo(pontoDe), acimaDoSolo(pontoPara), this.#intervalo)
       empurrar(linhas, de, cor)
       empurrar(linhas, para, cor)
     }
