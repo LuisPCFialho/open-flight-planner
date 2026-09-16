@@ -1,5 +1,5 @@
 import { setWorkerUrl } from 'maplibre-gl'
-import urlDoWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
+import urlDoWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 
 /**
  * Diz ao MapLibre onde esta o seu worker.
@@ -23,7 +23,20 @@ import urlDoWorker from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
  * de estar bom, inclinado e com a rota desenhada, mas com o solo perfeitamente
  * plano numa zona de montanha.
  *
- * O sufixo `?url` faz o Vite tratar o ficheiro como recurso e devolver um
- * caminho que serve tanto em desenvolvimento como na versao construida.
+ * O sufixo e `?worker&url`, e nao `?url`.
+ *
+ * O `?url` copia o ficheiro e devolve o caminho, mas nao segue o que ele
+ * importa. O worker do MapLibre importa `./maplibre-gl-shared.mjs`, que nunca
+ * chegava ao `dist`: o servidor respondia a esse pedido com o `index.html` e o
+ * worker morria ao carregar, com a mesma falta de sinal descrita acima. Em
+ * desenvolvimento nao acontecia, porque o Vite serve o ficheiro do
+ * `node_modules` com os vizinhos todos ao lado.
+ *
+ * O `?worker&url` empacota o worker com as dependencias e devolve o caminho do
+ * pacote. Precisa de `worker: { format: 'es' }` no `vite.config.ts`, porque o
+ * worker do MapLibre e um modulo.
+ *
+ * `ferramentas/verificar-dist.ts` corre no fim da construcao e trava-a se
+ * alguma importacao do `dist` voltar a ficar por resolver.
  */
 setWorkerUrl(urlDoWorker)

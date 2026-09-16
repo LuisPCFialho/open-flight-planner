@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  worker: { format: 'es' },
   server: { port: 5173 },
   /*
    * A mesma porta do servidor de desenvolvimento, de proposito.
