@@ -56,11 +56,22 @@ export function PainelCobertura({
   const [idDaArea, setIdDaArea] = useState(areas[0]?.id ?? '')
   const area = areas.find((a) => a.id === idDaArea) ?? areas[0]
 
-  const [altura, setAltura] = useState(60)
+  /*
+   * Oitenta metros e a altura de trabalho de um levantamento, e nao os sessenta
+   * que servem para inspeccionar. Mais alto, cada foto cobre mais terreno: a
+   * mesma parcela sai com menos de metade das passagens e menos de metade das
+   * fotos, sem perder sobreposicao.
+   */
+  const [altura, setAltura] = useState(80)
   const [lateral, setLateral] = useState(70)
   const [frontal, setFrontal] = useState(80)
   const [margem, setMargem] = useState(0)
-  const [umPontoPorFoto, setUmPontoPorFoto] = useState(false)
+  /*
+   * Ligado por omissao, e com razao: desligado, o ficheiro exportado nao leva
+   * accao de foto nenhuma. A rota voava e nao trazia nada, que e a pior maneira
+   * de descobrir um engano - ja no campo, com a bateria gasta.
+   */
+  const [umPontoPorFoto, setUmPontoPorFoto] = useState(true)
   /** `null` enquanto ninguém lhe tocar: acompanha a forma da parcela. */
   const [rumo, setRumo] = useState<number | null>(null)
 
@@ -189,10 +200,10 @@ export function PainelCobertura({
             />
             <span>Um waypoint por foto</span>
           </label>
-          <p className="nota">
-            Desligado, a rota leva dois waypoints por passagem e as fotos tiram-se por
-            intervalo no aparelho. Ligado, cada foto é um waypoint com a sua ação - o que
-            enche a rota depressa.
+          <p className={umPontoPorFoto ? 'nota' : 'erro'}>
+            {umPontoPorFoto
+              ? 'Cada foto é um waypoint com a sua ação. É o que faz o ficheiro exportado tirar fotos, e o que enche a rota depressa.'
+              : 'A rota fica com dois waypoints por passagem e o ficheiro exportado não leva ação de foto nenhuma: o intervalo de disparo tem de ser posto à mão no aparelho.'}
           </p>
         </section>
 

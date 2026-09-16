@@ -1195,6 +1195,9 @@ export function App() {
                       comFoto: opcoesCobertura.umPontoPorFoto,
                     }),
                   )
+                  // Uma cobertura com fotos e um registo fotografico: liga-se a
+                  // validacao que avisa de pontos que fiquem sem a sua foto.
+                  if (opcoesCobertura.umPontoPorFoto) setRegistoFotografico(true)
                   seleccao.limpar()
                   setCoberturaAberta(false)
                 }}
