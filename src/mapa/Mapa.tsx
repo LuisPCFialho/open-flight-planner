@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Map as MapaLibre,
   Marker,
@@ -74,7 +74,13 @@ export function Mapa(props: PropsMapa) {
   const camada3D = useRef<CamadaRota3D | null>(null)
   const marcadores = useRef(new Map<string, Marker>())
   const marcadoresPOI = useRef(new Map<string, Marker>())
-  const pronto = useRef(false)
+  /*
+   * O estilo do mapa chega depois do primeiro render, e ate chegar nao ha
+   * camadas onde escrever. Isto e estado e nao referencia de proposito: os
+   * efeitos de desenho tem de voltar a correr quando o mapa fica pronto, senao
+   * o que ja estava desenhado a espera nunca chega a aparecer.
+   */
+  const [pronto, setPronto] = useState(false)
 
   /** As funcoes mudam a cada render; os handlers do MapLibre registam-se uma vez. */
   const callbacks = useRef(props)
@@ -242,8 +248,7 @@ export function Mapa(props: PropsMapa) {
       camada3D.current = camada
       instancia.addLayer(camada)
 
-      pronto.current = true
-      desenhar(instancia, camada, marcadores.current, marcadoresPOI.current, callbacks.current, callbacks)
+      setPronto(true)
     })
 
     /*
@@ -324,12 +329,34 @@ export function Mapa(props: PropsMapa) {
     instancia.on('move', verificarVisibilidade)
     instancia.on('moveend', verificarVisibilidade)
 
+    /*
+     * A leitura de coordenadas sob o cursor, a um por fotograma.
+     *
+     * O rato emite bem mais eventos do que o ecra desenha, e cada um destes
+     * levanta a cota do terreno - que e um lancamento de raio contra os mosaicos
+     * - e poe a aplicacao inteira a renderizar. Guardar o ultimo evento e
+     * tratar so esse quando o fotograma chega da a mesma leitura ao utilizador
+     * pelo trabalho de um so.
+     */
+    let ultimoCursor: { lat: number; lng: number } | null = null
+    let cursorAgendado = 0
+
+    const tratarCursor = (): void => {
+      cursorAgendado = 0
+      const ponto = ultimoCursor
+      if (!ponto) return
+      const cota = instancia.queryTerrainElevation(ponto)
+      callbacks.current.aoMoverCursor({ lat: ponto.lat, lon: ponto.lng, cotaTerreno: cota ?? null })
+    }
+
     instancia.on('mousemove', (evento) => {
-      const { lat, lng } = evento.lngLat
-      const cota = instancia.queryTerrainElevation(evento.lngLat)
-      callbacks.current.aoMoverCursor({ lat, lon: lng, cotaTerreno: cota ?? null })
+      ultimoCursor = { lat: evento.lngLat.lat, lng: evento.lngLat.lng }
+      if (cursorAgendado === 0) cursorAgendado = requestAnimationFrame(tratarCursor)
     })
-    instancia.on('mouseout', () => callbacks.current.aoMoverCursor(null))
+    instancia.on('mouseout', () => {
+      ultimoCursor = null
+      callbacks.current.aoMoverCursor(null)
+    })
 
     // Cursor de insercao quando se passa sobre um troco com alt carregado.
     instancia.on('mouseenter', CAMADA_SEGMENTOS, () => {
@@ -340,7 +367,8 @@ export function Mapa(props: PropsMapa) {
     })
 
     return () => {
-      pronto.current = false
+      setPronto(false)
+      if (cursorAgendado !== 0) cancelAnimationFrame(cursorAgendado)
       tela.removeEventListener('mousedown', comecarArrasto)
       window.removeEventListener('mousemove', moverArrasto)
       window.removeEventListener('mouseup', largarArrasto)
@@ -363,7 +391,7 @@ export function Mapa(props: PropsMapa) {
   // --- terreno e inclinacao, ao alternar 2D e 3D ----------------------------
   useEffect(() => {
     const instancia = mapa.current
-    if (!instancia || !pronto.current) return
+    if (!instancia || !pronto) return
 
     if (props.modo3D) {
       instancia.setTerrain({ source: FONTE_TERRENO, exaggeration: 1 })
@@ -372,23 +400,72 @@ export function Mapa(props: PropsMapa) {
       instancia.setTerrain(null)
       instancia.easeTo({ pitch: 0, bearing: 0, duration: 600 })
     }
-  }, [props.modo3D])
+  }, [props.modo3D, pronto])
 
-  // --- redesenho quando a rota muda -----------------------------------------
+  /*
+   * --- redesenho, um efeito por coisa desenhada ------------------------------
+   *
+   * Isto era um unico efeito sem lista de dependencias, ou seja corria a cada
+   * render do componente. E o componente renderiza a cada movimento do rato,
+   * porque a barra de estado mostra as coordenadas sob o cursor. Resultado
+   * medido com 122 waypoints: 27 ms de trabalho por cada movimento do rato, a
+   * reconstruir a geometria inteira da rota, a refazer todo o GeoJSON e a
+   * reescrever o DOM de todos os marcadores - para desenhar exactamente o mesmo.
+   *
+   * Cada pedaco passa a depender so do que o alimenta. Os valores vem todos
+   * memorizados do lado de fora, portanto a identidade so muda quando o
+   * conteudo muda de facto.
+   */
+  const waypoints = props.rota.waypoints
+
   useEffect(() => {
     const instancia = mapa.current
-    const camada = camada3D.current
-    if (!instancia || !camada || !pronto.current) return
-    desenhar(instancia, camada, marcadores.current, marcadoresPOI.current, props, callbacks)
+    if (!instancia || !pronto) return
+    const fonte = instancia.getSource(FONTE_SEGMENTOS) as GeoJSONSource | undefined
+    fonte?.setData(segmentosGeoJSON(waypoints))
     // Acrescentar ou apagar waypoints muda a resposta com o mapa parado.
     instancia.fire('moveend')
-  })
+  }, [waypoints, pronto])
+
+  useEffect(() => {
+    const camada = camada3D.current
+    if (!camada || !pronto) return
+    camada.definirPontos(props.pontos3D)
+  }, [props.pontos3D, pronto])
+
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto) return
+    const fonte = instancia.getSource(FONTE_AREAS) as GeoJSONSource | undefined
+    fonte?.setData(areasGeoJSON(props.rota.areas))
+  }, [props.rota.areas, pronto])
+
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto) return
+    const fonte = instancia.getSource(FONTE_ENQUADRAMENTO) as GeoJSONSource | undefined
+    fonte?.setData(enquadramentoGeoJSON(props))
+    // O enquadramento sai da camara do ponto seleccionado ou da aeronave em voo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.enquadramento, props.seguir, props.seleccionados, waypoints, pronto])
+
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto) return
+    sincronizarMarcadores(instancia, marcadores.current, waypoints, props.seleccionados, callbacks)
+  }, [waypoints, props.seleccionados, pronto])
+
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto) return
+    sincronizarPOIs(instancia, marcadoresPOI.current, props.rota.pois, callbacks)
+  }, [props.rota.pois, pronto])
 
   // Em voo virtual o mapa acompanha a aeronave, como no Pilot 2.
   useEffect(() => {
     const instancia = mapa.current
     const seguir = props.seguir
-    if (!instancia || !pronto.current || !seguir) return
+    if (!instancia || !pronto || !seguir) return
 
     instancia.jumpTo({
       center: [seguir.posicao.lon, seguir.posicao.lat],
@@ -419,9 +496,9 @@ export function Mapa(props: PropsMapa) {
   // O cursor diz de imediato que o proximo clique cria um POI, nao um waypoint.
   useEffect(() => {
     const instancia = mapa.current
-    if (!instancia || !pronto.current) return
+    if (!instancia || !pronto) return
     instancia.getCanvas().style.cursor = props.modoPOI ? 'crosshair' : ''
-  }, [props.modoPOI])
+  }, [props.modoPOI, pronto])
 
   return <div className="mapa" ref={contentor} />
 }
@@ -436,29 +513,6 @@ export function Mapa(props: PropsMapa) {
  * passaria a consultar uma rota antiga assim que a rota mudasse.
  */
 type RefCallbacks = { current: PropsMapa }
-
-function desenhar(
-  instancia: MapaLibre,
-  camada: CamadaRota3D,
-  marcadores: Map<string, Marker>,
-  marcadoresPOI: Map<string, Marker>,
-  props: PropsMapa,
-  callbacks: RefCallbacks,
-): void {
-  const fonte = instancia.getSource(FONTE_SEGMENTOS) as GeoJSONSource | undefined
-  if (fonte) fonte.setData(segmentosGeoJSON(props.rota))
-
-  const fonteAreas = instancia.getSource(FONTE_AREAS) as GeoJSONSource | undefined
-  if (fonteAreas) fonteAreas.setData(areasGeoJSON(props.rota))
-
-  camada.definirPontos(props.pontos3D)
-
-  const fonteEnquadramento = instancia.getSource(FONTE_ENQUADRAMENTO) as GeoJSONSource | undefined
-  if (fonteEnquadramento) fonteEnquadramento.setData(enquadramentoGeoJSON(props))
-
-  sincronizarMarcadores(instancia, marcadores, props, callbacks)
-  sincronizarPOIs(instancia, marcadoresPOI, props, callbacks)
-}
 
 /**
  * Poligono do que a foto vai apanhar, mais as arestas da piramide de visao desde
@@ -526,10 +580,10 @@ function posicaoDoSeleccionado(props: PropsMapa): LatLon | null {
 function sincronizarPOIs(
   instancia: MapaLibre,
   marcadores: Map<string, Marker>,
-  props: PropsMapa,
+  pois: Rota['pois'],
   callbacks: RefCallbacks,
 ): void {
-  const vivos = new Set(props.rota.pois.map((p) => p.id))
+  const vivos = new Set(pois.map((p) => p.id))
   for (const [id, marcador] of marcadores) {
     if (!vivos.has(id)) {
       marcador.remove()
@@ -537,7 +591,7 @@ function sincronizarPOIs(
     }
   }
 
-  for (const poi of props.rota.pois) {
+  for (const poi of pois) {
     let marcador = marcadores.get(poi.id)
 
     if (!marcador) {
@@ -571,10 +625,10 @@ function sincronizarPOIs(
 }
 
 /** Um troco por feature, para se saber onde inserir quando se alt+clica na linha. */
-function areasGeoJSON(rota: Rota): FeatureCollection {
+function areasGeoJSON(areas: Rota['areas']): FeatureCollection {
   const features: Feature[] = []
 
-  for (const area of rota.areas ?? []) {
+  for (const area of areas ?? []) {
     const anel = contornoFechado(area.contorno)
     if (anel.length === 0) continue
 
@@ -588,11 +642,11 @@ function areasGeoJSON(rota: Rota): FeatureCollection {
   return { type: 'FeatureCollection', features }
 }
 
-function segmentosGeoJSON(rota: Rota): FeatureCollection {
+function segmentosGeoJSON(waypoints: Rota['waypoints']): FeatureCollection {
   const features: Feature[] = []
-  for (let i = 1; i < rota.waypoints.length; i++) {
-    const de = rota.waypoints[i - 1]
-    const para = rota.waypoints[i]
+  for (let i = 1; i < waypoints.length; i++) {
+    const de = waypoints[i - 1]
+    const para = waypoints[i]
     if (!de || !para) continue
     features.push({
       type: 'Feature',
@@ -612,10 +666,11 @@ function segmentosGeoJSON(rota: Rota): FeatureCollection {
 function sincronizarMarcadores(
   instancia: MapaLibre,
   marcadores: Map<string, Marker>,
-  props: PropsMapa,
+  waypoints: Rota['waypoints'],
+  seleccionados: ReadonlySet<string>,
   callbacks: RefCallbacks,
 ): void {
-  const vivos = new Set(props.rota.waypoints.map((w) => w.id))
+  const vivos = new Set(waypoints.map((w) => w.id))
   for (const [id, marcador] of marcadores) {
     if (!vivos.has(id)) {
       marcador.remove()
@@ -623,8 +678,8 @@ function sincronizarMarcadores(
     }
   }
 
-  for (const waypoint of props.rota.waypoints) {
-    const seleccionado = props.seleccionados.has(waypoint.id)
+  for (const waypoint of waypoints) {
+    const seleccionado = seleccionados.has(waypoint.id)
     let marcador = marcadores.get(waypoint.id)
 
     if (!marcador) {

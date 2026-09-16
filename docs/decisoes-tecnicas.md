@@ -416,3 +416,42 @@ Como se apanhou, para a proxima ser mais depressa: `map.queryTerrainElevation`
 devolvia 0 no centro, onde sao 356 m, e uma fonte GeoJSON trivial acrescentada a
 mao nunca chegava a `loaded()`. Sao dois sinais de tres linhas que separam "o
 terreno esta mal" de "o worker esta morto".
+
+## A lentidao com muitos waypoints nao era do desenho, era do render
+
+Com muitos waypoints, rodar e deslocar o mapa ficava a arrastar. A suspeita
+obvia era o desenho: 120 marcadores no DOM que o MapLibre reposiciona a cada
+fotograma. Medido, os marcadores eram 9% do custo. O resto estava noutro sitio.
+
+Eram duas coisas, ambas do lado do React.
+
+**Um efeito de desenho sem lista de dependencias.** Corria a cada render do
+componente do mapa, e o componente renderiza a cada movimento do rato, porque a
+barra de estado mostra as coordenadas sob o cursor. Cada movimento reconstruia
+a geometria inteira da rota, refazia todo o GeoJSON e reescrevia o DOM de todos
+os marcadores - para desenhar exactamente o mesmo. Medido com 122 waypoints:
+27,1 ms por movimento do rato, e uma reconstrucao completa por movimento.
+
+**A leitura do cursor em `useState` da aplicacao.** Tres numeros na barra de
+estado punham a arvore inteira - mapa, listas, paineis, perfil - a renderizar
+60 vezes por segundo. Sozinha, custava metade do orcamento de cada fotograma:
+45 fotogramas por segundo a rodar o mapa, 21 se o rato tambem se mexesse.
+
+As correccoes: um efeito por coisa desenhada, cada um a depender so do que o
+alimenta; a consulta de cota sob o cursor limitada a uma por fotograma; e a
+leitura do cursor com estado proprio, num canal externo a que so ela se liga
+(`src/ui/LeituraCursor.tsx`).
+
+Resultado, com 120 waypoints, a rodar o mapa e a mexer o rato ao mesmo tempo:
+
+| | antes | depois |
+|---|---|---|
+| reconstrucoes da rota por movimento do rato | 1 | 0 |
+| trabalho por movimento do rato | 27,1 ms | 1,8 ms |
+| fotogramas por segundo | 19,2 | 35,2 |
+
+Fica registado o metodo, que e o que interessa para a proxima: as medicoes
+foram feitas com o Chromium em modo headless, porque com a janela tapada o
+browser trava o `requestAnimationFrame` a 1 Hz e qualquer medicao de fotogramas
+passa a medir a travagem do browser, nao o programa. Com a janela tapada,
+medir trabalho sincrono em JS ainda da numeros validos; contar fotogramas nao.

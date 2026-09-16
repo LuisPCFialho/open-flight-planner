@@ -47,7 +47,8 @@ import {
   renomearRota,
 } from './dados/bd.ts'
 import { droneComId } from './drones.ts'
-import { Mapa, type CursorTerreno } from './mapa/Mapa.tsx'
+import { Mapa } from './mapa/Mapa.tsx'
+import { LeituraCursor, useCanalCursor } from './ui/LeituraCursor.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
 import { BarraEstatisticas } from './ui/BarraEstatisticas.tsx'
 import { ListaWaypoints, type LinhaWaypoint } from './ui/ListaWaypoints.tsx'
@@ -118,7 +119,14 @@ export function App() {
   const [configuracoesAbertas, setConfiguracoesAbertas] = useState(false)
   const [abaInferior, setAbaInferior] = useState<'perfil' | 'validacoes' | null>('perfil')
   const [registoFotografico, setRegistoFotografico] = useState(false)
-  const [cursor, setCursor] = useState<CursorTerreno | null>(null)
+  /*
+   * A leitura sob o cursor vive fora do estado da aplicacao.
+   *
+   * Em `useState`, cada movimento do rato renderizava toda a arvore para mudar
+   * tres numeros na barra de estado, e isso sozinho custava metade do
+   * orcamento de cada fotograma. Ver `LeituraCursor`.
+   */
+  const canalCursor = useCanalCursor()
   const [arranque, setArranque] = useState<string | null>(null)
   const [erroMapa, setErroMapa] = useState<string | null>(null)
 
@@ -572,7 +580,6 @@ export function App() {
     return <div className="aviso-arranque">A abrir o projeto local...</div>
   }
 
-  const cotaCursor = cursor?.cotaTerreno ?? null
   const unicoSeleccionado = seleccao.waypoints.length === 1 ? seleccao.waypoints[0] : null
   const aglSeleccionados = seleccao.waypoints.map((w) => {
     const i = rota.waypoints.findIndex((outro) => outro.id === w.id)
@@ -899,7 +906,7 @@ export function App() {
             aoInserirWaypoint={aoInserirWaypoint}
             aoMoverWaypoint={aoMoverWaypoint}
             aoSeleccionar={(id, juntar) => seleccao.seleccionar(id, juntar)}
-            aoMoverCursor={setCursor}
+            aoMoverCursor={canalCursor.escrever}
             aoRemoverPOI={(id) => aplicar((atual) => removerPOI(atual, id))}
             aoErro={setErroMapa}
           />
@@ -1065,15 +1072,7 @@ export function App() {
               <span className={topografia ? 'modo-activo' : 'erro'}>{avisoTopografia}</span>
             ) : null}
             {falha ? <span className="erro">{falha}</span> : null}
-            <span className="numerico">
-              {cursor ? `${cursor.lat.toFixed(6)}, ${cursor.lon.toFixed(6)}` : '--'}
-            </span>
-            <span className="numerico" title="Cota ortometrica do terreno sob o cursor">
-              ASL: {cotaCursor === null ? '--' : `${cotaCursor.toFixed(1)} m`}
-            </span>
-            <span className="numerico" title="Altura elipsoidal do terreno sob o cursor">
-              HAE: {cotaCursor === null ? '--' : `${(cotaCursor + rota.ondulacaoGeoide).toFixed(1)} m`}
-            </span>
+            <LeituraCursor canal={canalCursor} ondulacaoGeoide={rota.ondulacaoGeoide} />
             <span>WGS 84</span>
           </div>
         </section>

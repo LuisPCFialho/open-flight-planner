@@ -82,6 +82,7 @@ export class CamadaRota3D implements CustomLayerInterface {
   #numPontos = 0
   #precisaRecarregar = false
   #renders = 0
+  #reconstrucoes = 0
 
   onAdd(mapa: MapaLibre, gl: WebGL2RenderingContext): void {
     this.#mapa = mapa
@@ -124,6 +125,7 @@ export class CamadaRota3D implements CustomLayerInterface {
     verticesLinha: number
     verticesPonto: number
     renders: number
+    reconstrucoes: number
     origem: readonly number[]
   } {
     return {
@@ -131,12 +133,14 @@ export class CamadaRota3D implements CustomLayerInterface {
       verticesLinha: this.#numLinhas,
       verticesPonto: this.#numPontos,
       renders: this.#renders,
+      reconstrucoes: this.#reconstrucoes,
       origem: this.#origem,
     }
   }
 
   /** Substitui a rota desenhada. O trabalho pesado fica aqui, nao no render. */
   definirPontos(pontos: readonly PontoRota3D[]): void {
+    this.#reconstrucoes++
     this.#pontos = pontos
     this.#construirVertices()
     this.#precisaRecarregar = true
