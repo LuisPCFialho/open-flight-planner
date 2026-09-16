@@ -1739,3 +1739,12 @@ button,
 .controlo-vista-linha input[type='range'] {
   width: 84px;
 }
+
+.botoes-repetir {
+  display: flex;
+  gap: 6px;
+}
+
+.botoes-repetir button {
+  flex: 1;
+}

@@ -23,6 +23,7 @@ import {
   removerAccao,
 } from './nucleo/operacoes-accoes.ts'
 import { acrescentarPOI, poiNovo, removerPOI } from './nucleo/operacoes-poi.ts'
+import { repetirDeslocado, repetirEmSentidoContrario } from './nucleo/repeticao.ts'
 import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
 import { useEditorRota } from './estado/useEditorRota.ts'
 import { useSeleccao } from './estado/useSeleccao.ts'
@@ -1277,6 +1278,12 @@ export function App() {
           alturasAcimaDoSolo={aglSeleccionados}
           aoAlterar={alterarSeleccionados}
           aoIncrementarAltura={incrementarAltura}
+          aoRepetirDeslocado={(opcoes) => {
+            aplicar((atual) => repetirDeslocado(atual, seleccao.ids, opcoes))
+          }}
+          aoRepetirEmSentidoContrario={() => {
+            aplicar((atual) => repetirEmSentidoContrario(atual, seleccao.ids))
+          }}
           aoAcrescentarAccao={acrescentarAccao}
           aoAlterarAccao={(indice, accao) => {
             if (!unicoSeleccionado) return

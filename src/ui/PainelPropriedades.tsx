@@ -3,6 +3,7 @@ import type { Accao, Drone, ModoGuinada, Rota, TipoAccao, TipoCurva, Waypoint } 
 import { valorComum } from '../nucleo/edicao-lote.ts'
 import { CampoNumerico, CampoSelecao, Deslizador } from './campos.tsx'
 import { EditorAccoes } from './EditorAccoes.tsx'
+import { RepetirTroco } from './RepetirTroco.tsx'
 
 type Aba = 'parametros' | 'accoes'
 
@@ -20,6 +21,8 @@ type Props = {
   aoAlterarAccao: (indice: number, accao: Accao) => void
   aoRemoverAccao: (indice: number) => void
   aoMoverAccao: (de: number, para: number) => void
+  aoRepetirDeslocado: (opcoes: { afastamento: number; rumoGraus: number; quantas: number }) => void
+  aoRepetirEmSentidoContrario: () => void
 }
 
 const CURVAS: readonly { valor: TipoCurva; rotulo: string }[] = [
@@ -86,7 +89,16 @@ export function PainelPropriedades(props: Props) {
       </nav>
 
       <div className="painel-conteudo">
-        {aba === 'parametros' ? <Parametros {...props} /> : null}
+        {aba === 'parametros' ? (
+          <>
+            <Parametros {...props} />
+            <RepetirTroco
+              seleccionados={seleccionados}
+              aoRepetirDeslocado={props.aoRepetirDeslocado}
+              aoRepetirEmSentidoContrario={props.aoRepetirEmSentidoContrario}
+            />
+          </>
+        ) : null}
         {aba === 'accoes' ? (
           <EditorAccoes
             drone={drone}
