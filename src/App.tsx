@@ -4,7 +4,11 @@ import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
 import { calcularPerfil } from './nucleo/perfil.ts'
-import { aplicarModoAosWaypoints, atitudeNoWaypoint } from './nucleo/camara-trajecto.ts'
+import {
+  aplicarModoAosWaypoints,
+  atitudeNoWaypoint,
+  guinadaEfectiva,
+} from './nucleo/camara-trajecto.ts'
 import { AGL_MAXIMO, PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
 import {
   acrescentarWaypoint,
@@ -76,6 +80,13 @@ import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
 const CENTRO_INICIAL: LatLon = { lat: 40.746552, lon: -8.41061 }
 
+/** O que a barra de estado diz enquanto um modo de clique esta ligado. */
+const AJUDA_DO_MODO: Record<'waypoint' | 'poi' | 'medir', string> = {
+  waypoint: 'Clica no mapa para acrescentar waypoints. Escape para sair.',
+  poi: 'Clica no mapa para criar um ponto de interesse.',
+  medir: 'Clica no mapa para medir. Escape para sair.',
+}
+
 const fonteMosaicos = new FonteTerrariumAWS({ descodificador: descodificarPNGBrowser })
 
 export function App() {
@@ -125,7 +136,18 @@ export function App() {
   const [modo3D, setModo3D] = useState(false)
   const [rotaVisivel, setRotaVisivel] = useState(true)
   const [tamanhoCamara, setTamanhoCamara] = useState<TamanhoCamara>('normal')
-  const [modoPOI, setModoPOI] = useState(false)
+  /**
+   * O que um clique no mapa faz.
+   *
+   * `navegar` e o estado de repouso e nao cria nada: o botao esquerdo serve
+   * para deslocar a vista e escolher waypoints, e mais nada. Antes qualquer
+   * clique em qualquer sitio deixava la um waypoint, o que enche uma rota de
+   * pontos por engano so de andar a olhar para o terreno.
+   *
+   * Os modos sao exclusivos de proposito: ligar um desliga os outros, e assim
+   * ha sempre uma so resposta a pergunta "o que acontece se eu clicar aqui".
+   */
+  const [modoMapa, setModoMapa] = useState<'navegar' | 'waypoint' | 'poi' | 'medir'>('navegar')
   const [configuracoesAbertas, setConfiguracoesAbertas] = useState(false)
   const [abaInferior, setAbaInferior] = useState<'perfil' | 'validacoes' | null>('perfil')
   const [registoFotografico, setRegistoFotografico] = useState(false)
@@ -149,7 +171,6 @@ export function App() {
    * era desfazer uma alteracao a rota.
    */
   const [medicao, setMedicao] = useState<readonly LatLon[]>([])
-  const [modoMedicao, setModoMedicao] = useState(false)
   const [sombreado, setSombreado] = useState(true)
   const [larguraEsquerda, setLarguraEsquerda] = useLarguraPersistida('painel-esquerdo', 240)
   const [larguraDireita, setLarguraDireita] = useLarguraPersistida('painel-direito', 300)
@@ -323,6 +344,13 @@ export function App() {
         gimbalYaw: atitude.gimbalYaw,
         seleccionado: seleccao.ids.has(linha.waypoint.id),
         alerta: linha.alerta,
+        /*
+         * O aparelho so se desenha onde o utilizador escolheu. Em todos os
+         * waypoints enchia o mapa: numa rota de cobertura sao dezenas,
+         * sobrepostos, e o que se via era um tapete de aparelhos em vez do
+         * terreno que se anda a estudar.
+         */
+        comAparelho: seleccao.ids.has(linha.waypoint.id),
       })
     }
     return pontos
@@ -474,7 +502,10 @@ export function App() {
         cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
         cotaTerreno: cota,
       }),
-      guinada: waypoint.guinada ?? 0,
+      // O rumo sai do modo de guinada, e nao do campo: em `followWayline` o
+      // campo esta por preencher e lia-se zero, ou seja a previsao mostrava o
+      // que estava a norte em vez do que a foto ia apanhar.
+      guinada: guinadaEfectiva(rota, waypoint.index),
       gimbalPitch: waypoint.gimbalPitch,
       // A previsao de um waypoint ignorava a rotacao do gimbal e mostrava o que
       // a aeronave tinha pela frente, que nao e o que a foto vai apanhar.
@@ -501,6 +532,7 @@ export function App() {
       gimbalYaw: estadoReplay.atitude.gimbalYaw,
       seleccionado: false,
       alerta: false,
+      comAparelho: true,
       // Maior e pintada de verde, para nao se confundir com os waypoints por
       // onde passa.
       aumento: 1.7,
@@ -537,31 +569,46 @@ export function App() {
     fonteMosaicos,
   )
 
+  /** Liga o modo, ou volta a navegar se ele ja estiver ligado. */
+  const alternarModo = useCallback((modo: 'waypoint' | 'poi' | 'medir') => {
+    setModoMapa((actual) => {
+      const proximo = actual === modo ? 'navegar' : modo
+      // Sair da regua limpa o que estava medido; deixar la ficava a pairar.
+      if (actual === 'medir' && proximo !== 'medir') setMedicao([])
+      return proximo
+    })
+  }, [])
+
   // --- alteracoes -----------------------------------------------------------
-  const aoAdicionarWaypoint = useCallback(
+  const aoClicarNoMapa = useCallback(
     (lat: number, lon: number) => {
-      if (modoMedicao) {
+      if (modoMapa === 'medir') {
         setMedicao((anteriores) => [...anteriores, { lat, lon }])
         return
       }
-      if (modoPOI) {
+
+      if (modoMapa === 'poi') {
         aplicar((atual) =>
           acrescentarPOI(
             atual,
             poiNovo({ lat, lon, altura: alturaPredefinida(atual), nome: `POI ${atual.pois.length + 1}` }),
           ),
         )
-        setModoPOI(false)
+        // Um POI de cada vez: marca-se e volta-se a navegar.
+        setModoMapa('navegar')
         return
       }
-      aplicar((atual) =>
-        acrescentarWaypoint(
-          atual,
-          waypointNovo({ lat, lon, altura: alturaPredefinida(atual), index: atual.waypoints.length }),
-        ),
-      )
+
+      if (modoMapa === 'waypoint') {
+        aplicar((atual) =>
+          acrescentarWaypoint(
+            atual,
+            waypointNovo({ lat, lon, altura: alturaPredefinida(atual), index: atual.waypoints.length }),
+          ),
+        )
+      }
     },
-    [aplicar, modoPOI, modoMedicao],
+    [aplicar, modoMapa],
   )
 
   const aoInserirWaypoint = useCallback(
@@ -684,7 +731,8 @@ export function App() {
         return
       }
       if (evento.key === 'Escape') {
-        setModoPOI(false)
+        // Escape volta sempre a navegar, seja qual for o modo em curso.
+        setModoMapa('navegar')
         setConfiguracoesAbertas(false)
         seleccao.limpar()
         return
@@ -947,23 +995,25 @@ export function App() {
           </button>
           <button
             type="button"
-            className={modoPOI ? 'activo' : ''}
+            className={modoMapa === 'waypoint' ? 'activo' : ''}
+            title="Enquanto estiver ligado, clicar no mapa acrescenta um waypoint. Alt e clique num troço insere no meio."
+            onClick={() => alternarModo('waypoint')}
+          >
+            Criar waypoints
+          </button>
+          <button
+            type="button"
+            className={modoMapa === 'poi' ? 'activo' : ''}
             title="Clicar no mapa cria um ponto de interesse"
-            onClick={() => setModoPOI((v) => !v)}
+            onClick={() => alternarModo('poi')}
           >
             POI
           </button>
           <button
             type="button"
-            className={modoMedicao ? 'activo' : ''}
+            className={modoMapa === 'medir' ? 'activo' : ''}
             title="Medir distâncias e áreas no mapa, sem mexer na rota"
-            onClick={() => {
-              setModoMedicao((activo) => {
-                if (activo) setMedicao([])
-                return !activo
-              })
-              setModoPOI(false)
-            }}
+            onClick={() => alternarModo('medir')}
           >
             Medir
           </button>
@@ -1075,10 +1125,9 @@ export function App() {
             exageroVertical={exageroVertical}
             sombreado={sombreado}
             medicao={medicao}
-            aMedir={modoMedicao}
               seleccionados={seleccao.ids}
               modo3D={modo3D}
-              modoPOI={modoPOI}
+              modoMapa={modoMapa}
               enquadramento={enquadramento}
               seguir={
                 replay.activo && replay.estado
@@ -1097,7 +1146,7 @@ export function App() {
                 seleccao.limpar()
               }}
               centroInicial={CENTRO_INICIAL}
-              aoAdicionarWaypoint={aoAdicionarWaypoint}
+              aoClicarNoMapa={aoClicarNoMapa}
               aoInserirWaypoint={aoInserirWaypoint}
               aoMoverWaypoint={aoMoverWaypoint}
               aoSeleccionar={(id, juntar) => seleccao.seleccionar(id, juntar)}
@@ -1188,15 +1237,12 @@ export function App() {
               <PlayerReplay replay={replay} totalWaypoints={rota.waypoints.length} />
             ) : null}
 
-            {modoMedicao ? (
+            {modoMapa === 'medir' ? (
               <Regua
                 pontos={medicao}
                 aoDesfazerPonto={() => setMedicao((pontos) => pontos.slice(0, -1))}
                 aoLimpar={() => setMedicao([])}
-                aoFechar={() => {
-                  setModoMedicao(false)
-                  setMedicao([])
-                }}
+                aoFechar={() => alternarModo('medir')}
               />
             ) : null}
 
@@ -1216,7 +1262,9 @@ export function App() {
               {erroTerreno ?? erroMapa ? (
                 <span className="erro">{erroTerreno ?? erroMapa}</span>
               ) : null}
-              {modoPOI ? <span className="modo-activo">Clica no mapa para criar um POI</span> : null}
+              {modoMapa !== 'navegar' ? (
+                <span className="modo-activo">{AJUDA_DO_MODO[modoMapa]}</span>
+              ) : null}
               {avisoTopografia ? (
                 <span className={topografia ? 'modo-activo' : 'erro'}>{avisoTopografia}</span>
               ) : null}

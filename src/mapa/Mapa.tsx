@@ -48,8 +48,11 @@ export type PropsMapa = {
   aeronave: DroneNoMapa | null
   seleccionados: ReadonlySet<string>
   modo3D: boolean
-  /** Enquanto activo, clicar no mapa cria um ponto de interesse em vez de um waypoint. */
-  modoPOI: boolean
+  /**
+   * O que um clique no mapa faz. Em `navegar` nao faz nada: o botao esquerdo
+   * so desloca a vista e escolhe waypoints.
+   */
+  modoMapa: 'navegar' | 'waypoint' | 'poi' | 'medir'
   /** Intervalo aceite acima do solo, que decide a cor de cada troço da rota. */
   intervaloAcimaDoSolo: { minimo: number; maximo: number }
   /** Quantas vezes se estica a altura do terreno em 3D. */
@@ -58,8 +61,6 @@ export type PropsMapa = {
   sombreado: boolean
   /** Pontos da regua. Vazio quando nao se esta a medir. */
   medicao: readonly LatLon[]
-  /** Com a regua ligada, o proximo clique mede em vez de criar um waypoint. */
-  aMedir: boolean
   /** O que a camara do waypoint seleccionado vai apanhar, projectado no terreno. */
   enquadramento: Enquadramento | null
   /** Posicao da aeronave em voo virtual, para o mapa a seguir. */
@@ -77,7 +78,8 @@ export type PropsMapa = {
     envolvente?: [[number, number], [number, number]]
   } | null
   centroInicial: LatLon
-  aoAdicionarWaypoint: (lat: number, lon: number) => void
+  /** Clique em vazio, ja filtrado de arrastos. O modo decide o que fazer com ele. */
+  aoClicarNoMapa: (lat: number, lon: number) => void
   aoInserirWaypoint: (posicao: number, lat: number, lon: number) => void
   /** `definitivo` distingue o arrastar continuo do largar, para o historico. */
   aoMoverWaypoint: (id: string, lat: number, lon: number, definitivo: boolean) => void
@@ -360,22 +362,29 @@ export function Mapa(props: PropsMapa) {
     window.addEventListener('mousemove', aoMoverParaClique)
     window.addEventListener('mouseup', aoLargarParaClique)
 
-    // Clique em vazio acrescenta um waypoint no fim.
+    /*
+     * Clique em vazio. So faz alguma coisa com um modo ligado.
+     *
+     * Em `navegar` nao cria nada: o botao esquerdo desloca a vista e escolhe
+     * waypoints, e mais nada. Sem isto, qualquer clique a olhar para o terreno
+     * deixava la um waypoint.
+     */
     instancia.on('click', (evento) => {
       if (houveArrasto) return
-      const alvos = instancia.queryRenderedFeatures(evento.point, { layers: [CAMADA_SEGMENTOS] })
       const original = evento.originalEvent
 
-      if (alvos.length > 0 && original.altKey) {
+      // Alt sobre um troco insere um ponto no meio, e so no modo de waypoints.
+      if (original.altKey) {
+        if (callbacks.current.modoMapa !== 'waypoint') return
+        const alvos = instancia.queryRenderedFeatures(evento.point, { layers: [CAMADA_SEGMENTOS] })
         const indice = alvos[0]?.properties?.['indice']
         if (typeof indice === 'number') {
           callbacks.current.aoInserirWaypoint(indice + 1, evento.lngLat.lat, evento.lngLat.lng)
-          return
         }
+        return
       }
-      if (original.altKey) return
 
-      callbacks.current.aoAdicionarWaypoint(evento.lngLat.lat, evento.lngLat.lng)
+      callbacks.current.aoClicarNoMapa(evento.lngLat.lat, evento.lngLat.lng)
     })
 
     /*
@@ -447,12 +456,14 @@ export function Mapa(props: PropsMapa) {
       callbacks.current.aoMoverCursor(null)
     })
 
-    // Cursor de insercao quando se passa sobre um troco com alt carregado.
+    // Cursor de insercao ao passar sobre um troco, e so onde ela e possivel.
     instancia.on('mouseenter', CAMADA_SEGMENTOS, () => {
+      if (callbacks.current.modoMapa !== 'waypoint') return
       instancia.getCanvas().style.cursor = 'copy'
     })
     instancia.on('mouseleave', CAMADA_SEGMENTOS, () => {
-      instancia.getCanvas().style.cursor = ''
+      instancia.getCanvas().style.cursor =
+        callbacks.current.modoMapa === 'navegar' ? '' : 'crosshair'
     })
 
     return () => {
@@ -626,8 +637,8 @@ export function Mapa(props: PropsMapa) {
   useEffect(() => {
     const instancia = mapa.current
     if (!instancia || !pronto) return
-    instancia.getCanvas().style.cursor = props.modoPOI || props.aMedir ? 'crosshair' : ''
-  }, [props.modoPOI, props.aMedir, pronto])
+    instancia.getCanvas().style.cursor = props.modoMapa === 'navegar' ? '' : 'crosshair'
+  }, [props.modoMapa, pronto])
 
   return <div className="mapa" ref={contentor} />
 }

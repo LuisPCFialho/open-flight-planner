@@ -38,7 +38,7 @@ export function ListaWaypoints({
 
       {linhas.length === 0 ? (
         <p className="vazio">
-          Clica no mapa para acrescentar o primeiro waypoint.
+          Liga "Criar waypoints" na barra de cima e clica no mapa.
           <br />
           Alt e clique num troço insere um ponto intermédio.
         </p>
