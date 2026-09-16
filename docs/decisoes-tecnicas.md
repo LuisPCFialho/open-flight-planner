@@ -455,3 +455,24 @@ foram feitas com o Chromium em modo headless, porque com a janela tapada o
 browser trava o `requestAnimationFrame` a 1 Hz e qualquer medicao de fotogramas
 passa a medir a travagem do browser, nao o programa. Com a janela tapada,
 medir trabalho sincrono em JS ainda da numeros validos; contar fotogramas nao.
+
+## O exagero vertical do terreno nao chega as camadas proprias
+
+O `exaggeration` do `setTerrain` multiplica a cota do terreno na malha que o
+MapLibre desenha. Nao toca em mais nada. As camadas WebGL proprias - a rota a
+altitude verdadeira e os aparelhos nos waypoints - continuavam a por os vertices
+nas cotas reais.
+
+Com o exagero a 1,4, um cabeco a 400 m aparece a 560 e a rota, que ficava nos
+seus 460, passava a ir por dentro da montanha: os aparelhos desapareciam e a
+linha de voo tambem. Do lado de fora parecia que as camadas tinham morrido.
+
+A correccao e passar o mesmo factor as camadas e multiplicar por ele todas as
+cotas, incluindo a da origem local. Esticadas as duas na mesma proporcao, a
+relacao entre o terreno e a rota mantem-se, que e o que se esta a ler. Em 2D nao
+ha terreno e portanto nao ha exagero: o factor e um.
+
+Um aviso de diagnostico que custou tempo: `map.getStyle().layers` **nao lista
+camadas personalizadas**. O `getStyle` serializa a especificacao do estilo, e uma
+camada personalizada nao e serializavel. Para saber se ela la esta, usa-se
+`map.getLayer(id)`; para saber se esta a desenhar, conta-se `render`.
