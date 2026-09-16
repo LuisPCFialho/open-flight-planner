@@ -483,6 +483,29 @@ export function App() {
     }
   }, [rota, replay.activo, replay.estado, alvoCamara])
 
+  /**
+   * Onde a aeronave do leitor cai no corte do terreno.
+   *
+   * O percurso sai do proprio perfil, e nao de uma conta paralela: o troco e
+   * percorrido a velocidade constante, portanto a fraccao de tempo dentro dele
+   * e a mesma fraccao de distancia.
+   */
+  const aeronaveNoPerfil = useMemo(() => {
+    if (!perfil || !replay.activo || !replay.estado || !alvoCamara) return null
+    const estadoReplay = replay.estado
+
+    const daqui = perfil.waypoints.find((m) => m.indice === estadoReplay.indice)
+    if (!daqui) return null
+    const ali = perfil.waypoints.find((m) => m.indice === estadoReplay.indice + 1)
+
+    const percurso =
+      ali && !estadoReplay.parada
+        ? daqui.percurso + (ali.percurso - daqui.percurso) * estadoReplay.fraccao
+        : daqui.percurso
+
+    return { percurso, aslVoo: alvoCamara.alturaASL }
+  }, [perfil, replay.activo, replay.estado, alvoCamara])
+
   const { enquadramento, aCarregar: enquadramentoACarregar } = useEnquadramento(
     alvoCamara,
     drone ?? droneComId('mini5pro'),
@@ -1180,6 +1203,7 @@ export function App() {
                   aglMinimo={rota.alturaMinimaAcimaDoSolo}
                   aCarregar={amostrado.aCarregar}
                   erro={amostrado.erro}
+                  aeronave={aeronaveNoPerfil}
                   seleccionados={new Set(seleccao.waypoints.map((w) => w.index))}
                   aoSeleccionarWaypoint={(indice) => {
                     const alvo = rota.waypoints[indice]

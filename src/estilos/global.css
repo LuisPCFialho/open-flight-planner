@@ -1697,3 +1697,16 @@ button,
 .bussola-letras .bussola-letra-norte {
   fill: var(--texto);
 }
+
+/* A aeronave do leitor, marcada no corte do terreno. */
+.perfil-aeronave line {
+  stroke: var(--destaque);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+
+.perfil-aeronave circle {
+  fill: var(--rota);
+  stroke: #0b0e11;
+  stroke-width: 1.4;
+}

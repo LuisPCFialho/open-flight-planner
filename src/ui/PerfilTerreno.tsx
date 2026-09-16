@@ -22,6 +22,11 @@ type Props = {
   erro: string | null
   /** Waypoint em destaque, para o marcar no corte. */
   seleccionados: ReadonlySet<number>
+  /**
+   * Onde vai a aeronave do leitor, para se ver ao mesmo tempo onde ela esta e
+   * onde vai o terreno debaixo dela. `null` com o leitor fechado.
+   */
+  aeronave: { percurso: number; aslVoo: number } | null
   aoSeleccionarWaypoint: (indice: number) => void
   aoNivelar: (alturaAcimaDoSolo: number) => void
   podeNivelar: boolean
@@ -37,6 +42,7 @@ export function PerfilTerreno({
   aCarregar,
   erro,
   seleccionados,
+  aeronave,
   aoSeleccionarWaypoint,
   aoNivelar,
   podeNivelar,
@@ -195,6 +201,24 @@ export function PerfilTerreno({
             {metros >= 1000 ? `${(metros / 1000).toFixed(1)} km` : `${metros.toFixed(0)} m`}
           </text>
         ))}
+        {/*
+          * A aeronave do leitor, por cima de tudo o resto.
+          *
+          * A linha vai de alto a baixo porque o que interessa ler nao e so a
+          * altura: e que troco do corte esta a ser percorrido naquele momento.
+          */}
+        {aeronave ? (
+          <g className="perfil-aeronave">
+            <line
+              x1={x(aeronave.percurso)}
+              y1={MARGEM.topo}
+              x2={x(aeronave.percurso)}
+              y2={ALTURA - MARGEM.base}
+            />
+            <circle cx={x(aeronave.percurso)} cy={y(aeronave.aslVoo)} r={4.5} />
+          </g>
+        ) : null}
+
       </svg>
 
       <footer className="perfil-legenda">
