@@ -1,5 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Antes de qualquer mapa existir. Ver a nota no proprio ficheiro.
+import './mapa/worker-maplibre.ts'
 import { App } from './App.tsx'
 import './estilos/global.css'
 

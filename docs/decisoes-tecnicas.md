@@ -386,3 +386,33 @@ ficheiro de limites de parcela traz.
 O ponto de fecho que o KML repete nao se guarda: um contorno de quatro cantos
 ficava com cinco pontos e o ultimo por cima do primeiro, o que estraga a conta da
 area. Para o GeoJSON, que exige o anel fechado, ele e reposto ao desenhar.
+
+## O worker do MapLibre estava morto, e com ele metade do mapa
+
+O terreno aparecia perfeitamente plano numa zona de montanha. A causa nao era do
+terreno: era o worker do MapLibre nunca chegar a existir.
+
+O MapLibre 6 resolve o worker com `new URL('./maplibre-gl-worker.mjs',
+import.meta.url)`. O Vite pre-empacota a biblioteca para
+`node_modules/.vite/deps/maplibre-gl.js`, e a partir dai esse caminho aponta para
+`.vite/deps/maplibre-gl-worker.mjs`, que nao existe. Um `new Worker(...)` sobre
+um 404 nao atira excepcao: o worker morre ao carregar e todos os pedidos ficam
+por responder, para sempre, sem erro e sem aviso.
+
+O que isso levava atras era mais do que se veria a olho:
+
+- a descodificacao dos mosaicos de elevacao, ou seja o relevo inteiro
+- o processamento das fontes GeoJSON, ou seja a linha da rota no terreno, o
+  poligono do enquadramento e os contornos das areas importadas
+
+O que continuava a funcionar dava a ilusao de estar tudo bem: a ortofoto e raster
+e nao passa pelo worker, e a camada WebGL propria da rota corre no fio principal.
+Dava um mapa inclinado, com a rota desenhada a altitude certa, e o solo plano.
+
+A correccao e `setWorkerUrl` com o ficheiro importado com o sufixo `?url`, que
+faz o Vite emiti-lo como recurso em desenvolvimento e na versao construida.
+
+Como se apanhou, para a proxima ser mais depressa: `map.queryTerrainElevation`
+devolvia 0 no centro, onde sao 356 m, e uma fonte GeoJSON trivial acrescentada a
+mao nunca chegava a `loaded()`. Sao dois sinais de tres linhas que separam "o
+terreno esta mal" de "o worker esta morto".
