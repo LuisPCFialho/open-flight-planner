@@ -5,8 +5,9 @@ import type { Drone } from './nucleo/tipos.ts'
  *
  * Os valores de `droneEnumValue`, `droneSubEnumValue` e `payloadEnumValue` vem
  * de ficheiros KMZ reais e sao os que decidem se a rota voa ou nao. Os valores
- * de camara, velocidade e autonomia estao por confirmar contra especificacao
- * oficial e ficam editaveis na interface. O campo `porConfirmar` diz quais.
+ * de camara, velocidade e autonomia foram confirmados pelo operador; qualquer
+ * aparelho que se acrescente de futuro entra com os seus por confirmar, e o
+ * campo `porConfirmar` diz quais enquanto assim for.
  */
 export const DRONES: readonly Drone[] = [
   {
@@ -38,7 +39,11 @@ export const DRONES: readonly Drone[] = [
     droneSubEnumValue: 1,
     payloadEnumValue: 67,
     payloadSubEnumValue: 0,
-    camara: { temZoom: true, fovHorizontalGraus: 84, proporcao: 4 / 3 },
+    // Valores confirmados pelo operador em 16/09/2026.
+    camara: { temZoom: true, fovHorizontalGraus: 84, proporcao: 4 / 3, megapixeis: 48 },
+    velocidadeMaxWaypoint: 15,
+    alturaMaxima: 6000,
+    autonomiaMinutos: 45,
     accoesSuportadas: [
       'tirarFoto',
       'iniciarGravacao',
@@ -48,13 +53,7 @@ export const DRONES: readonly Drone[] = [
       'pairar',
       'zoom',
     ],
-    porConfirmar: [
-      'camara.fovHorizontalGraus',
-      'camara.megapixeis',
-      'velocidadeMaxWaypoint',
-      'alturaMaxima',
-      'autonomiaMinutos',
-    ],
+    porConfirmar: [],
   },
 ]
 
