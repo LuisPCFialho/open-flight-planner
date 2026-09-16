@@ -20,6 +20,9 @@ const CAMADA_SEGMENTOS = 'rota-terreno'
 const FONTE_ENQUADRAMENTO = 'enquadramento'
 const CAMADA_ENQUADRAMENTO_AREA = 'enquadramento-area'
 const CAMADA_ENQUADRAMENTO_LINHA = 'enquadramento-linha'
+/** Pixeis a partir dos quais se considera que houve arrasto e nao clique. */
+const LIMITE_ARRASTO = 4
+
 const FONTE_AREAS = 'areas-referencia'
 const CAMADA_AREAS_PREENCHIMENTO = 'areas-preenchimento'
 const CAMADA_AREAS_CONTORNO = 'areas-contorno'
@@ -58,6 +61,8 @@ export type PropsMapa = {
   aoSeleccionar: (id: string, juntar: boolean) => void
   aoMoverCursor: (cursor: CursorTerreno | null) => void
   aoRemoverPOI: (id: string) => void
+  /** Apaga o waypoint, pelo mesmo caminho do botao da lista, para se poder desfazer. */
+  aoEliminarWaypoint: (id: string) => void
   /** Avisa quando os waypoints saem ou voltam a entrar na janela visivel. */
   aoMudarVisibilidadeDaRota: (visivel: boolean) => void
   aoErro: (mensagem: string) => void
@@ -240,8 +245,40 @@ export function Mapa(props: PropsMapa) {
       desenhar(instancia, camada, marcadores.current, marcadoresPOI.current, callbacks.current, callbacks)
     })
 
+    /*
+     * Distinguir o clique do arrasto.
+     *
+     * O browser dispara `click` depois de qualquer par de premir e largar sobre
+     * o mesmo elemento, por mais que o rato tenha andado pelo meio. Resultado:
+     * deslocar, rodar ou inclinar o mapa acabava a deixar um waypoint - ou um
+     * POI, com o modo ligado - no sitio onde se largou o botao. Quem estava a
+     * navegar ia semeando pontos sem dar por isso.
+     */
+    let inicioDoPremir: { x: number; y: number } | null = null
+    let houveArrasto = false
+
+    const aoPremirParaClique = (evento: MouseEvent): void => {
+      inicioDoPremir = { x: evento.clientX, y: evento.clientY }
+      houveArrasto = false
+    }
+    const aoMoverParaClique = (evento: MouseEvent): void => {
+      if (!inicioDoPremir) return
+      const andou = Math.hypot(evento.clientX - inicioDoPremir.x, evento.clientY - inicioDoPremir.y)
+      if (andou > LIMITE_ARRASTO) houveArrasto = true
+    }
+    // O `houveArrasto` nao se limpa aqui: o `click` ainda vem a seguir e precisa
+    // dele. Limpa-se no premir seguinte.
+    const aoLargarParaClique = (): void => {
+      inicioDoPremir = null
+    }
+
+    tela.addEventListener('mousedown', aoPremirParaClique)
+    window.addEventListener('mousemove', aoMoverParaClique)
+    window.addEventListener('mouseup', aoLargarParaClique)
+
     // Clique em vazio acrescenta um waypoint no fim.
     instancia.on('click', (evento) => {
+      if (houveArrasto) return
       const alvos = instancia.queryRenderedFeatures(evento.point, { layers: [CAMADA_SEGMENTOS] })
       const original = evento.originalEvent
 
@@ -306,6 +343,9 @@ export function Mapa(props: PropsMapa) {
       tela.removeEventListener('mousedown', comecarArrasto)
       window.removeEventListener('mousemove', moverArrasto)
       window.removeEventListener('mouseup', largarArrasto)
+      tela.removeEventListener('mousedown', aoPremirParaClique)
+      window.removeEventListener('mousemove', aoMoverParaClique)
+      window.removeEventListener('mouseup', aoLargarParaClique)
       for (const marcador of marcadores.current.values()) marcador.remove()
       marcadores.current.clear()
       for (const marcador of marcadoresPOI.current.values()) marcador.remove()
@@ -507,6 +547,11 @@ function sincronizarPOIs(
         evento.stopPropagation()
         if (evento.shiftKey) callbacks.current.aoRemoverPOI(poi.id)
       })
+      elemento.addEventListener('contextmenu', (evento) => {
+        evento.preventDefault()
+        evento.stopPropagation()
+        callbacks.current.aoRemoverPOI(poi.id)
+      })
 
       marcador = new Marker({ element: elemento, draggable: false })
       marcador.setLngLat([poi.lon, poi.lat]).addTo(instancia)
@@ -592,6 +637,14 @@ function sincronizarMarcadores(
           waypoint.id,
           evento.shiftKey || evento.ctrlKey || evento.metaKey,
         )
+      })
+
+      // Botao direito em cima do waypoint apaga-o. Desfaz-se com Ctrl+Z, como
+      // tudo o resto: passa pelo mesmo caminho do botao de eliminar da lista.
+      elemento.addEventListener('contextmenu', (evento) => {
+        evento.preventDefault()
+        evento.stopPropagation()
+        callbacks.current.aoEliminarWaypoint(waypoint.id)
       })
 
       marcador = new Marker({ element: elemento, draggable: true })

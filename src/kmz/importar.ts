@@ -105,6 +105,8 @@ export function importarKMZ(
     pois,
     // O WPML nao tem onde guardar uma area de referencia.
     areas: [],
+    // O ficheiro traz os angulos ja decididos, ponto a ponto.
+    modoCamaraTrajecto: 'manter',
     criadaEm: criadoNoAparelho ?? agora,
     alteradaEm: alteradoNoAparelho ?? agora,
   }

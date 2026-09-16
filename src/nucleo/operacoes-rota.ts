@@ -34,6 +34,7 @@ export function rotaVazia(dados: {
     waypoints: [],
     pois: [],
     areas: [],
+    modoCamaraTrajecto: 'manter',
     criadaEm: agora,
     alteradaEm: agora,
   }

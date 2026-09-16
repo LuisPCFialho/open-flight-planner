@@ -890,6 +890,10 @@ export function App() {
             seguir={voo.activo ? { posicao: voo.estado.posicao, guinada: voo.estado.guinada } : null}
             centrarEm={centrarEm}
             aoMudarVisibilidadeDaRota={setRotaVisivel}
+            aoEliminarWaypoint={(id) => {
+              aplicar((atual) => removerWaypoints(atual, [id]))
+              seleccao.limpar()
+            }}
             centroInicial={CENTRO_INICIAL}
             aoAdicionarWaypoint={aoAdicionarWaypoint}
             aoInserirWaypoint={aoInserirWaypoint}

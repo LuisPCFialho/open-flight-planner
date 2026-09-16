@@ -58,6 +58,22 @@ class BaseDeDados extends Dexie {
             rota.areas ??= []
           }),
       )
+
+    /* O comportamento da camara entre waypoints e posterior. O valor de partida
+     * e o de sempre: cada waypoint guarda a atitude que tem. */
+    this.version(4)
+      .stores({
+        projetos: 'id, nome, cliente, criadoEm',
+        rotas: 'id, projetoId, nome, alteradaEm',
+      })
+      .upgrade((transaccao) =>
+        transaccao
+          .table<Rota>('rotas')
+          .toCollection()
+          .modify((rota) => {
+            rota.modoCamaraTrajecto ??= 'manter'
+          }),
+      )
   }
 }
 

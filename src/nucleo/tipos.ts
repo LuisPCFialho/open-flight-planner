@@ -18,6 +18,11 @@ export type ModoAltitude =
   | 'AGL'
 
 export type ModoGuinada = 'followWayline' | 'towardPOI' | 'fixed' | 'manual'
+
+/**
+ * Para onde a camara olha ao longo do trajecto. Ver `nucleo/camara-trajecto.ts`.
+ */
+export type ModoCamaraTrajecto = 'manter' | 'proximoWaypoint' | 'terreno'
 export type TipoCurva = 'pararNoPonto' | 'passarSuave'
 export type AccaoFinal = 'goHome' | 'noAction' | 'autoLand' | 'gotoFirstWaypoint'
 export type AccaoPerdaSinal = 'goBack' | 'landing' | 'hover'
@@ -126,6 +131,14 @@ export type Rota = {
   pois: POI[]
   /** Contornos de referencia. Rotas gravadas antes disto nao os tem. */
   areas: Area[]
+  /**
+   * Comportamento da camara entre waypoints.
+   *
+   * `manter` e o de sempre: cada waypoint guarda a sua atitude. Os outros dois
+   * calculam-na, e servem para pre-visualizar e para fixar de uma vez em toda a
+   * rota. Rotas gravadas antes disto ficam em `manter`.
+   */
+  modoCamaraTrajecto: ModoCamaraTrajecto
   criadaEm: number
   alteradaEm: number
 }

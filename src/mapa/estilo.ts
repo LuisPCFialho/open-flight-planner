@@ -35,6 +35,24 @@ export function estiloBase(): StyleSpecification {
         attribution: 'Terrain tiles, AWS Open Data',
       },
     },
+    /*
+     * Ceu.
+     *
+     * Sem isto, acima do horizonte nao se desenha nada e a tela fica
+     * transparente: na vista da camara em ecra inteiro via-se o mapa que esta
+     * por tras, atravessado pela linha do horizonte. Com o terreno em 3D o
+     * horizonte aparece sempre que a vista se inclina, portanto isto faz falta
+     * aos dois mapas.
+     */
+    sky: {
+      'sky-color': '#4a7cb0',
+      'horizon-color': '#b9cddd',
+      'fog-color': '#c3d2df',
+      'sky-horizon-blend': 0.6,
+      'horizon-fog-blend': 0.55,
+      'fog-ground-blend': 0.05,
+      'atmosphere-blend': 0.85,
+    },
     layers: [
       { id: 'fundo', type: 'background', paint: { 'background-color': '#0b0e11' } },
       { id: 'ortofoto', type: 'raster', source: 'ortofoto' },

@@ -184,6 +184,7 @@ function validarRota(bruto: unknown, ordem: number, projetoId: string): Rota {
       pois: Array.isArray(rota.pois) ? rota.pois : [],
       // As areas sao posteriores: um ficheiro antigo nao as traz.
       areas: Array.isArray(rota.areas) ? rota.areas.filter(areaValida) : [],
+      modoCamaraTrajecto: rota.modoCamaraTrajecto ?? 'manter',
       droneId: rota.droneId ?? 'mini5pro',
     },
     projetoId,
