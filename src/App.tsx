@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
-import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
 import { calcularPerfil } from './nucleo/perfil.ts'
-import { aplicarModoAosWaypoints, guinadaEfectiva } from './nucleo/camara-trajecto.ts'
+import { aplicarModoAosWaypoints } from './nucleo/camara-trajecto.ts'
 import { AGL_MAXIMO, PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
 import {
   acrescentarWaypoint,
@@ -36,6 +35,7 @@ import { useReplay } from './estado/useReplay.ts'
 import { useAtalhos } from './estado/useAtalhos.ts'
 import { linhasDaRota, pontos3DdaRota } from './estado/derivados.ts'
 import { usePersistenciaDaRota } from './estado/usePersistencia.ts'
+import { aeronaveDoReplay, aeronaveNoPerfil, alvoDaCamara } from './estado/alvo-camara.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
@@ -366,129 +366,36 @@ export function App() {
 
   const replay = useReplay(rota)
 
-  /**
-   * Alvo da vista de camara, por ordem de quem manda: a aeronave do leitor, a
-   * do voo virtual, ou o waypoint seleccionado.
-   */
-  const alvoCamara = useMemo(() => {
-    if (!rota) return null
+  /** Quem manda na camara, por ordem: o leitor, o voo virtual, a seleccao. */
+  const comandoDaCamara = useMemo(
+    () => ({
+      replay: replay.activo ? replay.estado : null,
+      voo: voo.activo ? voo.estado : null,
+      seleccionado: seleccao.waypoints.length === 1 ? (seleccao.waypoints[0] ?? null) : null,
+    }),
+    [replay.activo, replay.estado, voo.activo, voo.estado, seleccao.waypoints],
+  )
 
-    if (replay.activo && replay.estado) {
-      const estadoReplay = replay.estado
-      /*
-       * A cota sob a aeronave interpola-se entre a dos dois waypoints do troco.
-       * As cotas conhecidas sao as dos waypoints, e a meio do caminho nao ha
-       * nenhuma; o erro e o desvio do terreno em relacao a recta que os une, e
-       * para saber para onde a camara olha isso chega.
-       */
-      const daqui = rota.waypoints[estadoReplay.indice]
-      const ali = rota.waypoints[estadoReplay.indice + 1]
-      const cotaDaqui = daqui ? cotas.get(chaveDaPosicao(daqui)) : undefined
-      const cotaAli = ali ? cotas.get(chaveDaPosicao(ali)) : undefined
-      const cota =
-        cotaDaqui === undefined
-          ? rota.pontoDescolagem.cotaTerreno
-          : cotaAli === undefined
-            ? cotaDaqui
-            : cotaDaqui + (cotaAli - cotaDaqui) * estadoReplay.fraccao
+  const alvoCamara = useMemo(
+    () => (rota ? alvoDaCamara(rota, cotas, comandoDaCamara) : null),
+    [rota, cotas, comandoDaCamara],
+  )
 
-      return {
-        posicao: estadoReplay.posicao,
-        alturaASL: paraASL(estadoReplay.altura, rota.modoAltitude, {
-          cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
-          cotaTerreno: cota,
-        }),
-        guinada: estadoReplay.atitude.guinada,
-        gimbalPitch: estadoReplay.atitude.gimbalPitch,
-        gimbalYaw: estadoReplay.atitude.gimbalYaw,
-      }
-    }
+  const aeronaveDeReplay = useMemo<DroneNoMapa | null>(
+    () =>
+      comandoDaCamara.replay && alvoCamara
+        ? aeronaveDoReplay(comandoDaCamara.replay, alvoCamara.alturaASL)
+        : null,
+    [comandoDaCamara.replay, alvoCamara],
+  )
 
-    if (voo.activo) {
-      const cota = cotas.get(chaveDaPosicao(voo.estado.posicao)) ?? rota.pontoDescolagem.cotaTerreno
-      return {
-        posicao: voo.estado.posicao,
-        alturaASL: paraASL(voo.estado.altura, rota.modoAltitude, {
-          cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
-          cotaTerreno: cota,
-        }),
-        guinada: voo.estado.guinada,
-        gimbalPitch: voo.estado.gimbalPitch,
-        gimbalYaw: voo.estado.gimbalYaw,
-      }
-    }
-
-    const waypoint = seleccao.waypoints.length === 1 ? seleccao.waypoints[0] : undefined
-    if (!waypoint) return null
-    const cota = cotas.get(chaveDaPosicao(waypoint))
-    if (cota === undefined) return null
-
-    return {
-      posicao: { lat: waypoint.lat, lon: waypoint.lon },
-      alturaASL: paraASL(waypoint.altura, rota.modoAltitude, {
-        cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
-        cotaTerreno: cota,
-      }),
-      // O rumo sai do modo de guinada, e nao do campo: em `followWayline` o
-      // campo esta por preencher e lia-se zero, ou seja a previsao mostrava o
-      // que estava a norte em vez do que a foto ia apanhar.
-      guinada: guinadaEfectiva(rota, waypoint.index),
-      gimbalPitch: waypoint.gimbalPitch,
-      // A previsao de um waypoint ignorava a rotacao do gimbal e mostrava o que
-      // a aeronave tinha pela frente, que nao e o que a foto vai apanhar.
-      gimbalYaw: waypoint.gimbalYaw,
-    }
-  }, [rota, replay.activo, replay.estado, voo.activo, voo.estado, seleccao.waypoints, cotas])
-
-  /**
-   * A aeronave do leitor, desenhada em 3D a percorrer a rota.
-   *
-   * Vem a parte dos waypoints: metida nos pontos da rota, o troco de voo
-   * passaria por ela e a linha ficava com um desvio que nao existe.
-   */
-  const aeronaveDoReplay = useMemo<DroneNoMapa | null>(() => {
-    if (!rota || !replay.activo || !replay.estado || !alvoCamara) return null
-    const estadoReplay = replay.estado
-
-    return {
-      lat: estadoReplay.posicao.lat,
-      lon: estadoReplay.posicao.lon,
-      alturaVoo: alvoCamara.alturaASL,
-      guinada: estadoReplay.atitude.guinada,
-      gimbalPitch: estadoReplay.atitude.gimbalPitch,
-      gimbalYaw: estadoReplay.atitude.gimbalYaw,
-      seleccionado: false,
-      alerta: false,
-      comAparelho: true,
-      // Maior e pintada de verde, para nao se confundir com os waypoints por
-      // onde passa.
-      aumento: 1.7,
-      tinta: [0.31, 0.85, 0.45, 0.55],
-    }
-  }, [rota, replay.activo, replay.estado, alvoCamara])
-
-  /**
-   * Onde a aeronave do leitor cai no corte do terreno.
-   *
-   * O percurso sai do proprio perfil, e nao de uma conta paralela: o troco e
-   * percorrido a velocidade constante, portanto a fraccao de tempo dentro dele
-   * e a mesma fraccao de distancia.
-   */
-  const aeronaveNoPerfil = useMemo(() => {
-    if (!perfil || !replay.activo || !replay.estado || !alvoCamara) return null
-    const estadoReplay = replay.estado
-
-    const daqui = perfil.waypoints.find((m) => m.indice === estadoReplay.indice)
-    if (!daqui) return null
-    const ali = perfil.waypoints.find((m) => m.indice === estadoReplay.indice + 1)
-
-    const percurso =
-      ali && !estadoReplay.parada
-        ? daqui.percurso + (ali.percurso - daqui.percurso) * estadoReplay.fraccao
-        : daqui.percurso
-
-    return { percurso, aslVoo: alvoCamara.alturaASL }
-  }, [perfil, replay.activo, replay.estado, alvoCamara])
+  const aeronaveNoCorte = useMemo(
+    () =>
+      perfil && comandoDaCamara.replay && alvoCamara
+        ? aeronaveNoPerfil(perfil, comandoDaCamara.replay, alvoCamara.alturaASL)
+        : null,
+    [perfil, comandoDaCamara.replay, alvoCamara],
+  )
 
   const { enquadramento, aCarregar: enquadramentoACarregar } = useEnquadramento(
     alvoCamara,
@@ -987,7 +894,7 @@ export function App() {
             <Mapa
               rota={rota}
               pontos3D={pontos3D}
-              aeronave={aeronaveDoReplay}
+              aeronave={aeronaveDeReplay}
             intervaloAcimaDoSolo={intervaloAGL}
             sombreado={sombreado}
             medicao={medicao}
@@ -1212,7 +1119,7 @@ export function App() {
                   aglMinimo={rota.alturaMinimaAcimaDoSolo}
                   aCarregar={amostrado.aCarregar}
                   erro={amostrado.erro}
-                  aeronave={aeronaveNoPerfil}
+                  aeronave={aeronaveNoCorte}
                   seleccionados={new Set(seleccao.waypoints.map((w) => w.index))}
                   aoSeleccionarWaypoint={(indice) => {
                     const alvo = rota.waypoints[indice]
