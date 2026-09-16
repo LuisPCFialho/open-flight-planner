@@ -216,3 +216,55 @@ describe('seta da camara', () => {
     expect(maiorY).toBeGreaterThan(maiorX * 8)
   })
 })
+
+describe('forma da fuselagem', () => {
+  /** Vertices opacos: tudo menos as helices, que sao as unicas translucidas. */
+  function opacos(): { x: number; y: number; z: number }[] {
+    const pontos: { x: number; y: number; z: number }[] = []
+    for (let i = 0; i < malha.posicoes.length / 3; i++) {
+      if ((malha.cores[i * 4 + 3] ?? 1) < 1) continue
+      pontos.push({
+        x: malha.posicoes[i * 3] ?? 0,
+        y: malha.posicoes[i * 3 + 1] ?? 0,
+        z: malha.posicoes[i * 3 + 2] ?? 0,
+      })
+    }
+    return pontos
+  }
+
+  it('tem as costas abauladas e a barriga chata', () => {
+    /*
+     * O plano dos bracos e o z zero. Com a mesma altura para cima e para baixo a
+     * fuselagem saia um charuto; por baixo e quase plana, porque e onde assenta
+     * a bateria e onde ele pousa.
+     */
+    // A meio do corpo nao ha bracos nem motores nem gimbal: so fuselagem.
+    const meio = opacos().filter((p) => Math.abs(p.y) < 0.02)
+    expect(meio.length).toBeGreaterThan(10)
+
+    const cima = Math.max(...meio.map((p) => p.z))
+    const baixo = Math.min(...meio.map((p) => p.z))
+
+    expect(cima).toBeGreaterThan(Math.abs(baixo) * 1.8)
+  })
+
+  it('a objectiva passa a frente do nariz', () => {
+    /*
+     * E o que diz para onde ele esta a olhar quando se ve de cima, e de cima e
+     * como ele se ve quase sempre. Com a lente recolhida debaixo do nariz, um
+     * quadricoptero visto de cima e simetrico e nao se percebe onde e a frente.
+     */
+    const gimbal = opacos().filter((p) => p.z < -0.03)
+    expect(gimbal.length).toBeGreaterThan(0)
+
+    const maisAFrente = Math.max(...gimbal.map((p) => p.y))
+    expect(maisAFrente).toBeGreaterThan(comprimentoDoDrone() / 2)
+  })
+
+  it('assenta em quatro pes, dois a frente e dois atras', () => {
+    // So com pes atras ele ficava a espetar o nariz no chao.
+    const pes = opacos().filter((p) => p.z < -0.012 && p.z > -0.03)
+    expect(pes.some((p) => p.y > 0.05)).toBe(true)
+    expect(pes.some((p) => p.y < -0.05)).toBe(true)
+  })
+})

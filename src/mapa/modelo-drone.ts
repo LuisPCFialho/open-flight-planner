@@ -265,6 +265,13 @@ function calcularNormaisDeAneis(aneis: readonly Vec3[][]): Vec3[][] {
 // --- pecas -------------------------------------------------------------------
 
 const LADOS_CORPO = 18
+/**
+ * Pontos a volta do perfil de cada pa.
+ *
+ * Dez chegam: uma pa e quase plana, e o que precisa de resolucao e ao longo da
+ * envergadura, onde a corda e a torcao mudam, e nao a volta da seccao.
+ */
+const LADOS_PA = 10
 
 /**
  * Seccoes da fuselagem, do rabo ao nariz.
@@ -272,22 +279,39 @@ const LADOS_CORPO = 18
  * Sao estas que dao a forma: estreita atras, cheia ao meio, e a afinar para um
  * nariz rombo. Os valores sao meias-dimensoes em metros.
  */
-const SECCOES_CORPO: readonly { y: number; x: number; z: number }[] = [
-  { y: -0.076, x: 0.012, z: 0.008 },
-  { y: -0.07, x: 0.028, z: 0.017 },
-  { y: -0.056, x: 0.039, z: 0.024 },
-  { y: -0.03, x: 0.044, z: 0.027 },
-  { y: 0.0, x: 0.045, z: 0.028 },
-  { y: 0.03, x: 0.044, z: 0.027 },
-  { y: 0.052, x: 0.04, z: 0.025 },
-  { y: 0.066, x: 0.031, z: 0.02 },
-  { y: 0.074, x: 0.018, z: 0.013 },
-  { y: 0.078, x: 0.006, z: 0.005 },
+const SECCOES_CORPO: readonly {
+  y: number
+  x: number
+  cima: number
+  baixo: number
+  /** Onde passa o eixo da seccao. E o que faz o nariz descair para o gimbal. */
+  eixo: number
+}[] = [
+  { y: -0.0725, x: 0.013, cima: 0.011, baixo: 0.008, eixo: 0.009 },
+  { y: -0.066, x: 0.031, cima: 0.021, baixo: 0.013, eixo: 0.008 },
+  { y: -0.05, x: 0.042, cima: 0.028, baixo: 0.016, eixo: 0.007 },
+  { y: -0.026, x: 0.045, cima: 0.031, baixo: 0.017, eixo: 0.006 },
+  { y: 0.002, x: 0.045, cima: 0.03, baixo: 0.017, eixo: 0.006 },
+  { y: 0.028, x: 0.042, cima: 0.027, baixo: 0.016, eixo: 0.005 },
+  { y: 0.048, x: 0.036, cima: 0.023, baixo: 0.014, eixo: 0.003 },
+  { y: 0.062, x: 0.027, cima: 0.018, baixo: 0.011, eixo: 0.0 },
+  { y: 0.07, x: 0.017, cima: 0.012, baixo: 0.007, eixo: -0.004 },
+  { y: 0.0725, x: 0.006, cima: 0.005, baixo: 0.003, eixo: -0.007 },
 ]
 
 function corpo(c: Construtor): void {
+  /*
+   * Barriga chata, costas abauladas.
+   *
+   * Cada seccao tem duas alturas em vez de uma, e a diferenca e o que mais se ve
+   * de lado e de frente: com a mesma altura em cima e em baixo, a fuselagem
+   * saia um charuto, e nenhum aparelho desta familia e um charuto. Por baixo e
+   * quase plano, porque e onde assenta a bateria e onde ele pousa.
+   */
   const aneis = SECCOES_CORPO.map((s) =>
-    superelipse(LADOS_CORPO, s.x, s.z).map((p) => [p[0], s.y, p[2] + 0.004] as Vec3),
+    superelipse(LADOS_CORPO, s.x, 1).map(
+      (p) => [p[0], s.y, (p[2] >= 0 ? p[2] * s.cima : p[2] * s.baixo) + s.eixo] as Vec3,
+    ),
   )
 
   /*
@@ -295,9 +319,13 @@ function corpo(c: Construtor): void {
    * geometria: ao tamanho a que isto se ve, uma peca separada so acrescentava
    * triangulos e uma junta que ficaria a descoberto.
    */
-  c.superficie(aneis, (posicao) =>
-    posicao[2] > 0.019 && posicao[1] < -0.005 ? CINZENTO_ESCURO : CINZENTO_CLARO,
-  )
+  c.superficie(aneis, (posicao) => {
+    // A tampa da bateria: em cima e atras, e mais escura do que a cobertura.
+    if (posicao[2] > 0.019 && posicao[1] < -0.004) return CINZENTO_ESCURO
+    // A barriga e escura como a bateria, que e o que se ve quando ele passa por cima.
+    if (posicao[2] < -0.004) return CINZENTO_MEDIO
+    return CINZENTO_CLARO
+  })
 
   const rabo = aneis[0]
   const nariz = aneis[aneis.length - 1]
@@ -306,41 +334,81 @@ function corpo(c: Construtor): void {
 
   // Os dois sensores de visao da frente, que sao o que se reconhece de longe.
   for (const lado of [-1, 1]) {
-    c.tuboEntre([lado * 0.016, 0.068, 0.006], [lado * 0.016, 0.0745, 0.006], 0.005, 0.004, 8, PRETO)
+    c.tuboEntre([lado * 0.015, 0.058, 0.004], [lado * 0.015, 0.0665, 0.004], 0.005, 0.0042, 8, PRETO)
   }
+
+  /*
+   * O respiro de arrefecimento, em cima e ao meio.
+   *
+   * E uma faixa fina e escura, e ao tamanho a que isto se ve vale por duas
+   * coisas: quebra a cobertura clara, que de outro modo e uma mancha so, e diz
+   * de que lado esta a frente sem se ter de ver o gimbal.
+   */
+  c.caixa([0, -0.012, 0.0355], [0.014, 0.012, 0.0015], CINZENTO_ESCURO)
 }
 
-/** Uma pa de helice: afina e torce da raiz para a ponta. */
+/**
+ * Largura da pa ao longo da envergadura, de 0 na raiz a 1 na ponta.
+ *
+ * Alarga depressa nos primeiros 30%, tem a corda maxima a pouco mais de meio, e
+ * afina ate um bico arredondado. E este perfil, e nao a torcao nem a cor, que
+ * faz a diferenca entre ler-se uma helice e ler-se uma pa de remo: a versao
+ * anterior tinha a corda maxima a meio e as duas pontas rombas, o que de cima
+ * dava quatro folhas em vez de quatro helices.
+ */
+function larguraDaPa(t: number): number {
+  const subida = Math.min(1, (t / 0.3) ** 0.75)
+  const descida = 1 - 0.88 * Math.max(0, (t - 0.55) / 0.45) ** 1.7
+  return Math.max(0.12, Math.min(subida, descida))
+}
+
+/**
+ * Uma pa de helice: afina, torce e recurva da raiz para a ponta.
+ *
+ * A raiz nasce dentro da campanula do motor, de proposito. Comecando ao raio da
+ * campanula ficava um risco de fundo entre as duas, e a helice parecia colada e
+ * nao encaixada.
+ */
 function pa(c: Construtor, centro: Vec3, anguloBase: number, sentido: number): void {
-  const passos = 9
+  const passos = 12
+  const raizRaio = 0.006
+  const cordaMaxima = 0.0118
   const aneis: Vec3[][] = []
 
   for (let i = 0; i <= passos; i++) {
     const t = i / passos
-    const raio = 0.01 + (RAIO_HELICE - 0.01) * t
-    // Corda maxima a um terco da envergadura, e a afinar ate a ponta.
-    const corda = 0.013 * Math.sin(Math.PI * Math.min(1, 0.25 + t * 0.75)) + 0.003
-    const espessura = 0.0013 * (1 - t * 0.6)
+    const raio = raizRaio + (RAIO_HELICE - raizRaio) * t
+    const corda = cordaMaxima * larguraDaPa(t)
+    const espessura = 0.0017 * (1 - 0.68 * t)
     // A torcao e o que faz uma pa parecer uma pa e nao uma tira.
-    const torcao = sentido * (0.38 - 0.3 * t)
+    const torcao = sentido * (0.46 - 0.36 * t)
 
-    const angulo = anguloBase + t * sentido * 0.22
+    // Recurva: a ponta foge para tras do sentido de rotacao, como num cimitarra.
+    const angulo = anguloBase + sentido * 0.5 * t ** 1.7
     const cx = centro[0] + Math.cos(angulo) * raio
     const cy = centro[1] + Math.sin(angulo) * raio
+    // Diedro: a ponta sobe um pouco, que e como uma pa parada assenta.
+    const cz = centro[2] + 0.005 * t ** 1.6
 
     // Direccao da corda: perpendicular ao raio, no plano horizontal.
     const tx = -Math.sin(angulo)
     const ty = Math.cos(angulo)
 
     const anel: Vec3[] = []
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2
+    for (let k = 0; k < LADOS_PA; k++) {
+      const a = (k / LADOS_PA) * Math.PI * 2
       const aoLongoDaCorda = Math.cos(a) * corda
-      const emEspessura = Math.sin(a) * espessura
+      /*
+       * Perfil plano-convexo: cheio por cima, quase plano por baixo. E o que uma
+       * pa e, e o que faz a luz cair de maneira diferente nas duas faces - com
+       * uma seccao simetrica as duas ficavam iguais e a pa parecia uma fita.
+       */
+      const bruto = Math.sin(a)
+      const emEspessura = (bruto >= 0 ? bruto : bruto * 0.3) * espessura
       // Roda o perfil em torno do eixo da corda para dar a torcao.
       const desvioZ = emEspessura * Math.cos(torcao) + aoLongoDaCorda * Math.sin(torcao)
       const desvioCorda = aoLongoDaCorda * Math.cos(torcao) - emEspessura * Math.sin(torcao)
-      anel.push([cx + tx * desvioCorda, cy + ty * desvioCorda, centro[2] + desvioZ])
+      anel.push([cx + tx * desvioCorda, cy + ty * desvioCorda, cz + desvioZ])
     }
     aneis.push(anel)
   }
@@ -352,56 +420,139 @@ function pa(c: Construtor, centro: Vec3, anguloBase: number, sentido: number): v
   if (ponta) c.tampa(ponta, [0, 0, 1], HELICE)
 }
 
+/**
+ * Braco achatado: mais largo do que alto, com a seccao a afinar ate ao motor.
+ *
+ * Os bracos eram tubos redondos, e de cima quase nao se viam - ficavam a
+ * espreitar por baixo das pas e o aparelho lia-se como um corpo com quatro
+ * helices a pairar ao lado. Um braco real e uma lamina: quase tao largo como o
+ * motor e metade da altura, e e isso que o desenha de cima.
+ */
+function bracoAchatado(
+  c: Construtor,
+  de: Vec3,
+  para: Vec3,
+  larguraDe: number,
+  larguraPara: number,
+  alturaDe: number,
+  alturaPara: number,
+  cor: Cor,
+): void {
+  const eixo = normalizar(subtrair(para, de))
+  // A largura mede-se na horizontal e a altura na vertical, e nao numa base
+  // qualquer perpendicular ao eixo: o braco e chato em relacao ao mundo.
+  const lateral = normalizar([eixo[1], -eixo[0], 0])
+  const passos = 4
+  const aneis: Vec3[][] = []
+
+  for (let i = 0; i <= passos; i++) {
+    const t = i / passos
+    const centro: Vec3 = [
+      de[0] + (para[0] - de[0]) * t,
+      de[1] + (para[1] - de[1]) * t,
+      de[2] + (para[2] - de[2]) * t,
+    ]
+    const largura = larguraDe + (larguraPara - larguraDe) * t
+    const altura = alturaDe + (alturaPara - alturaDe) * t
+
+    const anel: Vec3[] = []
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2
+      const l = Math.cos(a) * largura
+      const h = Math.sin(a) * altura
+      anel.push([centro[0] + lateral[0] * l, centro[1] + lateral[1] * l, centro[2] + h])
+    }
+    aneis.push(anel)
+  }
+
+  c.superficie(aneis, () => cor)
+  const inicio = aneis[0]
+  const fim = aneis[aneis.length - 1]
+  if (inicio) c.tampa(inicio, [-eixo[0], -eixo[1], -eixo[2]], cor)
+  if (fim) c.tampa(fim, eixo, cor)
+}
+
 function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void {
-  // O braco sai da anca do corpo e afina ate ao motor.
-  const anca: Vec3 = [Math.sign(mx) * 0.03, my > 0 ? 0.038 : -0.042, 0.004]
-  c.tuboEntre(anca, [mx, my, 0.006], 0.0105, 0.0078, 10, CINZENTO_CLARO)
+  const anca: Vec3 = [Math.sign(mx) * 0.031, my > 0 ? 0.035 : -0.04, 0.004]
+  bracoAchatado(c, anca, [mx, my, 0.005], 0.011, 0.0092, 0.0062, 0.005, CINZENTO_CLARO)
 
   /*
-   * Motor: corpo cilindrico, campanula escura e veio.
+   * Motor: base, campanula escura e veio.
    *
    * A pilha sobe ate as pas ficarem acima da cobertura. Mais baixas, as pas
    * atravessavam o corpo - via-se de lado e de frente, e nenhum aparelho e
    * assim.
    */
-  c.tuboEntre([mx, my, 0.0], [mx, my, 0.018], 0.0125, 0.0125, 14, CINZENTO_MEDIO)
-  c.tuboEntre([mx, my, 0.018], [mx, my, 0.027], 0.0122, 0.0098, 14, CINZENTO_ESCURO)
-  c.tuboEntre([mx, my, 0.027], [mx, my, 0.0325], 0.0035, 0.003, 8, PRETO)
+  c.tuboEntre([mx, my, -0.001], [mx, my, 0.016], 0.0122, 0.0128, 14, CINZENTO_MEDIO)
+  c.tuboEntre([mx, my, 0.016], [mx, my, 0.0275], 0.0126, 0.0098, 14, CINZENTO_ESCURO)
+  // Porca do veio, onde a helice encaixa.
+  c.tuboEntre([mx, my, 0.0275], [mx, my, 0.0335], 0.0042, 0.0034, 8, PRETO)
 
   // Duas pas opostas. A fase de cada motor e diferente para nao ficarem alinhadas.
   const sentido = mx * my > 0 ? 1 : -1
-  for (const volta of [0, Math.PI]) pa(c, [mx, my, 0.0305], fase + volta, sentido)
+  for (const volta of [0, Math.PI]) pa(c, [mx, my, 0.0298], fase + volta, sentido)
 }
 
+/**
+ * Gimbal e camara, pendurados do nariz.
+ *
+ * E a peca que diz para onde o aparelho esta a olhar, e por isso e a que mais
+ * vale detalhar apesar de ser a mais pequena: sem ela, de cima, um quadricoptero
+ * e simetrico e nao se percebe onde e a frente.
+ */
 function gimbalECamara(c: Construtor): void {
-  // Suporte que desce do nariz.
-  c.tuboEntre([0, 0.054, -0.018], [0, 0.06, -0.030], 0.007, 0.006, 8, CINZENTO_MEDIO)
-  // Bracos do berco, um de cada lado.
+  // Braco que desce do nariz e recua, como o encaixe real.
+  c.tuboEntre([0, 0.05, -0.014], [0, 0.056, -0.027], 0.0075, 0.0062, 10, CINZENTO_MEDIO)
+
+  // Berco em U: dois bracos verticais e a travessa que os une por tras.
   for (const lado of [-1, 1]) {
     c.tuboEntre(
-      [lado * 0.016, 0.062, -0.026],
-      [lado * 0.016, 0.062, -0.042],
-      0.0035,
-      0.0035,
+      [lado * 0.017, 0.058, -0.024],
+      [lado * 0.017, 0.06, -0.041],
+      0.0036,
+      0.0034,
       8,
       CINZENTO_ESCURO,
     )
   }
+  c.caixa([0, 0.0555, -0.039], [0.017, 0.004, 0.005], CINZENTO_ESCURO)
 
-  c.caixa([0, 0.064, -0.040], [0.016, 0.015, 0.014], CINZENTO_ESCURO)
-  // Barrilete da lente, virado para a frente.
-  c.tuboEntre([0, 0.076, -0.040], [0, 0.086, -0.040], 0.0115, 0.0108, 16, PRETO)
-  c.tuboEntre([0, 0.086, -0.040], [0, 0.0868, -0.040], 0.0098, 0.0098, 16, VIDRO)
+  // Corpo da camara, mais alto do que largo, como o modulo real.
+  c.caixa([0, 0.0645, -0.0405], [0.0135, 0.014, 0.0135], PRETO)
+  /*
+   * Aro da objectiva em cinzento sobre o barrilete preto.
+   *
+   * E o unico contraste claro nesta zona toda, e e ele que marca onde a camara
+   * aponta quando o aparelho sai com dez pixeis no ecra.
+   */
+  c.tuboEntre([0, 0.0715, -0.0405], [0, 0.0765, -0.0405], 0.0122, 0.0118, 16, CINZENTO_MEDIO)
+  c.tuboEntre([0, 0.0765, -0.0405], [0, 0.082, -0.0405], 0.0105, 0.0098, 16, PRETO)
+  c.tuboEntre([0, 0.082, -0.0405], [0, 0.0826, -0.0405], 0.0086, 0.0086, 16, VIDRO)
 }
 
+/**
+ * Trem de pouso: quatro pes, os de tras maiores.
+ *
+ * O aparelho assenta nos quatro, e com pes so atras ele ficava a espetar o
+ * nariz no chao - de lado via-se, e e a vista em que o trem conta.
+ */
 function trem(c: Construtor): void {
-  // Os pes de tras sao o proprio braco a descair, como neste aparelho.
   for (const lado of [-1, 1]) {
+    // Atras o proprio braco descai e faz de perna, como neste aparelho.
     c.tuboEntre(
       [lado * MOTOR.x, -MOTOR.tras, -0.002],
-      [lado * (MOTOR.x + 0.004), -MOTOR.tras - 0.004, -0.024],
-      0.0055,
-      0.007,
+      [lado * (MOTOR.x + 0.004), -MOTOR.tras - 0.005, -0.026],
+      0.0056,
+      0.0072,
+      8,
+      CINZENTO_ESCURO,
+    )
+    // A frente sao so dois tacos por baixo do braco, curtos.
+    c.tuboEntre(
+      [lado * (MOTOR.x - 0.006), MOTOR.frente - 0.008, 0.0],
+      [lado * (MOTOR.x - 0.006), MOTOR.frente - 0.01, -0.014],
+      0.0048,
+      0.0056,
       8,
       CINZENTO_ESCURO,
     )

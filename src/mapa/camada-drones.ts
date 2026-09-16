@@ -62,7 +62,16 @@ type OpcoesRender = {
  * nariz, para onde aponta a camara, se esta direito.
  */
 const PIXEIS_SETA = 30
-const PIXEIS_APARELHO = 64
+/*
+ * Quarenta e seis, e nao sessenta e quatro.
+ *
+ * O numero antigo vinha de quando o modelo era uma silhueta e precisava de
+ * tamanho para se perceber o que era. Com a fuselagem torneada, os bracos
+ * achatados e as pas recurvadas, le-se bem mais pequeno - e mais pequeno e o
+ * que se quer, porque o que esta por baixo do aparelho e o terreno que se anda
+ * a estudar.
+ */
+const PIXEIS_APARELHO = 46
 /**
  * Limites do tamanho no mundo, em metros.
  *
