@@ -6,15 +6,21 @@ import {
   ScaleControl,
   type GeoJSONSource,
 } from 'maplibre-gl'
-import type { Feature, FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { LatLon, Rota } from '../nucleo/tipos.ts'
-import { algumDentroDaVista, contornoFechado } from '../nucleo/areas.ts'
+import { algumDentroDaVista } from '../nucleo/areas.ts'
 import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
 import { CAMADA_SOMBREADO, estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
 import { CamadaDrones, type DroneNoMapa } from './camada-drones.ts'
 import { ligarEstilo } from './arranque.ts'
+import { sincronizarMarcadores, sincronizarPOIs } from './marcadores.ts'
+import {
+  areasGeoJSON,
+  enquadramentoGeoJSON,
+  medicaoGeoJSON,
+  segmentosGeoJSON,
+} from './geojson.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
 
 const FONTE_SEGMENTOS = 'rota-segmentos'
@@ -595,7 +601,7 @@ export function Mapa(props: PropsMapa) {
     const instancia = mapa.current
     if (!instancia || !pronto) return
     const fonte = instancia.getSource(FONTE_ENQUADRAMENTO) as GeoJSONSource | undefined
-    fonte?.setData(enquadramentoGeoJSON(props))
+    fonte?.setData(enquadramentoGeoJSON(props.enquadramento, posicaoDaAeronave(props)))
     // O enquadramento sai da camara do ponto seleccionado ou da aeronave em voo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.enquadramento, props.seguir, props.seleccionados, waypoints, pronto])
@@ -676,267 +682,9 @@ export function Mapa(props: PropsMapa) {
   return <div className="mapa" data-pronto={pronto ? 'sim' : 'nao'} ref={contentor} />
 }
 
-// --- desenho -----------------------------------------------------------------
-
-/**
- * Referencia sempre actualizada para as callbacks.
- *
- * Os handlers de um marcador sao registados uma unica vez, quando o marcador
- * nasce. Se fechassem sobre as funcoes desse render, a seleccao por intervalo
- * passaria a consultar uma rota antiga assim que a rota mudasse.
- */
-type RefCallbacks = { current: PropsMapa }
-
-/**
- * Poligono do que a foto vai apanhar, mais as arestas da piramide de visao desde
- * a aeronave ate aos cantos.
- */
-function enquadramentoGeoJSON(props: PropsMapa): FeatureCollection {
-  const enquadramento = props.enquadramento
-  if (!enquadramento) return { type: 'FeatureCollection', features: [] }
-
-  const cantos = enquadramento.cantos.filter((c) => c !== null)
-  if (cantos.length < 3) return { type: 'FeatureCollection', features: [] }
-
-  const anel = cantos.map((c) => [c.ponto.lon, c.ponto.lat])
-  const primeiro = anel[0]
-  if (primeiro) anel.push(primeiro)
-
-  const features: Feature[] = [
-    { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [anel] } },
-  ]
-
-  const aeronave = props.seguir?.posicao ?? posicaoDoSeleccionado(props)
-  if (aeronave) {
-    for (const canto of cantos) {
-      features.push({
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: [
-            [aeronave.lon, aeronave.lat],
-            [canto.ponto.lon, canto.ponto.lat],
-          ],
-        },
-      })
-    }
-  }
-
-  const centro = enquadramento.centro
-  if (aeronave && centro) {
-    features.push({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [aeronave.lon, aeronave.lat],
-          [centro.ponto.lon, centro.ponto.lat],
-        ],
-      },
-    })
-  }
-
-  return { type: 'FeatureCollection', features }
-}
-
-function posicaoDoSeleccionado(props: PropsMapa): LatLon | null {
+/** De onde partem os raios do enquadramento: a aeronave, ou o ponto escolhido. */
+function posicaoDaAeronave(props: PropsMapa): LatLon | null {
+  if (props.seguir) return props.seguir.posicao
   const waypoint = props.rota.waypoints.find((w) => props.seleccionados.has(w.id))
   return waypoint ? { lat: waypoint.lat, lon: waypoint.lon } : null
-}
-
-/**
- * Marcadores dos pontos de interesse. Sao losangos, para nao se confundirem com
- * os circulos numerados dos waypoints a um relance.
- */
-function sincronizarPOIs(
-  instancia: MapaLibre,
-  marcadores: Map<string, Marker>,
-  pois: Rota['pois'],
-  callbacks: RefCallbacks,
-): void {
-  const vivos = new Set(pois.map((p) => p.id))
-  for (const [id, marcador] of marcadores) {
-    if (!vivos.has(id)) {
-      marcador.remove()
-      marcadores.delete(id)
-    }
-  }
-
-  for (const poi of pois) {
-    let marcador = marcadores.get(poi.id)
-
-    if (!marcador) {
-      const elemento = document.createElement('button')
-      elemento.type = 'button'
-      elemento.className = 'marcador-poi'
-      elemento.addEventListener('click', (evento) => {
-        evento.stopPropagation()
-        if (evento.shiftKey) callbacks.current.aoRemoverPOI(poi.id)
-      })
-      elemento.addEventListener('contextmenu', (evento) => {
-        evento.preventDefault()
-        evento.stopPropagation()
-        callbacks.current.aoRemoverPOI(poi.id)
-      })
-
-      marcador = new Marker({ element: elemento, draggable: false })
-      marcador.setLngLat([poi.lon, poi.lat]).addTo(instancia)
-      marcadores.set(poi.id, marcador)
-    } else {
-      const atual = marcador.getLngLat()
-      if (atual.lat !== poi.lat || atual.lng !== poi.lon) {
-        marcador.setLngLat([poi.lon, poi.lat])
-      }
-    }
-
-    const elemento = marcador.getElement()
-    elemento.title = `${poi.nome} — shift e clique para remover`
-    elemento.setAttribute('aria-label', `Ponto de interesse ${poi.nome}`)
-  }
-}
-
-/** Um troco por feature, para se saber onde inserir quando se alt+clica na linha. */
-function areasGeoJSON(areas: Rota['areas']): FeatureCollection {
-  const features: Feature[] = []
-
-  for (const area of areas ?? []) {
-    const anel = contornoFechado(area.contorno)
-    if (anel.length === 0) continue
-
-    features.push({
-      type: 'Feature',
-      properties: { id: area.id, nome: area.nome },
-      geometry: { type: 'Polygon', coordinates: [anel.map((p) => [p.lon, p.lat])] },
-    })
-  }
-
-  return { type: 'FeatureCollection', features }
-}
-
-function segmentosGeoJSON(waypoints: Rota['waypoints']): FeatureCollection {
-  const features: Feature[] = []
-  for (let i = 1; i < waypoints.length; i++) {
-    const de = waypoints[i - 1]
-    const para = waypoints[i]
-    if (!de || !para) continue
-    features.push({
-      type: 'Feature',
-      properties: { indice: i - 1 },
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [de.lon, de.lat],
-          [para.lon, para.lat],
-        ],
-      },
-    })
-  }
-  return { type: 'FeatureCollection', features }
-}
-
-function sincronizarMarcadores(
-  instancia: MapaLibre,
-  marcadores: Map<string, Marker>,
-  waypoints: Rota['waypoints'],
-  seleccionados: ReadonlySet<string>,
-  callbacks: RefCallbacks,
-): void {
-  const vivos = new Set(waypoints.map((w) => w.id))
-  for (const [id, marcador] of marcadores) {
-    if (!vivos.has(id)) {
-      marcador.remove()
-      marcadores.delete(id)
-    }
-  }
-
-  for (const waypoint of waypoints) {
-    const seleccionado = seleccionados.has(waypoint.id)
-    let marcador = marcadores.get(waypoint.id)
-
-    if (!marcador) {
-      const elemento = document.createElement('button')
-      elemento.type = 'button'
-      elemento.className = 'marcador-waypoint'
-
-      elemento.addEventListener('click', (evento) => {
-        evento.stopPropagation()
-        callbacks.current.aoSeleccionar(
-          waypoint.id,
-          evento.shiftKey || evento.ctrlKey || evento.metaKey,
-        )
-      })
-
-      // Botao direito em cima do waypoint apaga-o. Desfaz-se com Ctrl+Z, como
-      // tudo o resto: passa pelo mesmo caminho do botao de eliminar da lista.
-      elemento.addEventListener('contextmenu', (evento) => {
-        evento.preventDefault()
-        evento.stopPropagation()
-        callbacks.current.aoEliminarWaypoint(waypoint.id)
-      })
-
-      marcador = new Marker({ element: elemento, draggable: true })
-      marcador.setLngLat([waypoint.lon, waypoint.lat]).addTo(instancia)
-
-      const novo = marcador
-      novo.on('drag', () => {
-        const pos = novo.getLngLat()
-        callbacks.current.aoMoverWaypoint(waypoint.id, pos.lat, pos.lng, false)
-      })
-      novo.on('dragend', () => {
-        const pos = novo.getLngLat()
-        callbacks.current.aoMoverWaypoint(waypoint.id, pos.lat, pos.lng, true)
-      })
-
-      marcadores.set(waypoint.id, marcador)
-    } else {
-      const atual = marcador.getLngLat()
-      if (atual.lat !== waypoint.lat || atual.lng !== waypoint.lon) {
-        marcador.setLngLat([waypoint.lon, waypoint.lat])
-      }
-    }
-
-    const elemento = marcador.getElement()
-    elemento.textContent = String(waypoint.index + 1)
-    elemento.classList.toggle('seleccionado', seleccionado)
-    elemento.setAttribute('aria-label', `Waypoint ${waypoint.index + 1}`)
-  }
-}
-
-/**
- * A regua desenhada: a linha quebrada, os vertices, e o poligono fechado a
- * partir de tres pontos.
- *
- * O poligono desenha-se fechado mas a linha nao, porque o que se esta a medir e
- * o caminho que se marcou; fechar a linha daria a entender que ha ali um lado
- * que ainda nao se marcou.
- */
-function medicaoGeoJSON(pontos: readonly LatLon[]): FeatureCollection {
-  const features: Feature[] = pontos.map((p) => ({
-    type: 'Feature',
-    properties: {},
-    geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
-  }))
-
-  if (pontos.length >= 2) {
-    features.push({
-      type: 'Feature',
-      properties: {},
-      geometry: { type: 'LineString', coordinates: pontos.map((p) => [p.lon, p.lat]) },
-    })
-  }
-
-  if (pontos.length >= 3) {
-    const anel = pontos.map((p) => [p.lon, p.lat])
-    const primeiro = anel[0]
-    if (primeiro) anel.push(primeiro)
-    features.push({
-      type: 'Feature',
-      properties: {},
-      geometry: { type: 'Polygon', coordinates: [anel] },
-    })
-  }
-
-  return { type: 'FeatureCollection', features }
 }
