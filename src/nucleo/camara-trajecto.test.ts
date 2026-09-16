@@ -7,6 +7,7 @@ import {
   atitudeNoTroco,
   atitudeNoWaypoint,
   atitudeParaOAlvo,
+  guinadaEfectiva,
   interpolarAngulo,
   posicaoNoTroco,
 } from './camara-trajecto.ts'
@@ -87,7 +88,15 @@ describe('atitude em cada waypoint', () => {
     let rota = rotaRecta([60, 60])
     rota = {
       ...rota,
-      waypoints: rota.waypoints.map((w) => ({ ...w, gimbalPitch: -12, gimbalYaw: 25, guinada: 200 })),
+      // O rumo so esta gravado quando o modo de guinada o diz; com
+      // `followWayline` ele sai da geometria da rota.
+      waypoints: rota.waypoints.map((w) => ({
+        ...w,
+        modoGuinada: 'fixed' as const,
+        gimbalPitch: -12,
+        gimbalYaw: 25,
+        guinada: 200,
+      })),
     }
     expect(atitudeNoWaypoint(rota, 0, 'manter')).toEqual({
       guinada: 200,
@@ -219,5 +228,96 @@ describe('fixar o modo nos waypoints', () => {
     const fixada = aplicarModoAosWaypoints(rotaRecta([60, 60]), 'proximoWaypoint')
     expect(fixada.waypoints[0]?.modoGuinada).toBe('fixed')
     expect(fixada.waypoints[0]?.guinada).toBeCloseTo(90, 1)
+  })
+})
+
+describe('guinada efectiva', () => {
+  /** Rota em L: dois pontos para leste, depois um para norte. */
+  function rotaEmL(): Rota {
+    let rota = rotaVazia({
+      nome: 'ensaio',
+      projetoId: 'p',
+      droneId: 'mini5pro',
+      pontoDescolagem: DESCOLAGEM,
+    })
+    const a = { lat: DESCOLAGEM.lat, lon: DESCOLAGEM.lon }
+    const b = deslocar(a, 90, 200)
+    const c = deslocar(b, 0, 200)
+    for (const [i, ponto] of [a, b, c].entries()) {
+      rota = acrescentarWaypoint(rota, waypointNovo({ ...ponto, altura: 60, index: i }))
+    }
+    return rota
+  }
+
+  it('no modo followWayline o rumo sai da rota, e nao do campo por preencher', () => {
+    /*
+     * Este era o defeito: uma rota acabada de marcar nasce toda em
+     * `followWayline` com `guinada` por preencher, e ler o campo em bruto dava
+     * zero em todos os pontos. Os aparelhos desenhados apontavam todos a norte
+     * e a previsao do enquadramento mostrava o que estava a norte.
+     */
+    const rota = rotaEmL()
+    expect(guinadaEfectiva(rota, 0)).toBeCloseTo(90, 1)
+    expect(guinadaEfectiva(rota, 1)).toBeCloseTo(0, 1)
+  })
+
+  it('no ultimo ponto mantem-se o rumo com que se chega', () => {
+    expect(guinadaEfectiva(rotaEmL(), 2)).toBeCloseTo(0, 1)
+  })
+
+  it('o modo fixed usa mesmo o campo gravado', () => {
+    const base = rotaEmL()
+    const rota: Rota = {
+      ...base,
+      waypoints: base.waypoints.map((w) => ({ ...w, modoGuinada: 'fixed' as const, guinada: 217 })),
+    }
+    expect(guinadaEfectiva(rota, 0)).toBe(217)
+  })
+
+  it('o modo towardPOI aponta ao ponto de interesse', () => {
+    const base = rotaEmL()
+    const primeiro = base.waypoints[0]
+    if (!primeiro) throw new Error('rota vazia')
+    const alvo = deslocar(primeiro, 270, 150)
+
+    const rota: Rota = {
+      ...base,
+      pois: [{ id: 'poi1', nome: 'mesa', lat: alvo.lat, lon: alvo.lon, altura: 0 }],
+      waypoints: base.waypoints.map((w, i) =>
+        i === 0 ? { ...w, modoGuinada: 'towardPOI' as const, poiId: 'poi1' } : w,
+      ),
+    }
+    expect(guinadaEfectiva(rota, 0)).toBeCloseTo(270, 0)
+  })
+
+  it('um POI que ja nao existe nao inventa rumo nenhum', () => {
+    const base = rotaEmL()
+    const rota: Rota = {
+      ...base,
+      waypoints: base.waypoints.map((w, i) =>
+        i === 0 ? { ...w, modoGuinada: 'towardPOI' as const, poiId: 'desaparecido' } : w,
+      ),
+    }
+    expect(guinadaEfectiva(rota, 0)).toBe(0)
+  })
+
+  it('dois waypoints no mesmo sitio nao dao um rumo ao acaso', () => {
+    let rota = rotaVazia({
+      nome: 'ensaio',
+      projetoId: 'p',
+      droneId: 'mini5pro',
+      pontoDescolagem: DESCOLAGEM,
+    })
+    for (let i = 0; i < 2; i++) {
+      rota = acrescentarWaypoint(
+        rota,
+        waypointNovo({ lat: DESCOLAGEM.lat, lon: DESCOLAGEM.lon, altura: 60, index: i }),
+      )
+    }
+    expect(Number.isFinite(guinadaEfectiva(rota, 0))).toBe(true)
+  })
+
+  it('um waypoint que nao existe da zero em vez de rebentar', () => {
+    expect(guinadaEfectiva(rotaEmL(), 99)).toBe(0)
   })
 })

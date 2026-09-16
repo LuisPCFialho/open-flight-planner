@@ -63,7 +63,7 @@ export function atitudeNoWaypoint(
   if (!waypoint) return { guinada: 0, gimbalPitch: -30, gimbalYaw: 0 }
 
   const gravada: Atitude = {
-    guinada: waypoint.guinada ?? 0,
+    guinada: guinadaEfectiva(rota, indice),
     gimbalPitch: waypoint.gimbalPitch,
     gimbalYaw: waypoint.gimbalYaw,
   }
@@ -175,4 +175,41 @@ export function aplicarModoAosWaypoints(rota: Rota, modo: ModoCamaraTrajecto): R
       }
     }),
   }
+}
+
+/**
+ * Para onde o nariz da aeronave aponta neste waypoint.
+ *
+ * O campo `guinada` so vale quando o modo e `fixed` ou `manual`. Nos outros dois
+ * o rumo nao esta guardado em lado nenhum: sai da geometria da rota, e e o
+ * proprio aparelho que o calcula em voo. Ler `guinada` em bruto - que e o que se
+ * fazia - devolvia zero em todos os waypoints de uma rota acabada de marcar,
+ * porque o modo de origem e `followWayline` e nesse modo o campo fica por
+ * preencher. O efeito era todos os aparelhos desenhados a apontar a norte e a
+ * previsao do enquadramento a mostrar o que estava a norte, e nao o que a foto
+ * ia apanhar.
+ */
+export function guinadaEfectiva(rota: Rota, indice: number): number {
+  const waypoint = rota.waypoints[indice]
+  if (!waypoint) return 0
+
+  if (waypoint.modoGuinada === 'towardPOI') {
+    const poi = rota.pois.find((p) => p.id === waypoint.poiId)
+    // Um POI que ja nao existe deixa o rumo por definir; ha uma validacao a
+    // dizer isso pelo nome, e aqui nao se inventa um rumo qualquer.
+    if (poi) return rumo(waypoint, poi)
+    return waypoint.guinada ?? 0
+  }
+
+  if (waypoint.modoGuinada === 'followWayline') {
+    const seguinte = rota.waypoints[indice + 1]
+    if (seguinte && distancia(waypoint, seguinte) > 0.001) return rumo(waypoint, seguinte)
+
+    // No ultimo ponto nao ha para onde seguir: mantem-se o rumo com que se chega.
+    const anterior = rota.waypoints[indice - 1]
+    if (anterior && distancia(anterior, waypoint) > 0.001) return rumo(anterior, waypoint)
+    return waypoint.guinada ?? 0
+  }
+
+  return waypoint.guinada ?? 0
 }
