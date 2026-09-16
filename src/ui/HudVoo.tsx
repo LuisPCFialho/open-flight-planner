@@ -53,10 +53,10 @@ export function HudVoo({
         <span className="hud-rotulo">Rumo</span>
         <span className="hud-valor grande numerico">{estado.guinada.toFixed(0)}&deg;</span>
         <span className="hud-rotulo">Gimbal</span>
-        <span className="hud-valor numerico" title="Inclinacao do gimbal">
+        <span className="hud-valor numerico" title="Inclinação do gimbal">
           {estado.gimbalPitch.toFixed(1)}&deg;
         </span>
-        <span className="hud-valor numerico" title="Rotacao do gimbal em relacao ao nariz">
+        <span className="hud-valor numerico" title="Rotação do gimbal em relação ao nariz">
           {estado.gimbalYaw >= 0 ? '+' : ''}
           {estado.gimbalYaw.toFixed(1)}&deg; gim
         </span>
@@ -80,7 +80,7 @@ export function HudVoo({
 
       {/* Velocidade a que se anda a reconhecer, nao a velocidade da rota. */}
       <div className="hud-bloco hud-velocidade">
-        <span className="hud-rotulo">Deslocacao</span>
+        <span className="hud-rotulo">Deslocação</span>
         <span className="hud-valor numerico">{velocidade.toFixed(0)} m/s</span>
         <input
           type="range"
@@ -88,13 +88,13 @@ export function HudVoo({
           max={VELOCIDADE_MAXIMA}
           step={PASSO_VELOCIDADE}
           value={velocidade}
-          title="Velocidade do voo virtual. Tambem se muda com as teclas + e -"
+          title="Velocidade do voo virtual. Também se muda com as teclas + e -"
           onChange={(evento) => aoAlterarVelocidade(Number.parseFloat(evento.target.value))}
         />
       </div>
 
       <div className="hud-bloco hud-accoes">
-        <button type="button" onClick={aoGravar} title="Shift e espaco">
+        <button type="button" onClick={aoGravar} title="Shift e espaço">
           Gravar waypoint
         </button>
         <span className="hud-ajuda">

@@ -76,7 +76,7 @@ export function CampoNumerico({
     <div className="campo">
       <label className="campo-rotulo" htmlFor={id}>
         {rotulo}
-        {divergem ? <span className="campo-divergem">Varios valores</span> : null}
+        {divergem ? <span className="campo-divergem">Vários valores</span> : null}
       </label>
 
       <div className="campo-corpo">
@@ -152,7 +152,7 @@ export function CampoSelecao<T extends string>({
     <div className="campo">
       <label className="campo-rotulo" htmlFor={id}>
         {rotulo}
-        {divergem ? <span className="campo-divergem">Varios valores</span> : null}
+        {divergem ? <span className="campo-divergem">Vários valores</span> : null}
       </label>
       <select
         id={id}

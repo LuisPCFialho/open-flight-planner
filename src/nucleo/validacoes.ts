@@ -152,9 +152,9 @@ function validarColisaoNosTrocos(rota: Rota, contexto: ContextoValidacao): Valid
       {
         id: 'colisao-por-verificar',
         severidade: 'aviso',
-        titulo: 'A folga entre waypoints ainda nao foi verificada',
+        titulo: 'A folga entre waypoints ainda não foi verificada',
         detalhe:
-          'Falta o perfil do terreno ao longo do percurso. Os waypoints podem estar folgados e um troco entre eles passar dentro do terreno.',
+          'Falta o perfil do terreno ao longo do percurso. Os waypoints podem estar folgados e um troço entre eles passar dentro do terreno.',
       },
     ]
   }
@@ -247,7 +247,7 @@ function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
     validacoes.push({
       id: 'velocidade-global-invalida',
       severidade: 'erro',
-      titulo: 'A velocidade global da rota nao e voavel',
+      titulo: 'A velocidade global da rota não é voável',
       detalhe: `Esta a ${rota.velocidadeGlobal} m/s. Tem de ser maior do que zero.`,
     })
   }
@@ -258,7 +258,7 @@ function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
       id: 'velocidade-waypoint-invalida',
       severidade: 'erro',
       titulo: `${parados.length} waypoint${parados.length === 1 ? '' : 's'} com velocidade nao voavel`,
-      detalhe: 'A velocidade propria de um waypoint tem de ser maior do que zero.',
+      detalhe: 'A velocidade própria de um waypoint tem de ser maior do que zero.',
       waypoints: parados.map((w) => w.index),
     })
   }
@@ -274,7 +274,7 @@ function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
         detalhe:
           rapidos.length > 0
             ? `Afecta ${rapidos.length} waypoint${rapidos.length === 1 ? '' : 's'}.`
-            : 'A velocidade global da rota esta acima do maximo do aparelho.',
+            : 'A velocidade global da rota está acima do máximo do aparelho.',
         ...(rapidos.length > 0 ? { waypoints: rapidos.map((w) => w.index) } : {}),
       })
     }
@@ -307,7 +307,7 @@ function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
     {
       id: 'autonomia',
       severidade: 'erro',
-      titulo: 'A rota nao cabe na autonomia',
+      titulo: 'A rota não cabe na autonomia',
       detalhe: `Estimam-se ${formatarDuracao(duracao)} de voo, contando a ida ao primeiro ponto e o regresso, e a margem prudente para o ${drone.nome} sao ${formatarDuracao(limite)}, ou seja ${Math.round(MARGEM_AUTONOMIA * 100)}% de ${autonomia} minutos.`,
     },
   ]
@@ -340,7 +340,7 @@ function validarFotos(rota: Rota, contexto: ContextoValidacao): Validacao[] {
       id: 'sem-foto',
       severidade: 'aviso',
       titulo: `${semFoto.length} waypoint${semFoto.length === 1 ? '' : 's'} sem accao de foto`,
-      detalhe: 'Numa rota de registo fotografico cada ponto costuma ter a sua foto.',
+      detalhe: 'Numa rota de registo fotográfico cada ponto costuma ter a sua foto.',
       waypoints: semFoto.map((w) => w.index),
     },
   ]
@@ -355,7 +355,7 @@ function validarPOIs(rota: Rota): Validacao[] {
       id: 'poi-perdido',
       severidade: 'erro',
       titulo: `${perdidos.length} waypoint${perdidos.length === 1 ? '' : 's'} a apontar a um POI que nao existe`,
-      detalhe: 'O ficheiro sairia com um ponto de interesse invalido.',
+      detalhe: 'O ficheiro sairia com um ponto de interesse inválido.',
       waypoints: perdidos,
     },
   ]
@@ -371,7 +371,7 @@ function validarCotasEmFalta(rota: Rota, contexto: ContextoValidacao): Validacao
       severidade: 'erro',
       titulo: `Falta a cota do terreno de ${emFalta.length} waypoint${emFalta.length === 1 ? '' : 's'}`,
       detalhe:
-        'Sem essas cotas nao e possivel saber a que altura do solo a rota passa, nem converter alturas com seguranca.',
+        'Sem essas cotas não é possível saber a que altura do solo a rota passa, nem converter alturas com segurança.',
       waypoints: emFalta.map((w) => w.index),
     },
   ]

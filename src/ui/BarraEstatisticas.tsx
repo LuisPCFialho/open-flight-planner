@@ -13,11 +13,11 @@ export function BarraEstatisticas({ estatisticas }: Props) {
   return (
     <div className="estatisticas" role="status" aria-live="polite">
       <Campo
-        rotulo="Distancia"
+        rotulo="Distância"
         valor={formatarDistancia(estatisticas.distanciaHorizontal)}
         titulo={`Percurso 3D: ${formatarDistancia(estatisticas.distancia3D)}`}
       />
-      <Campo rotulo="Duracao" valor={formatarDuracao(estatisticas.duracao)} />
+      <Campo rotulo="Duração" valor={formatarDuracao(estatisticas.duracao)} />
       <Campo rotulo="Waypoints" valor={String(estatisticas.numeroWaypoints)} />
       <Campo rotulo="Fotos" valor={String(estatisticas.numeroFotos)} />
     </div>

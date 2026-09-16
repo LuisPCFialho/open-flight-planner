@@ -12,15 +12,15 @@ import { CampoNumerico, CampoSelecao } from './campos.tsx'
 import { IconeDescolagem } from './icones.tsx'
 
 const MODOS_ALTITUDE: readonly { valor: ModoAltitude; rotulo: string; ajuda: string }[] = [
-  { valor: 'ASL', rotulo: 'ASL', ajuda: 'Acima do nivel medio do mar' },
-  { valor: 'ALT', rotulo: 'ALT', ajuda: 'Relativa a cota do ponto de descolagem' },
+  { valor: 'ASL', rotulo: 'ASL', ajuda: 'Acima do nível médio do mar' },
+  { valor: 'ALT', rotulo: 'ALT', ajuda: 'Relativa à cota do ponto de descolagem' },
   { valor: 'AGL', rotulo: 'AGL', ajuda: 'Acima do solo em cada ponto' },
 ]
 
 const ACCOES_FINAIS: readonly { valor: AccaoFinal; rotulo: string }[] = [
   { valor: 'goHome', rotulo: 'Regressar ao ponto de descolagem' },
-  { valor: 'noAction', rotulo: 'Pairar no ultimo waypoint' },
-  { valor: 'autoLand', rotulo: 'Aterrar no ultimo waypoint' },
+  { valor: 'noAction', rotulo: 'Pairar no último waypoint' },
+  { valor: 'autoLand', rotulo: 'Aterrar no último waypoint' },
   { valor: 'gotoFirstWaypoint', rotulo: 'Voltar ao primeiro waypoint' },
 ]
 
@@ -74,9 +74,9 @@ export function ConfiguracoesRota({
   aoFechar,
 }: Props) {
   return (
-    <div className="painel-flutuante" role="dialog" aria-label="Configuracoes de rota de voo">
+    <div className="painel-flutuante" role="dialog" aria-label="Configurações de rota de voo">
       <header className="painel-cabecalho">
-        <h2>Configuracoes de rota de voo</h2>
+        <h2>Configurações de rota de voo</h2>
         <button type="button" onClick={aoFechar} title="Fechar">
           Fechar
         </button>
@@ -122,7 +122,7 @@ export function ConfiguracoesRota({
         </section>
 
         <section className="grupo">
-          <h3>Modo de altitude da trajetoria</h3>
+          <h3>Modo de altitude da trajetória</h3>
           <div className="alternador">
             {MODOS_ALTITUDE.map((modo) => (
               <button
@@ -139,7 +139,7 @@ export function ConfiguracoesRota({
           </div>
           <p className="nota">
             {impedimentoConversao ??
-              'Mudar de modo reescreve as alturas sem mexer na posicao real de nenhum waypoint.'}
+              'Mudar de modo reescreve as alturas sem mexer na posição real de nenhum waypoint.'}
           </p>
         </section>
 
@@ -212,7 +212,7 @@ export function ConfiguracoesRota({
         <section className="grupo">
           <h3>Limites acima do solo</h3>
           <CampoNumerico
-            rotulo="Altura minima acima do solo"
+            rotulo="Altura mínima acima do solo"
             valor={rota.alturaMinimaAcimaDoSolo}
             unidade=" m"
             min={1}
@@ -245,7 +245,7 @@ export function ConfiguracoesRota({
         <section className="grupo">
           <h3>Geoide</h3>
           <CampoNumerico
-            rotulo="Ondulacao do geoide (HAE menos ASL)"
+            rotulo="Ondulação do geoide (HAE menos ASL)"
             valor={rota.ondulacaoGeoide}
             unidade=" m"
             casas={1}

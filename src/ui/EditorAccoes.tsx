@@ -61,7 +61,7 @@ export function EditorAccoes({
           Selecciona um so para editar a lista.
         </p>
       ) : waypoint.acoes.length === 0 ? (
-        <p className="nota">Sem accoes neste waypoint.</p>
+        <p className="nota">Sem acções neste waypoint.</p>
       ) : (
         <ol className="lista-accoes">
           {waypoint.acoes.map((accao, indice) => (
@@ -114,7 +114,7 @@ function ParametrosDaAccao({
       return (
         <>
           <EntradaCurta
-            titulo="Inclinacao do gimbal, graus"
+            titulo="Inclinação do gimbal, graus"
             valor={accao.pitch}
             min={-90}
             max={45}

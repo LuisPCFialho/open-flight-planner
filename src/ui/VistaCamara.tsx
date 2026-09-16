@@ -173,7 +173,7 @@ export function VistaCamara({
       <div className="vista-camara-leituras numerico">
         {centro ? (
           <>
-            <span title="Distancia obliqua ao centro do enquadramento">
+            <span title="Distância oblíqua ao centro do enquadramento">
               {centro.distancia.toFixed(0)} m ao centro
             </span>
             <span title="Largura do terreno coberta pela foto">
@@ -181,7 +181,7 @@ export function VistaCamara({
             </span>
           </>
         ) : (
-          <span>{aCarregar ? 'a projectar...' : 'a camara aponta acima do horizonte'}</span>
+          <span>{aCarregar ? 'a projectar...' : 'a câmara aponta acima do horizonte'}</span>
         )}
       </div>
     </div>

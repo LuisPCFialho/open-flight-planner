@@ -48,7 +48,7 @@ export function valorIndentado(nome: string, conteudo: string | number): No {
  * para o aparelho.
  */
 export function numero(valorNumerico: number, casas = 6): string {
-  if (!Number.isFinite(valorNumerico)) throw new Error(`numero invalido para WPML: ${valorNumerico}`)
+  if (!Number.isFinite(valorNumerico)) throw new Error(`número inválido para WPML: ${valorNumerico}`)
   if (Number.isInteger(valorNumerico)) return String(valorNumerico)
   const texto = valorNumerico.toFixed(casas)
   // Remove zeros finais, mas nunca deixa o numero acabar em ponto.
@@ -63,7 +63,7 @@ export function numero(valorNumerico: number, casas = 6): string {
  * e o que faz o ficheiro gerado ser identico ao que o aparelho produz.
  */
 export function decimal(valor: number, casas: number): string {
-  if (!Number.isFinite(valor)) throw new Error(`numero invalido para WPML: ${valor}`)
+  if (!Number.isFinite(valor)) throw new Error(`número inválido para WPML: ${valor}`)
   return valor.toFixed(casas)
 }
 

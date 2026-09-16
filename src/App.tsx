@@ -99,7 +99,7 @@ export function App() {
         aoConseguir?.(valor)
       })
       .catch((causa: unknown) => {
-        setFalha(causa instanceof Error ? causa.message : 'a operacao falhou')
+        setFalha(causa instanceof Error ? causa.message : 'a operação falhou')
       })
   }, [])
   const [topografia, setTopografia] = useState<FonteTerrenoDXF | null>(null)
@@ -677,7 +677,7 @@ export function App() {
   if (arranque) {
     return (
       <div className="aviso-arranque">
-        <h1>Nao foi possivel abrir o projeto</h1>
+        <h1>Não foi possível abrir o projeto</h1>
         <p>{arranque}</p>
       </div>
     )
@@ -702,7 +702,7 @@ export function App() {
             className={configuracoesAbertas ? 'activo' : ''}
             onClick={() => setConfiguracoesAbertas((v) => !v)}
           >
-            Configuracoes de rota de voo
+            Configurações de rota de voo
           </button>
           <BarraEstatisticas estatisticas={estatisticas} />
         </div>
@@ -772,7 +772,7 @@ export function App() {
             fonteTerreno={fonteTerreno}
             bloqueio={
               exportacaoBloqueada
-                ? `${validacoes.filter((v) => v.severidade === 'erro').length} erro(s) de validacao impedem a exportacao`
+                ? `${validacoes.filter((v) => v.severidade === 'erro').length} erro(s) de validação impedem a exportação`
                 : null
             }
             aoImportar={(importada) => {
@@ -784,7 +784,7 @@ export function App() {
           />
           <button
             type="button"
-            title="Voltar a lista de projetos"
+            title="Voltar à lista de projetos"
             onClick={() => {
               gravarPendente()
               voo.parar()
@@ -798,11 +798,11 @@ export function App() {
             className={`botao-ficheiro ${rota.areas?.length ? 'activo' : ''}`}
             title={
               rota.areas?.length
-                ? `${rota.areas.length} area(s) de referencia, ${formatarArea(rota.areas.reduce((total, a) => total + areaDoContorno(a.contorno), 0))} no total. Importar de novo substitui.`
-                : 'Importar KMZ ou KML com poligonos, para ter no mapa o contorno da area a filmar'
+                ? `${rota.areas.length} área(s) de referência, ${formatarArea(rota.areas.reduce((total, a) => total + areaDoContorno(a.contorno), 0))} no total. Importar de novo substitui.`
+                : 'Importar KMZ ou KML com polígonos, para ter no mapa o contorno da área a filmar'
             }
           >
-            Area
+            Área
             <input
               type="file"
               accept=".kmz,.kml"
@@ -820,7 +820,7 @@ export function App() {
                     const total = areas.reduce((soma, a) => soma + areaDoContorno(a.contorno), 0)
                     setAvisoTopografia(
                       [
-                        `${ficheiro.name}: ${areas.length} area(s), ${formatarArea(total)}`,
+                        `${ficheiro.name}: ${areas.length} área(s), ${formatarArea(total)}`,
                         ...avisos,
                       ].join('. '),
                     )
@@ -838,7 +838,7 @@ export function App() {
                     }
                   })
                   .catch((causa: unknown) => {
-                    setFalha(causa instanceof Error ? causa.message : 'falha a ler as areas')
+                    setFalha(causa instanceof Error ? causa.message : 'falha a ler as áreas')
                   })
               }}
             />
@@ -847,10 +847,10 @@ export function App() {
           {rota.areas?.length ? (
             <button
               type="button"
-              title="Retirar as areas de referencia do mapa"
+              title="Retirar as áreas de referência do mapa"
               onClick={() => editor.alterarRota({ areas: [] })}
             >
-              Sem area
+              Sem área
             </button>
           ) : null}
 
@@ -883,7 +883,7 @@ export function App() {
                   .catch((causa: unknown) => {
                     setTopografia(null)
                     setAvisoTopografia(
-                      causa instanceof Error ? causa.message : 'nao foi possivel ler o DXF',
+                      causa instanceof Error ? causa.message : 'não foi possível ler o DXF',
                     )
                   })
               }}
@@ -927,7 +927,7 @@ export function App() {
           <button
             type="button"
             className={voo.activo ? 'activo' : ''}
-            title="Pilotar a aeronave pelo mapa e gravar waypoints com a atitude em que esta"
+            title="Pilotar a aeronave pelo mapa e gravar waypoints com a atitude em que está"
             onClick={() => {
               if (voo.activo) {
                 voo.parar()
@@ -1184,13 +1184,13 @@ export function App() {
                     <span className="contador numerico">{validacoes.length}</span>
                   ) : null}
                 </button>
-                <label className="interruptor" title="Espera-se accao de foto em cada waypoint">
+                <label className="interruptor" title="Espera-se acção de foto em cada waypoint">
                   <input
                     type="checkbox"
                     checked={registoFotografico}
                     onChange={(e) => setRegistoFotografico(e.target.checked)}
                   />
-                  Registo fotografico
+                  Registo fotográfico
                 </label>
                 <button type="button" className="fechar-inferior" onClick={() => setAbaInferior(null)}>
                   Ocultar

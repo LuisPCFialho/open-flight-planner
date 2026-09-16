@@ -23,8 +23,8 @@ type Props = {
 }
 
 const CURVAS: readonly { valor: TipoCurva; rotulo: string }[] = [
-  { valor: 'pararNoPonto', rotulo: 'Trajetoria reta. A aeronave para' },
-  { valor: 'passarSuave', rotulo: 'Trajetoria curva. A aeronave passa' },
+  { valor: 'pararNoPonto', rotulo: 'Trajetória reta. A aeronave para' },
+  { valor: 'passarSuave', rotulo: 'Trajetória curva. A aeronave passa' },
 ]
 
 const GUINADAS: readonly { valor: ModoGuinada; rotulo: string }[] = [
@@ -47,7 +47,7 @@ export function PainelPropriedades(props: Props) {
         <p className="vazio">
           Selecciona um waypoint na lista ou no mapa.
           <br />
-          Ctrl e clique junta a seleccao, shift selecciona um intervalo.
+          Ctrl e clique junta a selecção, shift selecciona um intervalo.
         </p>
       </aside>
     )
@@ -72,7 +72,7 @@ export function PainelPropriedades(props: Props) {
           className={aba === 'parametros' ? 'activo' : ''}
           onClick={() => setAba('parametros')}
         >
-          Parametros
+          Parâmetros
         </button>
         <button
           type="button"
@@ -81,7 +81,7 @@ export function PainelPropriedades(props: Props) {
           className={aba === 'accoes' ? 'activo' : ''}
           onClick={() => setAba('accoes')}
         >
-          Accoes
+          Acções
         </button>
       </nav>
 
@@ -152,7 +152,7 @@ function Parametros({
       ) : null}
 
       <CampoNumerico
-        rotulo="Velocidade da trajetoria"
+        rotulo="Velocidade da trajetória"
         valor={velocidade}
         unidade=" m/s"
         casas={1}
@@ -163,7 +163,7 @@ function Parametros({
       />
 
       <CampoSelecao
-        rotulo="Tipo de trajetoria"
+        rotulo="Tipo de trajetória"
         valor={curva}
         opcoes={CURVAS}
         aoAlterar={(v) => aoAlterar({ tipoCurva: v })}
@@ -201,7 +201,7 @@ function Parametros({
       ) : null}
 
       <Deslizador
-        rotulo="Inclinacao do estabilizador"
+        rotulo="Inclinação do estabilizador"
         valor={pitch}
         min={-90}
         max={45}

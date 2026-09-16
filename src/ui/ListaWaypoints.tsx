@@ -32,7 +32,7 @@ export function ListaWaypoints({
   return (
     <div className="painel painel-esquerdo">
       <header className="painel-cabecalho">
-        <h2>Lista de trajetorias</h2>
+        <h2>Lista de trajetórias</h2>
         <span className="etiqueta-modo">{rota.modoAltitude}</span>
       </header>
 
@@ -40,7 +40,7 @@ export function ListaWaypoints({
         <p className="vazio">
           Clica no mapa para acrescentar o primeiro waypoint.
           <br />
-          Alt e clique num troco insere um ponto intermedio.
+          Alt e clique num troço insere um ponto intermédio.
         </p>
       ) : (
         <ol className="lista-waypoints">
@@ -83,7 +83,7 @@ export function ListaWaypoints({
 
               <span className="accoes-rapidas">
                 {waypoint.acoes.some((a) => a.tipo === 'tirarFoto') ? (
-                  <span className="indicador" title="Tem accao de tirar foto">
+                  <span className="indicador" title="Tem acção de tirar foto">
                     <IconeFoto />
                   </span>
                 ) : null}

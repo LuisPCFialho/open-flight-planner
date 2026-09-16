@@ -64,7 +64,7 @@ export function EcraProjetos({ aoAbrir }: Props) {
       setErro(
         causa instanceof FicheiroInvalido || causa instanceof Error
           ? causa.message
-          : 'nao foi possivel ler o ficheiro',
+          : 'não foi possível ler o ficheiro',
       )
     }
   }
@@ -103,7 +103,7 @@ export function EcraProjetos({ aoAbrir }: Props) {
           <p className="vazio">A abrir a base de dados local...</p>
         ) : linhas.length === 0 ? (
           <p className="vazio">
-            Ainda nao ha projetos. Cria um, ou importa um JSON exportado noutro posto.
+            Ainda não há projetos. Cria um, ou importa um JSON exportado noutro posto.
           </p>
         ) : (
           <table>
@@ -178,7 +178,7 @@ export function EcraProjetos({ aoAbrir }: Props) {
                       onClick={() => {
                         const aviso =
                           rotas > 0
-                            ? `Apagar "${projeto.nome}" leva ${rotas} rota${rotas === 1 ? '' : 's'}. Nao ha desfazer.`
+                            ? `Apagar "${projeto.nome}" leva ${rotas} rota${rotas === 1 ? '' : 's'}. Não há desfazer.`
                             : `Apagar "${projeto.nome}"?`
                         if (window.confirm(aviso)) void apagarProjeto(projeto.id)
                       }}

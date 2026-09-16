@@ -84,7 +84,7 @@ export function SelectorRota({ rota, aoAbrir, aoCriar, aoDuplicar, aoApagar, aoR
         onClick={() => {
           const aviso =
             rota.waypoints.length > 0
-              ? `Apagar "${rota.nome}" leva ${rota.waypoints.length} waypoint${rota.waypoints.length === 1 ? '' : 's'}. Nao ha desfazer.`
+              ? `Apagar "${rota.nome}" leva ${rota.waypoints.length} waypoint${rota.waypoints.length === 1 ? '' : 's'}. Não há desfazer.`
               : `Apagar "${rota.nome}"?`
           if (window.confirm(aviso)) aoApagar()
         }}
