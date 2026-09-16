@@ -57,7 +57,6 @@ export type PropsMapa = {
   /** Intervalo aceite acima do solo, que decide a cor de cada troço da rota. */
   intervaloAcimaDoSolo: { minimo: number; maximo: number }
   /** Quantas vezes se estica a altura do terreno em 3D. */
-  exageroVertical: number
   /** Sombreado do relevo por cima da ortofoto. */
   sombreado: boolean
   /** Pontos da regua. Vazio quando nao se esta a medir. */
@@ -527,13 +526,13 @@ export function Mapa(props: PropsMapa) {
     if (!instancia || !pronto) return
 
     if (props.modo3D) {
-      instancia.setTerrain({ source: FONTE_TERRENO, exaggeration: props.exageroVertical })
+      instancia.setTerrain({ source: FONTE_TERRENO, exaggeration: 1 })
       if (instancia.getPitch() < 30) instancia.easeTo({ pitch: 62, duration: 600 })
     } else {
       instancia.setTerrain(null)
       instancia.easeTo({ pitch: 0, bearing: 0, duration: 600 })
     }
-  }, [props.modo3D, props.exageroVertical, pronto])
+  }, [props.modo3D, pronto])
 
   useEffect(() => {
     const instancia = mapa.current
@@ -570,26 +569,20 @@ export function Mapa(props: PropsMapa) {
     instancia.fire('moveend')
   }, [waypoints, pronto])
 
-  /*
-   * Em 2D nao ha terreno e portanto nao ha exagero: as camadas WebGL desenham
-   * as alturas verdadeiras.
-   */
   const intervaloAGL = props.intervaloAcimaDoSolo
-  const exagero = props.modo3D ? props.exageroVertical : 1
 
   useEffect(() => {
     if (!pronto) return
-    camada3D.current?.definirPontos(props.pontos3D, intervaloAGL, exagero)
-  }, [props.pontos3D, intervaloAGL, exagero, pronto])
+    camada3D.current?.definirPontos(props.pontos3D, intervaloAGL)
+  }, [props.pontos3D, intervaloAGL, pronto])
 
   useEffect(() => {
     if (!pronto) return
     const aeronave = props.aeronave
     camadaDrones.current?.definirPontos(
       aeronave ? [...props.pontos3D, aeronave] : props.pontos3D,
-      exagero,
     )
-  }, [props.pontos3D, props.aeronave, exagero, pronto])
+  }, [props.pontos3D, props.aeronave, pronto])
 
   useEffect(() => {
     const instancia = mapa.current

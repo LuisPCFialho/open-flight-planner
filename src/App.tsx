@@ -164,7 +164,6 @@ export function App() {
   /** Orientacao do mapa, pelo mesmo caminho e pela mesma razao que o cursor. */
   const canalOrientacao = useCanal<Orientacao>({ rumo: 0, inclinacao: 0 })
   const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
-  const [exageroVertical, setExageroVertical] = useState(1)
   const [coberturaAberta, setCoberturaAberta] = useState(false)
   /**
    * A regua vive fora da rota e fora do historico.
@@ -990,7 +989,6 @@ export function App() {
               pontos3D={pontos3D}
               aeronave={aeronaveDoReplay}
             intervaloAcimaDoSolo={intervaloAGL}
-            exageroVertical={exageroVertical}
             sombreado={sombreado}
             medicao={medicao}
               seleccionados={seleccao.ids}
@@ -1027,13 +1025,7 @@ export function App() {
 
             <Bussola canal={canalOrientacao} aoApontarANorte={() => setPedidoDeNorte(Date.now())} />
 
-            <ControlosVista
-              modo3D={modo3D}
-              exageroVertical={exageroVertical}
-              aoMudarExagero={setExageroVertical}
-              sombreado={sombreado}
-              aoMudarSombreado={setSombreado}
-            />
+            <ControlosVista sombreado={sombreado} aoMudarSombreado={setSombreado} />
 
             {coberturaAberta && (rota.areas ?? []).length > 0 && drone ? (
               <PainelCobertura
