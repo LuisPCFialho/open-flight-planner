@@ -14,6 +14,7 @@ import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
 import { CAMADA_SOMBREADO, estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
 import { CamadaDrones, type DroneNoMapa } from './camada-drones.ts'
+import { ligarEstilo } from './arranque.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
 
 const FONTE_SEGMENTOS = 'rota-segmentos'
@@ -215,34 +216,12 @@ export function Mapa(props: PropsMapa) {
       })
     }
 
-    /*
-     * Instalar as nossas fontes e camadas, quando o estilo estiver de pe.
-     *
-     * Nao basta ouvir o `load`. O estilo e aplicado depois de o mapa existir - e
-     * tem de ser, para haver a quem entregar um erro de estilo - e o MapLibre
-     * avisa que esta a reconstruir o estilo de raiz porque o anterior ainda nao
-     * acabara de carregar. Nessa corrida o `load` pode ja ter passado, e entao
-     * nunca mais volta: o mapa fica com a ortofoto e mais nada, sem rota, sem
-     * areas e sem marcadores, e sem erro nenhum que o explique.
-     *
-     * Ouvem-se os dois eventos e a instalacao e idempotente: corre quem chegar
-     * primeiro, e a segunda vez nao faz nada.
+    /**
+     * As nossas fontes e camadas. Chamada por `ligarEstilo` quando o estilo
+     * estiver de pe, e pode rebentar se ainda nao estiver - e la que isso se
+     * trata.
      */
-    let instalado = false
     const instalar = (): void => {
-      if (instalado) return
-      /*
-       * Enquanto o estilo nao estiver de pe, `addSource` atira "Style is not
-       * done loading". Nao ha aqui nada a fazer senao esperar pelo aviso
-       * seguinte: a excepcao e apanhada, o estado fica como estava - nada foi
-       * acrescentado, porque esta e a primeira chamada - e tenta-se outra vez.
-       *
-       * Deixar a excepcao sair daqui e o que nao se pode fazer: ela propaga para
-       * o React, que desmonta o componente, e o que fica no ecra e a aplicacao
-       * sem mapa nenhum.
-       */
-      try {
-
       /*
        * As areas de referencia entram primeiro, e por isso ficam por baixo.
        *
@@ -354,11 +333,7 @@ export function Mapa(props: PropsMapa) {
       camadaDrones.current = drones
       instancia.addLayer(drones)
 
-        instalado = true
-        setPronto(true)
-      } catch {
-        // O estilo ainda nao estava pronto. Tenta-se no aviso seguinte.
-      }
+      setPronto(true)
     }
 
     /*
@@ -375,21 +350,9 @@ export function Mapa(props: PropsMapa) {
      * instalar a mao - para o caso de o estilo ja estar de pe quando chegarmos
      * aqui. As tres tentativas sao inofensivas porque a instalacao e idempotente.
      */
-    /*
-     * Ouvem-se os dois eventos, e subscreve-se antes de aplicar o estilo.
-     *
-     * So com o `load` a versao construida nascia com a ortofoto e mais nada -
-     * sem rota, sem areas, sem marcadores - e sem erro nenhum que o explicasse.
-     * Em desenvolvimento nunca acontecia, o que e a pior especie de defeito: o
-     * `load` de um mapa a que se troca o estilo logo a seguir pode passar antes
-     * de alguem estar a ouvir, e nao volta.
-     *
-     * O `styledata` volta sempre que o estilo muda, e e esse que salva. A
-     * instalacao corre uma so vez, seja quem for a chegar primeiro.
-     */
-    instancia.on('load', instalar)
-    instancia.on('styledata', instalar)
-    instancia.setStyle(estiloBase())
+    // A ordem e a tolerancia a falhas estao em `arranque.ts`, com testes: foi
+    // por ai que a versao construida nasceu uma vez com o mapa vazio.
+    ligarEstilo(instancia, estiloBase(), instalar)
 
     /*
      * Distinguir o clique do arrasto.
