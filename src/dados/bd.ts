@@ -156,3 +156,21 @@ export async function duplicarRota(rotaId: string): Promise<Rota> {
 export async function renomearRota(rotaId: string, nome: string): Promise<void> {
   await bd.rotas.update(rotaId, { nome, alteradaEm: Date.now() })
 }
+
+/**
+ * Grava os voos de uma divisao como rotas do mesmo projeto.
+ *
+ * Os identificadores vem da divisao com a marca do voo, mas na base cada rota
+ * precisa do seu: dois projetos a dividir a mesma rota dariam choque de chaves.
+ */
+export async function gravarTrocos(trocos: readonly Rota[]): Promise<Rota[]> {
+  const agora = Date.now()
+  const novas = trocos.map((troco) => ({
+    ...troco,
+    id: novoId(),
+    criadaEm: agora,
+    alteradaEm: agora,
+  }))
+  await bd.rotas.bulkAdd(novas)
+  return novas
+}

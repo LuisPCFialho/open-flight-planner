@@ -512,3 +512,26 @@ com a orientacao a mudar de passagem para passagem.
 Verificado contra o perimetro real de Sever do Vouga: 23,91 ha, faixa de
 108 por 81 m a 60 m de altura, 32,4 m entre passagens, 26 passagens, 9,6 km de
 percurso e 461 fotos.
+
+## Dividir por baterias nao e o percurso a dividir pela autonomia
+
+Cada troco e um voo por si: sobe, vai ate ao primeiro ponto do troco, percorre-o,
+e volta a casa. Quanto mais longe o troco fica do ponto de descolagem, menos
+tempo lhe sobra para trabalhar - e por isso os ultimos trocos levam menos
+waypoints do que os primeiros, mesmo com passagens todas iguais.
+
+O criterio e ganancioso de proposito: acrescenta-se waypoints ao troco enquanto o
+voo completo couber, e corta-se no ultimo que coube. Um criterio optimo daria
+trocos mais equilibrados e cortes em sitios que ninguem reconhece; assim, o
+primeiro voo leva o maximo que pode, que e o que quem esta no campo espera de uma
+bateria cheia.
+
+Um ponto longe de mais do sitio de descolagem nao cabe em bateria nenhuma, e ai
+nao ha corte que resolva: o que ha a fazer e mudar o ponto de descolagem. Esses
+pontos sao assinalados a parte em vez de darem trocos que nao voam, e nao travam
+os que vem a seguir.
+
+Uma armadilha que apanhou o primeiro teste: uma recta de dezenas de quilometros
+**nao e uma rota que se divida**, e sim uma rota com pontos inalcancaveis. O que
+se parte e uma cobertura - longa, mas que se mantem perto do sitio de onde se
+levantou voo. E a forma da rota que decide, nao o comprimento.

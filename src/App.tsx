@@ -29,6 +29,7 @@ import {
 import { acrescentarPOI, poiNovo, removerPOI } from './nucleo/operacoes-poi.ts'
 import { repetirDeslocado, repetirEmSentidoContrario } from './nucleo/repeticao.ts'
 import { acrescentarCobertura } from './nucleo/cobertura.ts'
+import { dividirPorAutonomia } from './nucleo/baterias.ts'
 import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
 import { useEditorRota } from './estado/useEditorRota.ts'
 import { useSeleccao } from './estado/useSeleccao.ts'
@@ -48,6 +49,7 @@ import {
   bd,
   criarProjeto,
   criarRota,
+  gravarTrocos,
   duplicarRota,
   gravarRota,
   listarProjetos,
@@ -372,6 +374,18 @@ export function App() {
 
   const estatisticas = useMemo(() => (rota ? calcularEstatisticas(rota) : null), [rota])
   const drone = useMemo(() => (rota ? droneComId(rota.droneId) : null), [rota])
+
+  /**
+   * Em quantos voos esta rota se divide, e onde.
+   *
+   * A validacao ja dizia que a rota nao cabe na autonomia e ficava por ali. O
+   * que falta a seguir e sempre o mesmo trabalho: descobrir onde cortar, e
+   * cortar.
+   */
+  const divisao = useMemo(
+    () => (rota && drone ? dividirPorAutonomia(rota, drone) : null),
+    [rota, drone],
+  )
 
   // --- perfil do terreno e validacoes ---------------------------------------
   const amostrado = usePerfilTerreno(rota, fonteTerreno, PASSO_COLISAO)
@@ -923,6 +937,27 @@ export function App() {
               }}
             />
           </label>
+
+          {divisao && divisao.trocos.length > 1 ? (
+            <button
+              type="button"
+              title={`A rota não cabe numa bateria. Divide-se em ${divisao.trocos.length} voos, cada um com a sua ida e regresso, e cada um fica uma rota deste projeto.`}
+              onClick={() => {
+                gravarPendente()
+                voo.parar()
+                tentar(gravarTrocos(divisao.trocos), (novas) => {
+                  seleccao.limpar()
+                  const primeira = novas[0]
+                  if (primeira) setRotaAberta(primeira.id)
+                  setAvisoTopografia(
+                    `${novas.length} voos criados a partir de "${rota.nome}". A rota original fica como estava.`,
+                  )
+                })
+              }}
+            >
+              {divisao.trocos.length} baterias
+            </button>
+          ) : null}
 
           {rota.areas?.length ? (
             <button
