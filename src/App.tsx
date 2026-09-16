@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
@@ -11,7 +11,6 @@ import {
   alterarWaypoints,
   inserirWaypoint,
   removerWaypoints,
-  rotaVazia,
   waypointNovo,
 } from './nucleo/operacoes-rota.ts'
 import { novoId } from './nucleo/ids.ts'
@@ -35,6 +34,7 @@ import { useReplay } from './estado/useReplay.ts'
 import { useAtalhos } from './estado/useAtalhos.ts'
 import { linhasDaRota, pontos3DdaRota } from './estado/derivados.ts'
 import { usePersistenciaDaRota } from './estado/usePersistencia.ts'
+import { useProjetoEmCurso } from './estado/useProjetoEmCurso.ts'
 import { aeronaveDoReplay, aeronaveNoPerfil, alvoDaCamara } from './estado/alvo-camara.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
@@ -45,13 +45,10 @@ import { envolvente } from './nucleo/areas.ts'
 import {
   apagarRota,
   bd,
-  criarProjeto,
   criarRota,
   gravarTrocos,
   duplicarRota,
   gravarRota,
-  listarProjetos,
-  listarRotas,
   renomearRota,
 } from './dados/bd.ts'
 import { droneComId } from './drones.ts'
@@ -177,67 +174,17 @@ export function App() {
   const [sombreado, setSombreado] = useState(true)
   const [larguraEsquerda, setLarguraEsquerda] = useLarguraPersistida('painel-esquerdo', 240)
   const [larguraDireita, setLarguraDireita] = useLarguraPersistida('painel-direito', 300)
-  const [arranque, setArranque] = useState<string | null>(null)
   const [erroMapa, setErroMapa] = useState<string | null>(null)
 
   // --- arranque: recupera a ultima rota ou cria uma nova ---------------------
-  useEffect(() => {
-    let cancelado = false
-
-    if (!projetoAberto) return
-
-    const iniciar = async (): Promise<void> => {
-      const projetos = await listarProjetos()
-      const projeto =
-        projetos.find((p) => p.id === projetoAberto) ??
-        projetos[0] ??
-        (await criarProjeto({ nome: 'Projeto sem nome' }))
-      const rotas = await listarRotas(projeto.id)
-      const existente = [...rotas].sort((a, b) => b.alteradaEm - a.alteradaEm)[0]
-
-      // Uma rota explicitamente escolhida manda sobre a ultima alterada.
-      const escolhida = rotaAberta ? rotas.find((r) => r.id === rotaAberta) : undefined
-      const aAbrir = escolhida ?? existente
-
-      if (aAbrir) {
-        if (!cancelado) {
-          carregar(aAbrir)
-          setRotaAberta(aAbrir.id)
-        }
-        return
-      }
-
-      const cotaDescolagem = await fonteTerreno.cota(CENTRO_INICIAL.lat, CENTRO_INICIAL.lon)
-      const nova = rotaVazia({
-        nome: 'Rota sem nome',
-        projetoId: projeto.id,
-        droneId: 'mini5pro',
-        pontoDescolagem: { ...CENTRO_INICIAL, cotaTerreno: cotaDescolagem },
-      })
-      // A verificacao vem antes da escrita, e nao depois: em modo estrito o
-      // React corre este efeito duas vezes, e gravar primeiro deixava na base de
-      // dados uma rota vazia orfa por cada projeto aberto pela primeira vez.
-      if (cancelado) return
-      await gravarRota(nova)
-      if (!cancelado) {
-        carregar(nova)
-        setRotaAberta(nova.id)
-      }
-    }
-
-    iniciar().catch((causa: unknown) => {
-      if (!cancelado) {
-        setArranque(causa instanceof Error ? causa.message : 'falha a abrir o projeto local')
-      }
-    })
-
-    return () => {
-      cancelado = true
-    }
-    // So `carregar` interessa aqui, e e estavel. Depender do editor inteiro faria
-    // este efeito correr a cada render e repor a rota gravada por cima das edicoes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carregar, projetoAberto, rotaAberta])
+  const { erro: arranque } = useProjetoEmCurso({
+    projetoAberto,
+    rotaAberta,
+    centroInicial: CENTRO_INICIAL,
+    fonteTerreno,
+    carregar,
+    aoAbrirRota: setRotaAberta,
+  })
 
   /*
    * Gravar a rota, com folga, e a pedido antes de trocar de rota.
