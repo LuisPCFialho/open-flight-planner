@@ -36,17 +36,32 @@ export type MalhaDrone = {
 type Cor = readonly [number, number, number, number]
 type Vec3 = readonly [number, number, number]
 
-const CINZENTO_CLARO: Cor = [0.8, 0.82, 0.86, 1]
-const CINZENTO_MEDIO: Cor = [0.62, 0.65, 0.69, 1]
-const CINZENTO_ESCURO: Cor = [0.24, 0.26, 0.3, 1]
-const PRETO: Cor = [0.1, 0.11, 0.13, 1]
-const VIDRO: Cor = [0.16, 0.26, 0.4, 1]
-const HELICE: Cor = [0.7, 0.73, 0.78, 0.9]
+/*
+ * Cores.
+ *
+ * O aparelho e cinzento medio e nao branco, e foi o engano mais visivel da
+ * versao anterior: ao lado de uma ortofoto, um aparelho claro le-se como um
+ * reflexo e um cinzento le-se como um objecto.
+ *
+ * As pas sao quase pretas com as pontas cor de laranja. Nao e enfeite: e a
+ * convencao de visibilidade que os fabricantes todos usam, e aqui faz o mesmo
+ * trabalho que faz no ar - a esta escala sao dois riscos escuros e quatro
+ * pontos vivos, e sao eles que dizem de relance que aquilo e um aparelho.
+ */
+const CORPO_CLARO: Cor = [0.72, 0.74, 0.76, 1]
+const CORPO_ESCURO: Cor = [0.42, 0.44, 0.47, 1]
+const BRACO: Cor = [0.66, 0.68, 0.7, 1]
+const CINZENTO_ESCURO: Cor = [0.22, 0.24, 0.27, 1]
+const PRETO: Cor = [0.09, 0.1, 0.12, 1]
+const VIDRO: Cor = [0.14, 0.22, 0.34, 1]
+const HELICE: Cor = [0.17, 0.18, 0.2, 0.92]
+/** Ponta da pa. Alfa abaixo de um, como o resto da pa: e assim que os testes as separam. */
+const PONTA_HELICE: Cor = [1, 0.62, 0.12, 0.92]
 /** Amarelo da seta, o mesmo do poligono de enquadramento. */
 const SETA: Cor = [0.94, 0.71, 0.16, 1]
 
 /** Meia dimensao do corpo, em metros. */
-const CORPO = { x: 0.045, y: 0.0725, z: 0.028 }
+const CORPO = { x: 0.04, y: 0.0725, z: 0.028 }
 /** Distancia do centro a cada motor, em x e y. */
 const MOTOR = { x: 0.087, frente: 0.087, tras: 0.093 }
 const RAIO_HELICE = 0.0785
@@ -338,14 +353,14 @@ function corpo(c: Construtor): void {
     // A tampa da bateria: em cima e atras, e mais escura do que a cobertura.
     if (posicao[2] > 0.019 && posicao[1] < -0.004) return CINZENTO_ESCURO
     // A barriga e escura como a bateria, que e o que se ve quando ele passa por cima.
-    if (posicao[2] < -0.004) return CINZENTO_MEDIO
-    return CINZENTO_CLARO
+    if (posicao[2] < -0.004) return CORPO_ESCURO
+    return CORPO_CLARO
   })
 
   const rabo = aneis[0]
   const nariz = aneis[aneis.length - 1]
   if (rabo) c.tampa(rabo, [0, -1, 0], CINZENTO_ESCURO)
-  if (nariz) c.tampa(nariz, [0, 1, 0], CINZENTO_CLARO)
+  if (nariz) c.tampa(nariz, [0, 1, 0], CORPO_CLARO)
 
   // Os dois sensores de visao da frente, que sao o que se reconhece de longe.
   for (const lado of [-1, 1]) {
@@ -428,11 +443,18 @@ function pa(c: Construtor, centro: Vec3, anguloBase: number, sentido: number): v
     aneis.push(anel)
   }
 
-  c.superficie(aneis, () => HELICE)
+  /*
+   * A ponta cor de laranja e o ultimo troco da pa.
+   *
+   * A cor vai por vertice, portanto a passagem de escuro para laranja faz-se ao
+   * longo do troco e nao num corte seco - que e como a tinta acaba numa pa a
+   * serio, e o que evita um degrau visivel num modelo com tao poucos aneis.
+   */
+  c.superficie(aneis, (_, anel) => (anel >= passos - 1 ? PONTA_HELICE : HELICE))
   const raiz = aneis[0]
   const ponta = aneis[aneis.length - 1]
   if (raiz) c.tampa(raiz, [0, 0, 1], HELICE)
-  if (ponta) c.tampa(ponta, [0, 0, 1], HELICE)
+  if (ponta) c.tampa(ponta, [0, 0, 1], PONTA_HELICE)
 }
 
 /**
@@ -489,7 +511,7 @@ function bracoAchatado(
 
 function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void {
   const anca: Vec3 = [Math.sign(mx) * 0.031, my > 0 ? 0.035 : -0.04, 0.004]
-  bracoAchatado(c, anca, [mx, my, 0.005], 0.011, 0.0092, 0.0062, 0.005, CINZENTO_CLARO)
+  bracoAchatado(c, anca, [mx, my, 0.005], 0.0078, 0.007, 0.0045, 0.004, BRACO)
 
   /*
    * Motor: base, campanula escura e veio.
@@ -498,8 +520,8 @@ function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void 
    * atravessavam o corpo - via-se de lado e de frente, e nenhum aparelho e
    * assim.
    */
-  c.tuboEntre([mx, my, -0.001], [mx, my, 0.015], 0.0122, 0.0128, LADOS_MOTOR, CINZENTO_MEDIO)
-  c.tuboEntre([mx, my, 0.015], [mx, my, 0.029], 0.0126, 0.0092, LADOS_MOTOR, CINZENTO_ESCURO)
+  c.tuboEntre([mx, my, -0.001], [mx, my, 0.014], 0.0105, 0.0112, LADOS_MOTOR, CINZENTO_ESCURO)
+  c.tuboEntre([mx, my, 0.014], [mx, my, 0.028], 0.011, 0.0082, LADOS_MOTOR, PRETO)
 
   // Duas pas opostas. A fase de cada motor e diferente para nao ficarem alinhadas.
   const sentido = mx * my > 0 ? 1 : -1
@@ -515,7 +537,7 @@ function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void 
  */
 function gimbalECamara(c: Construtor): void {
   // Braco que desce do nariz e recua, como o encaixe real.
-  c.tuboEntre([0, 0.05, -0.014], [0, 0.056, -0.027], 0.0075, 0.0062, LADOS_BRACO, CINZENTO_MEDIO)
+  c.tuboEntre([0, 0.05, -0.012], [0, 0.058, -0.026], 0.008, 0.0068, LADOS_BRACO, CORPO_ESCURO)
 
   // Berco em U: dois bracos verticais e a travessa que os une por tras.
   for (const lado of [-1, 1]) {
@@ -538,37 +560,34 @@ function gimbalECamara(c: Construtor): void {
    * E o unico contraste claro nesta zona toda, e e ele que marca onde a camara
    * aponta quando o aparelho sai com dez pixeis no ecra.
    */
-  c.tuboEntre([0, 0.0715, -0.0405], [0, 0.0765, -0.0405], 0.0122, 0.0118, LADOS_LENTE, CINZENTO_MEDIO)
+  c.tuboEntre([0, 0.0755, -0.0425], [0, 0.0815, -0.0425], 0.0135, 0.013, LADOS_LENTE, CINZENTO_ESCURO)
   c.tuboEntre([0, 0.0765, -0.0405], [0, 0.082, -0.0405], 0.0105, 0.0098, LADOS_LENTE, PRETO)
   c.tuboEntre([0, 0.082, -0.0405], [0, 0.0826, -0.0405], 0.0086, 0.0086, LADOS_LENTE, VIDRO)
 }
 
 /**
- * Trem de pouso: quatro pes, os de tras maiores.
+ * Trem de pouso: quatro pernas em L, presas aos bracos.
  *
- * O aparelho assenta nos quatro, e com pes so atras ele ficava a espetar o
- * nariz no chao - de lado via-se, e e a vista em que o trem conta.
+ * Eram tacos curtos e nao se liam. Sao pernas: descem do braco, viram para fora
+ * e acabam num pe chato. De lado sao o que da altura ao aparelho, e de frente
+ * sao o que lhe da assento - com tacos, ele parecia pousado na barriga.
+ *
+ * As de tras sao mais longas do que as da frente, porque a camara vai a frente
+ * por baixo e precisa de folga para nao raspar.
  */
 function trem(c: Construtor): void {
+  const perna = (x: number, y: number, descida: number, abertura: number): void => {
+    const cimo: Vec3 = [x, y, -0.002]
+    const joelho: Vec3 = [x + abertura * 0.35, y, -descida]
+    const pe: Vec3 = [x + abertura, y, -descida - 0.004]
+
+    c.tuboEntre(cimo, joelho, 0.0042, 0.0038, LADOS_PERNA, CINZENTO_ESCURO)
+    c.tuboEntre(joelho, pe, 0.0038, 0.0046, LADOS_PERNA, CINZENTO_ESCURO)
+  }
+
   for (const lado of [-1, 1]) {
-    // Atras o proprio braco descai e faz de perna, como neste aparelho.
-    c.tuboEntre(
-      [lado * MOTOR.x, -MOTOR.tras, -0.002],
-      [lado * (MOTOR.x + 0.004), -MOTOR.tras - 0.005, -0.026],
-      0.0056,
-      0.0072,
-      LADOS_PERNA,
-      CINZENTO_ESCURO,
-    )
-    // A frente sao so dois tacos por baixo do braco, curtos.
-    c.tuboEntre(
-      [lado * (MOTOR.x - 0.006), MOTOR.frente - 0.008, 0.0],
-      [lado * (MOTOR.x - 0.006), MOTOR.frente - 0.01, -0.014],
-      0.0048,
-      0.0056,
-      LADOS_PERNA,
-      CINZENTO_ESCURO,
-    )
+    perna(lado * (MOTOR.x - 0.012), -MOTOR.tras + 0.012, 0.03, lado * 0.008)
+    perna(lado * (MOTOR.x - 0.016), MOTOR.frente - 0.014, 0.022, lado * 0.007)
   }
 }
 
