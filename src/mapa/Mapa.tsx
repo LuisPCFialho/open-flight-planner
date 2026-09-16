@@ -13,7 +13,7 @@ import { algumDentroDaVista, contornoFechado } from '../nucleo/areas.ts'
 import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
 import { estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
-import { CamadaDrones } from './camada-drones.ts'
+import { CamadaDrones, type DroneNoMapa } from './camada-drones.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
 
 const FONTE_SEGMENTOS = 'rota-segmentos'
@@ -34,6 +34,13 @@ export type PropsMapa = {
   rota: Rota
   /** Pontos ja com as cotas resolvidas. Um waypoint sem cota nao e desenhado em 3D. */
   pontos3D: readonly PontoRota3D[]
+  /**
+   * A aeronave a mover-se, quando o leitor esta a correr.
+   *
+   * Vem a parte dos waypoints porque so entra na camada dos aparelhos: metida
+   * nos pontos da rota, acrescentaria um troco e uma vertical a linha de voo.
+   */
+  aeronave: DroneNoMapa | null
   seleccionados: ReadonlySet<string>
   modo3D: boolean
   /** Enquanto activo, clicar no mapa cria um ponto de interesse em vez de um waypoint. */
@@ -441,8 +448,15 @@ export function Mapa(props: PropsMapa) {
   useEffect(() => {
     if (!pronto) return
     camada3D.current?.definirPontos(props.pontos3D)
-    camadaDrones.current?.definirPontos(props.pontos3D)
   }, [props.pontos3D, pronto])
+
+  useEffect(() => {
+    if (!pronto) return
+    const aeronave = props.aeronave
+    camadaDrones.current?.definirPontos(
+      aeronave ? [...props.pontos3D, aeronave] : props.pontos3D,
+    )
+  }, [props.pontos3D, props.aeronave, pronto])
 
   useEffect(() => {
     const instancia = mapa.current

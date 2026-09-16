@@ -30,14 +30,28 @@ export type DroneNoMapa = {
   seleccionado: boolean
   /** Fora do intervalo seguro acima do solo. */
   alerta: boolean
+  /**
+   * Quantas vezes maior do que os outros. Um em cada waypoint fica a um; a
+   * aeronave do leitor vem maior, para se distinguir dos pontos por onde passa.
+   */
+  aumento?: number
+  /** Cor a misturar, para a aeronave do leitor nao se confundir com a rota. */
+  tinta?: readonly [number, number, number, number]
 }
 
 type OpcoesRender = {
   defaultProjectionData?: { mainMatrix: ArrayLike<number> }
 }
 
-/** Tamanho a que o aparelho se quer ver, em pixeis de ecra. */
-const PIXEIS_ALVO = 46
+/**
+ * Tamanho a que o aparelho se quer ver, em pixeis de ecra.
+ *
+ * Medido contra uma rota de 131 waypoints num quadriculado apertado, que e o
+ * caso mau: a 46 pixeis as helices de uns sobrepunham-se as dos outros e o que
+ * se via era um tapete cinzento. A 34 ainda se reconhece o aparelho e ja se
+ * distingue um do seguinte.
+ */
+const PIXEIS_ALVO = 34
 /**
  * Limites do tamanho no mundo, em metros.
  *
@@ -60,17 +74,19 @@ const SEM_TINTA: readonly [number, number, number, number] = [0, 0, 0, 0]
  *  3..4   orientacao do aparelho: guinada e inclinacao (que e sempre zero)
  *  5..6   orientacao da camara: azimute e inclinacao do gimbal
  *  7..10  tinta: rgb, e em alfa quanto dela se mistura
+ * 11      aumento, relativo ao tamanho comum
  * ```
  *
  * As duas malhas partilham este buffer e cada uma le o seu par de angulos, o
  * que e o mesmo que dizer que o mesmo aparelho pode olhar para um lado e voar
  * para outro - que e o que um gimbal faz.
  */
-const FLUTUANTES_POR_INSTANCIA = 11
+const FLUTUANTES_POR_INSTANCIA = 12
 const BYTES_POR_INSTANCIA = FLUTUANTES_POR_INSTANCIA * 4
 export const DESVIO_ORIENTACAO_DRONE = 3 * 4
 export const DESVIO_ORIENTACAO_CAMARA = 5 * 4
 const DESVIO_TINTA = 7 * 4
+const DESVIO_AUMENTO = 11 * 4
 
 const VERTICE_FONTE = `#version 300 es
 precision highp float;
@@ -84,6 +100,8 @@ in vec3 aCentro;
 in vec2 aOrientacao;
 /** rgb da tinta, e em alfa quanto dela se mistura. */
 in vec4 aTinta;
+/** Quantas vezes maior do que o tamanho comum. */
+in float aAumento;
 
 uniform mat4 uMatriz;
 /** x: quantas vezes aumentar a malha; y: unidades mercator por metro. */
@@ -107,7 +125,7 @@ void main() {
   vec3 normalEnu = vec3(n.x * ca + n.y * sa, -n.x * sa + n.y * ca, n.z);
 
   // Em coordenadas Mercator o y cresce para sul.
-  vec3 desvio = vec3(enu.x, -enu.y, enu.z) * (uEscala.x * uEscala.y);
+  vec3 desvio = vec3(enu.x, -enu.y, enu.z) * (uEscala.x * aAumento * uEscala.y);
 
   float luz = 0.40 + 0.60 * max(dot(normalize(normalEnu), normalize(vec3(0.35, 0.25, 0.90))), 0.0);
   vCor = vec4(mix(aCor.rgb, aTinta.rgb, aTinta.a) * luz, aCor.a);
@@ -321,6 +339,7 @@ export class CamadaDrones implements CustomLayerInterface {
     ligar(gl, programa, 'aCentro', 3, BYTES_POR_INSTANCIA, 0, 1)
     ligar(gl, programa, 'aOrientacao', 2, BYTES_POR_INSTANCIA, desvioOrientacao, 1)
     ligar(gl, programa, 'aTinta', 4, BYTES_POR_INSTANCIA, DESVIO_TINTA, 1)
+    ligar(gl, programa, 'aAumento', 1, BYTES_POR_INSTANCIA, DESVIO_AUMENTO, 1)
 
     const indices = gl.createBuffer()
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices)
@@ -372,7 +391,9 @@ export function construirInstancias(pontos: readonly DroneNoMapa[]): {
 
   for (const [i, ponto] of pontos.entries()) {
     const m = MercatorCoordinate.fromLngLat([ponto.lon, ponto.lat], ponto.alturaVoo)
-    const tinta = ponto.alerta ? TINTA_ALERTA : ponto.seleccionado ? TINTA_SELECCAO : SEM_TINTA
+    const tinta =
+      ponto.tinta ??
+      (ponto.alerta ? TINTA_ALERTA : ponto.seleccionado ? TINTA_SELECCAO : SEM_TINTA)
     const base = i * FLUTUANTES_POR_INSTANCIA
 
     dados[base] = m.x - origem[0]
@@ -393,6 +414,8 @@ export function construirInstancias(pontos: readonly DroneNoMapa[]): {
     dados[base + 8] = tinta[1]
     dados[base + 9] = tinta[2]
     dados[base + 10] = tinta[3]
+
+    dados[base + 11] = ponto.aumento ?? 1
   }
 
   return { dados, origem, metro }

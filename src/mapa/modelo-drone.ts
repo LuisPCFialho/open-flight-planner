@@ -32,8 +32,13 @@ const CINZENTO_CLARO: Cor = [0.82, 0.84, 0.86, 1]
 const CINZENTO_ESCURO: Cor = [0.22, 0.24, 0.27, 1]
 const PRETO: Cor = [0.11, 0.12, 0.14, 1]
 const VIDRO: Cor = [0.35, 0.55, 0.75, 1]
-/** As helices sao translucidas, como as de um aparelho a trabalhar. */
-const HELICE: Cor = [0.6, 0.63, 0.68, 0.45]
+/**
+ * As helices sao translucidas, como as de um aparelho a trabalhar.
+ *
+ * O alfa e baixo de proposito: numa rota densa os discos de varios aparelhos
+ * sobrepoem-se, e a 0,45 somavam-se ate darem um tapete opaco por cima do mapa.
+ */
+const HELICE: Cor = [0.6, 0.63, 0.68, 0.28]
 
 /** Meia dimensao do corpo, em metros. */
 const CORPO = { x: 0.045, y: 0.0725, z: 0.028 }

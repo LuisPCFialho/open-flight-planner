@@ -130,3 +130,29 @@ export function IconeCarregar(props: PropsIcone) {
     </Envolucro>
   )
 }
+
+export function IconeReproduzir(props: PropsIcone) {
+  return (
+    <Envolucro {...props}>
+      <path d="M5 3.2 12.4 8 5 12.8Z" fill="currentColor" />
+    </Envolucro>
+  )
+}
+
+export function IconePausa(props: PropsIcone) {
+  return (
+    <Envolucro {...props}>
+      <path d="M5.6 3.4v9.2M10.4 3.4v9.2" strokeWidth="2.2" />
+    </Envolucro>
+  )
+}
+
+/** Voltar ao principio, como o botao de rebobinar de um leitor. */
+export function IconeInicio(props: PropsIcone) {
+  return (
+    <Envolucro {...props}>
+      <path d="M4.2 3.4v9.2" strokeWidth="2" />
+      <path d="M13 3.6 6.4 8 13 12.4Z" fill="currentColor" />
+    </Envolucro>
+  )
+}

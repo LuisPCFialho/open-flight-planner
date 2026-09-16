@@ -6,6 +6,7 @@ import type {
   ModoDescolagem,
   Rota,
 } from '../nucleo/tipos.ts'
+import type { ModoCamaraTrajecto } from '../nucleo/camara-trajecto.ts'
 import { DRONES } from '../drones.ts'
 import { CampoNumerico, CampoSelecao } from './campos.tsx'
 import { IconeDescolagem } from './icones.tsx'
@@ -23,6 +24,28 @@ const ACCOES_FINAIS: readonly { valor: AccaoFinal; rotulo: string }[] = [
   { valor: 'gotoFirstWaypoint', rotulo: 'Voltar ao primeiro waypoint' },
 ]
 
+const MODOS_CAMARA: readonly {
+  valor: ModoCamaraTrajecto
+  rotulo: string
+  ajuda: string
+}[] = [
+  {
+    valor: 'manter',
+    rotulo: 'Manter',
+    ajuda: 'Cada waypoint fica com os ângulos que lá estiverem gravados',
+  },
+  {
+    valor: 'proximoWaypoint',
+    rotulo: 'Seguir o percurso',
+    ajuda: 'A câmara vai a olhar para o waypoint seguinte, como quem segue o caminho',
+  },
+  {
+    valor: 'terreno',
+    rotulo: 'Olhar o terreno',
+    ajuda: 'A câmara aponta a prumo ao solo, para levantamento',
+  },
+]
+
 const PERDA_SINAL: readonly { valor: AccaoPerdaSinal; rotulo: string }[] = [
   { valor: 'goBack', rotulo: 'Regressar' },
   { valor: 'landing', rotulo: 'Aterrar' },
@@ -36,6 +59,8 @@ type Props = {
   impedimentoConversao: string | null
   aoAlterarRota: (alteracao: Partial<Rota>) => void
   aoMudarModoAltitude: (modo: ModoAltitude) => void
+  /** Escreve os ângulos do modo em cada waypoint, e volta ao modo Manter. */
+  aoFixarCamaraNosWaypoints: () => void
   aoFechar: () => void
 }
 
@@ -45,6 +70,7 @@ export function ConfiguracoesRota({
   impedimentoConversao,
   aoAlterarRota,
   aoMudarModoAltitude,
+  aoFixarCamaraNosWaypoints,
   aoFechar,
 }: Props) {
   return (
@@ -115,6 +141,37 @@ export function ConfiguracoesRota({
             {impedimentoConversao ??
               'Mudar de modo reescreve as alturas sem mexer na posicao real de nenhum waypoint.'}
           </p>
+        </section>
+
+        <section className="grupo">
+          <h3>Câmara ao longo do trajeto</h3>
+          <div className="alternador">
+            {MODOS_CAMARA.map((modo) => (
+              <button
+                key={modo.valor}
+                type="button"
+                title={modo.ajuda}
+                className={rota.modoCamaraTrajecto === modo.valor ? 'activo' : ''}
+                onClick={() => aoAlterarRota({ modoCamaraTrajecto: modo.valor })}
+              >
+                {modo.rotulo}
+              </button>
+            ))}
+          </div>
+          <p className="nota">
+            {MODOS_CAMARA.find((m) => m.valor === rota.modoCamaraTrajecto)?.ajuda}
+            {'. '}
+            Entre dois waypoints a câmara passa de uma atitude para a outra pelo caminho,
+            em vez de corrigir tudo de uma vez à chegada.
+          </p>
+          <button
+            type="button"
+            disabled={rota.modoCamaraTrajecto === 'manter'}
+            onClick={aoFixarCamaraNosWaypoints}
+            title="Escreve os ângulos calculados em cada waypoint, para depois se poderem acertar à mão"
+          >
+            Fixar nos waypoints
+          </button>
         </section>
 
         <section className="grupo">

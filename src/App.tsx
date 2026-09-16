@@ -4,7 +4,7 @@ import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
 import { calcularPerfil } from './nucleo/perfil.ts'
-import { atitudeNoWaypoint } from './nucleo/camara-trajecto.ts'
+import { aplicarModoAosWaypoints, atitudeNoWaypoint } from './nucleo/camara-trajecto.ts'
 import { AGL_MAXIMO, PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
 import {
   acrescentarWaypoint,
@@ -29,6 +29,7 @@ import { useSeleccao } from './estado/useSeleccao.ts'
 import { usePerfilTerreno } from './estado/usePerfilTerreno.ts'
 import { useEnquadramento } from './estado/useEnquadramento.ts'
 import { useVooVirtual, type EstadoVoo } from './estado/useVooVirtual.ts'
+import { useReplay } from './estado/useReplay.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
@@ -51,6 +52,7 @@ import { droneComId } from './drones.ts'
 import { Mapa } from './mapa/Mapa.tsx'
 import { LeituraCursor, useCanalCursor } from './ui/LeituraCursor.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
+import type { DroneNoMapa } from './mapa/camada-drones.ts'
 import { BarraEstatisticas } from './ui/BarraEstatisticas.tsx'
 import { ListaWaypoints, type LinhaWaypoint } from './ui/ListaWaypoints.tsx'
 import { PainelPropriedades, type AlteracaoWaypoint } from './ui/PainelPropriedades.tsx'
@@ -60,6 +62,7 @@ import { PerfilTerreno } from './ui/PerfilTerreno.tsx'
 import { PainelValidacoes } from './ui/PainelValidacoes.tsx'
 import { VistaCamara, type TamanhoCamara } from './ui/VistaCamara.tsx'
 import { HudVoo } from './ui/HudVoo.tsx'
+import { PlayerReplay } from './ui/PlayerReplay.tsx'
 import { EcraProjetos } from './ui/EcraProjetos.tsx'
 import { SelectorRota } from './ui/SelectorRota.tsx'
 import { IconeDesfazer, IconeRefazer, IconeTerreno } from './ui/icones.tsx'
@@ -373,9 +376,45 @@ export function App() {
     },
   })
 
-  /** Alvo da vista de camara: a aeronave em voo, ou o waypoint seleccionado. */
+  const replay = useReplay(rota)
+
+  /**
+   * Alvo da vista de camara, por ordem de quem manda: a aeronave do leitor, a
+   * do voo virtual, ou o waypoint seleccionado.
+   */
   const alvoCamara = useMemo(() => {
     if (!rota) return null
+
+    if (replay.activo && replay.estado) {
+      const estadoReplay = replay.estado
+      /*
+       * A cota sob a aeronave interpola-se entre a dos dois waypoints do troco.
+       * As cotas conhecidas sao as dos waypoints, e a meio do caminho nao ha
+       * nenhuma; o erro e o desvio do terreno em relacao a recta que os une, e
+       * para saber para onde a camara olha isso chega.
+       */
+      const daqui = rota.waypoints[estadoReplay.indice]
+      const ali = rota.waypoints[estadoReplay.indice + 1]
+      const cotaDaqui = daqui ? cotas.get(chaveDaPosicao(daqui)) : undefined
+      const cotaAli = ali ? cotas.get(chaveDaPosicao(ali)) : undefined
+      const cota =
+        cotaDaqui === undefined
+          ? rota.pontoDescolagem.cotaTerreno
+          : cotaAli === undefined
+            ? cotaDaqui
+            : cotaDaqui + (cotaAli - cotaDaqui) * estadoReplay.fraccao
+
+      return {
+        posicao: estadoReplay.posicao,
+        alturaASL: paraASL(estadoReplay.altura, rota.modoAltitude, {
+          cotaDescolagem: rota.pontoDescolagem.cotaTerreno,
+          cotaTerreno: cota,
+        }),
+        guinada: estadoReplay.atitude.guinada,
+        gimbalPitch: estadoReplay.atitude.gimbalPitch,
+        gimbalYaw: estadoReplay.atitude.gimbalYaw,
+      }
+    }
 
     if (voo.activo) {
       const cota = cotas.get(chaveDaPosicao(voo.estado.posicao)) ?? rota.pontoDescolagem.cotaTerreno
@@ -408,7 +447,33 @@ export function App() {
       // a aeronave tinha pela frente, que nao e o que a foto vai apanhar.
       gimbalYaw: waypoint.gimbalYaw,
     }
-  }, [rota, voo.activo, voo.estado, seleccao.waypoints, cotas])
+  }, [rota, replay.activo, replay.estado, voo.activo, voo.estado, seleccao.waypoints, cotas])
+
+  /**
+   * A aeronave do leitor, desenhada em 3D a percorrer a rota.
+   *
+   * Vem a parte dos waypoints: metida nos pontos da rota, o troco de voo
+   * passaria por ela e a linha ficava com um desvio que nao existe.
+   */
+  const aeronaveDoReplay = useMemo<DroneNoMapa | null>(() => {
+    if (!rota || !replay.activo || !replay.estado || !alvoCamara) return null
+    const estadoReplay = replay.estado
+
+    return {
+      lat: estadoReplay.posicao.lat,
+      lon: estadoReplay.posicao.lon,
+      alturaVoo: alvoCamara.alturaASL,
+      guinada: estadoReplay.atitude.guinada,
+      gimbalPitch: estadoReplay.atitude.gimbalPitch,
+      gimbalYaw: estadoReplay.atitude.gimbalYaw,
+      seleccionado: false,
+      alerta: false,
+      // Maior e pintada de verde, para nao se confundir com os waypoints por
+      // onde passa.
+      aumento: 1.7,
+      tinta: [0.31, 0.85, 0.45, 0.55],
+    }
+  }, [rota, replay.activo, replay.estado, alvoCamara])
 
   const { enquadramento, aCarregar: enquadramentoACarregar } = useEnquadramento(
     alvoCamara,
@@ -853,6 +918,23 @@ export function App() {
           </button>
           <button
             type="button"
+            className={replay.activo ? 'activo' : ''}
+            disabled={rota.waypoints.length < 2}
+            title="Percorrer a rota no tempo, para ver o voo antes de o fazer"
+            onClick={() => {
+              if (replay.activo) {
+                replay.fechar()
+                return
+              }
+              // Os dois não correm ao mesmo tempo: são duas aeronaves no mesmo sítio.
+              if (voo.activo) voo.parar()
+              replay.abrir()
+            }}
+          >
+            Replay
+          </button>
+          <button
+            type="button"
             title="Desfazer (Ctrl+Z)"
             disabled={!editor.podeDesfazer}
             onClick={editor.desfazer}
@@ -898,92 +980,136 @@ export function App() {
         />
 
         <section className="zona-mapa">
-          <Mapa
-            rota={rota}
-            pontos3D={pontos3D}
-            seleccionados={seleccao.ids}
-            modo3D={modo3D}
-            modoPOI={modoPOI}
-            enquadramento={enquadramento}
-            seguir={voo.activo ? { posicao: voo.estado.posicao, guinada: voo.estado.guinada } : null}
-            centrarEm={centrarEm}
-            aoMudarVisibilidadeDaRota={setRotaVisivel}
-            aoEliminarWaypoint={(id) => {
-              aplicar((atual) => removerWaypoints(atual, [id]))
-              seleccao.limpar()
-            }}
-            centroInicial={CENTRO_INICIAL}
-            aoAdicionarWaypoint={aoAdicionarWaypoint}
-            aoInserirWaypoint={aoInserirWaypoint}
-            aoMoverWaypoint={aoMoverWaypoint}
-            aoSeleccionar={(id, juntar) => seleccao.seleccionar(id, juntar)}
-            aoMoverCursor={canalCursor.escrever}
-            aoRemoverPOI={(id) => aplicar((atual) => removerPOI(atual, id))}
-            aoErro={setErroMapa}
-          />
-
-          {configuracoesAbertas ? (
-            <ConfiguracoesRota
+          <div className="vista-mapa">
+            <Mapa
               rota={rota}
-              drone={drone}
-              impedimentoConversao={impedimentoConversao}
-              aoAlterarRota={editor.alterarRota}
-              aoMudarModoAltitude={mudarModoAltitude}
-              aoFechar={() => setConfiguracoesAbertas(false)}
-            />
-          ) : null}
-
-          {/*
-            * Perdeu-se a rota de vista: oferece-se o caminho de volta.
-            *
-            * Navegar em 3D leva mais longe do que se pensa, e sem isto so se
-            * volta procurando o sitio outra vez a mao.
-            */}
-          {!rotaVisivel && rota.waypoints.length > 0 && !voo.activo ? (
-            <button
-              type="button"
-              className="voltar-a-rota"
-              title="A rota ficou fora da vista"
-              onClick={() => {
-                const caixa = envolvente(rota.waypoints)
-                const primeiro = rota.waypoints[0]
-                if (!primeiro) return
-                setCentrarEm({
-                  posicao: { lat: primeiro.lat, lon: primeiro.lon },
-                  pedido: Date.now(),
-                  ...(caixa ? { envolvente: caixa } : {}),
-                })
-              }}
-            >
-              Centrar na rota
-            </button>
-          ) : null}
-
-          {alvoCamara ? (
-            <VistaCamara
-              posicao={alvoCamara.posicao}
-              alturaASL={alvoCamara.alturaASL}
+              pontos3D={pontos3D}
+              aeronave={aeronaveDoReplay}
+              seleccionados={seleccao.ids}
+              modo3D={modo3D}
+              modoPOI={modoPOI}
               enquadramento={enquadramento}
-              aCarregar={enquadramentoACarregar}
-              fovHorizontal={drone.camara.fovHorizontalGraus ?? 80}
-              tamanho={tamanhoCamara}
-              aoMudarTamanho={setTamanhoCamara}
-              {...(voo.activo ? { aoApontar: voo.apontar } : {})}
+              seguir={
+                replay.activo && replay.estado
+                  ? {
+                      posicao: replay.estado.posicao,
+                      guinada: replay.estado.atitude.guinada,
+                    }
+                  : voo.activo
+                    ? { posicao: voo.estado.posicao, guinada: voo.estado.guinada }
+                    : null
+              }
+              centrarEm={centrarEm}
+              aoMudarVisibilidadeDaRota={setRotaVisivel}
+              aoEliminarWaypoint={(id) => {
+                aplicar((atual) => removerWaypoints(atual, [id]))
+                seleccao.limpar()
+              }}
+              centroInicial={CENTRO_INICIAL}
+              aoAdicionarWaypoint={aoAdicionarWaypoint}
+              aoInserirWaypoint={aoInserirWaypoint}
+              aoMoverWaypoint={aoMoverWaypoint}
+              aoSeleccionar={(id, juntar) => seleccao.seleccionar(id, juntar)}
+              aoMoverCursor={canalCursor.escrever}
+              aoRemoverPOI={(id) => aplicar((atual) => removerPOI(atual, id))}
+              aoErro={setErroMapa}
             />
-          ) : null}
 
-          {voo.activo && alvoCamara ? (
-            <HudVoo
-              estado={voo.estado}
-              modoAltitude={rota.modoAltitude}
-              alturaASL={alvoCamara.alturaASL}
-              cotaTerreno={cotas.get(chaveDaPosicao(voo.estado.posicao)) ?? null}
-              velocidade={voo.velocidade}
-              aoAlterarVelocidade={voo.alterarVelocidade}
-              aoGravar={voo.gravar}
-              aoParar={voo.parar}
-            />
-          ) : null}
+            {configuracoesAbertas ? (
+              <ConfiguracoesRota
+                rota={rota}
+                drone={drone}
+                impedimentoConversao={impedimentoConversao}
+                aoAlterarRota={editor.alterarRota}
+                aoMudarModoAltitude={mudarModoAltitude}
+                aoFixarCamaraNosWaypoints={() =>
+                  aplicar((atual) => aplicarModoAosWaypoints(atual, atual.modoCamaraTrajecto))
+                }
+                aoFechar={() => setConfiguracoesAbertas(false)}
+              />
+            ) : null}
+
+            {/*
+              * Perdeu-se a rota de vista: oferece-se o caminho de volta.
+              *
+              * Navegar em 3D leva mais longe do que se pensa, e sem isto so se
+              * volta procurando o sitio outra vez a mao.
+              */}
+            {!rotaVisivel && rota.waypoints.length > 0 && !voo.activo ? (
+              <button
+                type="button"
+                className="voltar-a-rota"
+                title="A rota ficou fora da vista"
+                onClick={() => {
+                  const caixa = envolvente(rota.waypoints)
+                  const primeiro = rota.waypoints[0]
+                  if (!primeiro) return
+                  setCentrarEm({
+                    posicao: { lat: primeiro.lat, lon: primeiro.lon },
+                    pedido: Date.now(),
+                    ...(caixa ? { envolvente: caixa } : {}),
+                  })
+                }}
+              >
+                Centrar na rota
+              </button>
+            ) : null}
+
+            {alvoCamara ? (
+              <VistaCamara
+                posicao={alvoCamara.posicao}
+                alturaASL={alvoCamara.alturaASL}
+                enquadramento={enquadramento}
+                aCarregar={enquadramentoACarregar}
+                fovHorizontal={drone.camara.fovHorizontalGraus ?? 80}
+                tamanho={tamanhoCamara}
+                aoMudarTamanho={setTamanhoCamara}
+                {...(voo.activo ? { aoApontar: voo.apontar } : {})}
+              />
+            ) : null}
+
+            {voo.activo && alvoCamara ? (
+              <HudVoo
+                estado={voo.estado}
+                modoAltitude={rota.modoAltitude}
+                alturaASL={alvoCamara.alturaASL}
+                cotaTerreno={cotas.get(chaveDaPosicao(voo.estado.posicao)) ?? null}
+                velocidade={voo.velocidade}
+                aoAlterarVelocidade={voo.alterarVelocidade}
+                aoGravar={voo.gravar}
+                aoParar={voo.parar}
+              />
+            ) : null}
+
+            {replay.activo ? (
+              <PlayerReplay replay={replay} totalWaypoints={rota.waypoints.length} />
+            ) : null}
+
+
+            {!abaInferior ? (
+              <button
+                type="button"
+                className="mostrar-inferior"
+                onClick={() => setAbaInferior('perfil')}
+              >
+                Perfil de terreno
+                {exportacaoBloqueada ? <span className="ponto-erro" aria-hidden="true" /> : null}
+              </button>
+            ) : null}
+
+            <div className="barra-inferior-mapa">
+              {erroTerreno ?? erroMapa ? (
+                <span className="erro">{erroTerreno ?? erroMapa}</span>
+              ) : null}
+              {modoPOI ? <span className="modo-activo">Clica no mapa para criar um POI</span> : null}
+              {avisoTopografia ? (
+                <span className={topografia ? 'modo-activo' : 'erro'}>{avisoTopografia}</span>
+              ) : null}
+              {falha ? <span className="erro">{falha}</span> : null}
+              <LeituraCursor canal={canalCursor} ondulacaoGeoide={rota.ondulacaoGeoide} />
+              <span>WGS 84</span>
+            </div>
+          </div>
 
           {abaInferior && perfil ? (
             <div className="painel-inferior">
@@ -1062,30 +1188,6 @@ export function App() {
               )}
             </div>
           ) : null}
-
-          {!abaInferior ? (
-            <button
-              type="button"
-              className="mostrar-inferior"
-              onClick={() => setAbaInferior('perfil')}
-            >
-              Perfil de terreno
-              {exportacaoBloqueada ? <span className="ponto-erro" aria-hidden="true" /> : null}
-            </button>
-          ) : null}
-
-          <div className="barra-inferior-mapa">
-            {erroTerreno ?? erroMapa ? (
-              <span className="erro">{erroTerreno ?? erroMapa}</span>
-            ) : null}
-            {modoPOI ? <span className="modo-activo">Clica no mapa para criar um POI</span> : null}
-            {avisoTopografia ? (
-              <span className={topografia ? 'modo-activo' : 'erro'}>{avisoTopografia}</span>
-            ) : null}
-            {falha ? <span className="erro">{falha}</span> : null}
-            <LeituraCursor canal={canalCursor} ondulacaoGeoide={rota.ondulacaoGeoide} />
-            <span>WGS 84</span>
-          </div>
         </section>
 
         <PainelPropriedades

@@ -125,9 +125,25 @@ button.activo {
   min-height: 0;
 }
 
+/*
+ * O mapa e o painel de baixo dividem a zona em duas faixas.
+ *
+ * Antes eram ambos absolutos com `bottom: 0`, e o painel do perfil, que e o
+ * mais alto, tapava tudo o que estivesse la em baixo: a barra de estado com as
+ * coordenadas, e o leitor do plano de voo. Ora o leitor e o perfil sao para
+ * usar ao mesmo tempo - ve-se onde vai a aeronave e onde vai o terreno. Em
+ * faixas, o que flutua sobre o mapa fica limitado ao mapa.
+ */
 .zona-mapa {
   position: relative;
   min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.vista-mapa {
+  position: relative;
+  min-height: 0;
 }
 
 .mapa {
@@ -740,16 +756,14 @@ input.campo-entrada {
 /* --- painel inferior: perfil e validacoes ---------------------------------- */
 
 .painel-inferior {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   z-index: 4;
   background: rgba(18, 23, 29, 0.97);
   border-top: 1px solid var(--borda-forte);
   display: flex;
   flex-direction: column;
-  max-height: 46%;
+  /* Em faixas nao ha percentagem que resolva: a altura da faixa e o conteudo. */
+  max-height: 46vh;
+  overflow: auto;
 }
 
 .abas-inferior {
@@ -1542,4 +1556,56 @@ button,
 
 .hud-velocidade input[type='range'] {
   width: 120px;
+}
+
+/*
+ * Leitor do plano de voo.
+ *
+ * Fica onde o HUD do voo virtual fica, porque os dois nunca aparecem ao mesmo
+ * tempo: sao duas aeronaves no mesmo sitio, e so uma delas manda de cada vez.
+ */
+.player-replay {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: rgba(11, 14, 17, 0.92);
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  box-shadow: 0 8px 26px rgb(0 0 0 / 0.55);
+}
+
+.player-botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 26px;
+}
+
+.player-relogio {
+  /* Largura fixa: o relogio nao pode empurrar a barra a cada segundo. */
+  min-width: 96px;
+  text-align: center;
+  color: var(--texto-suave);
+}
+
+.player-barra {
+  width: 320px;
+}
+
+.player-waypoint {
+  min-width: 56px;
+  text-align: center;
+  color: var(--texto-suave);
+}
+
+.player-velocidades button {
+  padding: 3px 7px;
+  font-size: 11px;
 }
