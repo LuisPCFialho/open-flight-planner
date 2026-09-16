@@ -92,10 +92,19 @@ docs/
 
 ## Por confirmar
 
+Nada disto se resolve a programar. Ha um documento com o que observar, porque e
+que importa, e onde se escreve cada resposta:
+**[docs/verificar-no-campo.md](docs/verificar-no-campo.md)**.
+
+Em resumo:
+
+- **Nenhum KMZ exportado foi voado.** E a unica coisa que decide se isto serve.
 - O `template.kml` e o `waylines.wpml` completos de uma exportacao real do
-  FlightHub 2. O gerador do dialeto Pilot 2 tem a ordem de alguns elementos
-  escrita a partir da especificacao publica, e esta assinalado no codigo.
-- As accoes `hover` e `rotateYaw` no dialeto Fly. As de foto, gimbal e video
-  estao confirmadas contra ficheiros reais. A aplicacao avisa ao exportar quando
-  a rota usa alguma das que faltam.
-- Campo de visao, velocidade maxima e autonomia de cada drone, em `src/drones.ts`.
+  FlightHub 2 para Mavic 3T. Sem eles, a numeracao das accoes do dialeto Pilot 2
+  e a ordem de alguns elementos ficam escritas a partir da especificacao publica,
+  e esta assinalado no codigo.
+- As accoes `hover`, `rotateYaw` e `zoom` no dialeto Fly. As de foto, gimbal e
+  video estao confirmadas contra ficheiros reais. A aplicacao avisa ao exportar
+  quando a rota usa alguma das que faltam.
+- A margem de autonomia (70%) e o limite de rotacao do gimbal em voo virtual
+  (90 graus) sao prudentes por escolha, e nao medidos.
