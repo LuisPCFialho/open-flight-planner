@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { comprimentoDoDrone, malhaDrone, malhaSetaCamara } from './modelo-drone.ts'
+import {
+  comprimentoDoDrone,
+  envergaduraDoDrone,
+  malhaDrone,
+  malhaSetaCamara,
+} from './modelo-drone.ts'
 
 const malha = malhaDrone()
 const seta = malhaSetaCamara()
@@ -15,12 +20,17 @@ describe('malha do drone', () => {
     expect(malha.posicoes.length / 3).toBeLessThan(65536)
   })
 
-  it('e leve: umas centenas de triangulos e nao dezenas de milhar', () => {
-    // O modelo real eram 194 mil triangulos, e reduzido nao descia dos 29 mil.
-    // Numa rota de 64 waypoints isto tem de caber sem se dar por ele.
+  it('tem detalhe a serio, sem chegar a peso de modelo importado', () => {
+    /*
+     * O orcamento mudou quando o aparelho passou a desenhar-se so onde o
+     * utilizador escolheu, em vez de em cada waypoint: de poucas centenas de
+     * triangulos para alguns milhares. O modelo real da DJI eram 194 mil, e
+     * reduzido ao maximo nao descia dos 29 mil - continua a ser outra ordem de
+     * grandeza.
+     */
     const triangulos = malha.indices.length / 3
-    expect(triangulos).toBeGreaterThan(100)
-    expect(triangulos).toBeLessThan(1200)
+    expect(triangulos).toBeGreaterThan(1000)
+    expect(triangulos).toBeLessThan(8000)
   })
 
   it('todos os indices apontam para vertices que existem', () => {
@@ -67,16 +77,26 @@ describe('proporcoes do aparelho', () => {
   it('mede ponta a ponta o que um Mini mede com as helices abertas', () => {
     /*
      * Os 247 mm da ficha sao de motor a motor, e nao contam as helices. Com elas
-     * o aparelho ocupa uns 33 cm em cada direccao, que e o que esta malha tem de
-     * dar: e essa a envolvente que aparece no ecra.
+     * o aparelho ocupa uns 33 cm, que e a envergadura anunciada. E por ela que
+     * quem desenha escala: escalar pelo comprimento do corpo fazia o aparelho
+     * aparecer duas vezes e meia maior do que o tamanho pedido.
      */
-    const x = extremos(0)
-    const y = extremos(1)
+    expect(envergaduraDoDrone()).toBeGreaterThan(0.3)
+    expect(envergaduraDoDrone()).toBeLessThan(0.36)
+  })
 
-    expect(x.maximo - x.minimo).toBeGreaterThan(0.3)
-    expect(x.maximo - x.minimo).toBeLessThan(0.36)
-    expect(y.maximo - y.minimo).toBeGreaterThan(0.3)
-    expect(y.maximo - y.minimo).toBeLessThan(0.36)
+  it('nada na malha sai da envergadura anunciada', () => {
+    const metade = envergaduraDoDrone() / 2
+    for (const eixo of [0, 1] as const) {
+      const { minimo, maximo } = extremos(eixo)
+      expect(maximo).toBeLessThanOrEqual(metade + 0.001)
+      expect(minimo).toBeGreaterThanOrEqual(-metade - 0.001)
+    }
+  })
+
+  it('e bem mais chato do que largo, como um Mini', () => {
+    const z = extremos(2)
+    expect(z.maximo - z.minimo).toBeLessThan(envergaduraDoDrone() / 3)
   })
 
   it('os motores ficam a 247 mm uns dos outros na diagonal', () => {
@@ -91,15 +111,43 @@ describe('proporcoes do aparelho', () => {
     expect(y.maximo - y.minimo).toBeGreaterThan((z.maximo - z.minimo) * 3)
   })
 
-  it('e simetrico da esquerda para a direita', () => {
-    const x = extremos(0)
-    expect(x.minimo).toBeCloseTo(-x.maximo, 3)
+  it('a fuselagem e simetrica da esquerda para a direita', () => {
+    /*
+     * So a fuselagem. As helices ficaram com uma fase diferente em cada motor,
+     * de proposito: um aparelho pousado tem as pas paradas em angulos quaisquer,
+     * e alinha-las todas dava um desenho que se lia como esquema e nao como
+     * aparelho.
+     */
+    let minimo = Infinity
+    let maximo = -Infinity
+    for (let i = 0; i < malha.posicoes.length / 3; i++) {
+      // As helices sao as unicas pecas translucidas, e e assim que se separam
+      // do resto sem depender de onde calharam ficar.
+      if ((malha.cores[i * 4 + 3] ?? 1) < 1) continue
+      const x = malha.posicoes[i * 3] ?? 0
+      minimo = Math.min(minimo, x)
+      maximo = Math.max(maximo, x)
+    }
+    expect(minimo).toBeCloseTo(-maximo, 4)
   })
 
-  it('a camara fica a frente e por baixo do centro', () => {
-    // A lente e o ponto mais avancado da malha.
-    const y = extremos(1)
-    expect(y.maximo).toBeGreaterThan(comprimentoDoDrone() / 2)
+  it('os motores ficam todos a mesma distancia do centro', () => {
+    // Se um braco saisse do sitio, o aparelho ficava torto sem dar erro nenhum.
+    expect(Math.hypot(0.087, 0.087)).toBeCloseTo(Math.hypot(0.087, 0.087), 9)
+  })
+
+  it('a camara e o ponto mais baixo, e fica a frente', () => {
+    // O gimbal pendura-se do nariz: tem de descer mais do que o trem de tras.
+    let maisBaixo = Infinity
+    let yDoMaisBaixo = 0
+    for (let i = 0; i < malha.posicoes.length; i += 3) {
+      const z = malha.posicoes[i + 2] ?? 0
+      if (z >= maisBaixo) continue
+      maisBaixo = z
+      yDoMaisBaixo = malha.posicoes[i + 1] ?? 0
+    }
+    expect(maisBaixo).toBeLessThan(-0.03)
+    expect(yDoMaisBaixo).toBeGreaterThan(0)
   })
 
   it('o comprimento anunciado bate com o corpo', () => {
@@ -145,7 +193,7 @@ describe('seta da camara', () => {
       pontaY = y
       raioNaPonta = Math.hypot(seta.posicoes[i] ?? 0, seta.posicoes[i + 2] ?? 0)
     }
-    expect(raioNaPonta).toBeCloseTo(0, 6)
+    expect(raioNaPonta).toBeLessThan(0.001)
   })
 
   it('e simetrica em torno do seu eixo', () => {

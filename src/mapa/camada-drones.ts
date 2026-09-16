@@ -1,5 +1,5 @@
 import { MercatorCoordinate, type CustomLayerInterface, type Map as MapaLibre } from 'maplibre-gl'
-import { comprimentoDoDrone, malhaDrone, malhaSetaCamara, type MalhaDrone } from './modelo-drone.ts'
+import { envergaduraDoDrone, malhaDrone, malhaSetaCamara, type MalhaDrone } from './modelo-drone.ts'
 import { ligarPrograma, matrizComTranslacao } from './webgl.ts'
 
 /**
@@ -31,6 +31,15 @@ export type DroneNoMapa = {
   /** Fora do intervalo seguro acima do solo. */
   alerta: boolean
   /**
+   * Desenhar o aparelho, e nao so a seta da camara.
+   *
+   * So onde o utilizador escolheu e na aeronave do leitor. Um aparelho em cada
+   * waypoint enchia o mapa: numa rota de cobertura sao dezenas, sobrepostos, e
+   * o que se via era um tapete de aparelhos em vez do terreno que se anda a
+   * estudar. A seta, essa, fica em todos: e ela que diz para onde a camara olha.
+   */
+  comAparelho?: boolean
+  /**
    * Quantas vezes maior do que os outros. Um em cada waypoint fica a um; a
    * aeronave do leitor vem maior, para se distinguir dos pontos por onde passa.
    */
@@ -44,14 +53,16 @@ type OpcoesRender = {
 }
 
 /**
- * Tamanho a que o aparelho se quer ver, em pixeis de ecra.
+ * Tamanho a que cada peca se quer ver, em pixeis de ecra.
  *
- * Medido contra uma rota de 131 waypoints num quadriculado apertado, que e o
- * caso mau: a 46 pixeis as helices de uns sobrepunham-se as dos outros e o que
- * se via era um tapete cinzento. A 34 ainda se reconhece o aparelho e ja se
- * distingue um do seguinte.
+ * Sao dois numeros diferentes porque as duas pecas fazem trabalho diferente. A
+ * seta esta em todos os waypoints e so tem de dizer uma direccao: grande, numa
+ * rota de cobertura, tapa o terreno que se anda a estudar. O aparelho esta so
+ * onde o utilizador escolheu, e ai o que se quer e ve-lo - a orientacao do
+ * nariz, para onde aponta a camara, se esta direito.
  */
-const PIXEIS_ALVO = 34
+const PIXEIS_SETA = 30
+const PIXEIS_APARELHO = 64
 /**
  * Limites do tamanho no mundo, em metros.
  *
@@ -157,15 +168,20 @@ export class CamadaDrones implements CustomLayerInterface {
 
   #mapa: MapaLibre | null = null
   #programa: WebGLProgram | null = null
-  #bufferInstancias: WebGLBuffer | null = null
+  /** Uma instancia por waypoint: a seta esta em todos. */
+  #bufferSetas: WebGLBuffer | null = null
+  /** So os que levam aparelho desenhado. */
+  #bufferDrones: WebGLBuffer | null = null
   #drone: MalhaCarregada | null = null
   #seta: MalhaCarregada | null = null
   #localMatriz: WebGLUniformLocation | null = null
   #localEscala: WebGLUniformLocation | null = null
 
   #pontos: readonly DroneNoMapa[] = []
-  #instancias = new Float32Array(0)
-  #numInstancias = 0
+  #instanciasSetas = new Float32Array(0)
+  #instanciasDrones = new Float32Array(0)
+  #numSetas = 0
+  #numDrones = 0
   #origem: [number, number, number] = [0, 0, 0]
   /** Unidades Mercator por metro, a latitude da origem. */
   #metro = 0
@@ -181,12 +197,25 @@ export class CamadaDrones implements CustomLayerInterface {
     this.#localMatriz = gl.getUniformLocation(programa, 'uMatriz')
     this.#localEscala = gl.getUniformLocation(programa, 'uEscala')
 
-    this.#bufferInstancias = gl.createBuffer()
+    this.#bufferSetas = gl.createBuffer()
+    this.#bufferDrones = gl.createBuffer()
 
     // O drone usa a guinada da aeronave; a seta usa a orientacao do gimbal. Sao
     // dois pares de flutuantes na mesma instancia, e cada malha le o seu.
-    this.#drone = this.#carregarMalha(gl, programa, malhaDrone(), DESVIO_ORIENTACAO_DRONE)
-    this.#seta = this.#carregarMalha(gl, programa, malhaSetaCamara(), DESVIO_ORIENTACAO_CAMARA)
+    this.#drone = this.#carregarMalha(
+      gl,
+      programa,
+      malhaDrone(),
+      DESVIO_ORIENTACAO_DRONE,
+      this.#bufferDrones,
+    )
+    this.#seta = this.#carregarMalha(
+      gl,
+      programa,
+      malhaSetaCamara(),
+      DESVIO_ORIENTACAO_CAMARA,
+      this.#bufferSetas,
+    )
 
     this.#precisaRecarregar = true
   }
@@ -198,23 +227,27 @@ export class CamadaDrones implements CustomLayerInterface {
       gl.deleteBuffer(malha.vertices)
       gl.deleteBuffer(malha.indices)
     }
-    if (this.#bufferInstancias) gl.deleteBuffer(this.#bufferInstancias)
+    if (this.#bufferSetas) gl.deleteBuffer(this.#bufferSetas)
+    if (this.#bufferDrones) gl.deleteBuffer(this.#bufferDrones)
     if (this.#programa) gl.deleteProgram(this.#programa)
     this.#drone = null
     this.#seta = null
-    this.#bufferInstancias = null
+    this.#bufferSetas = null
+    this.#bufferDrones = null
     this.#programa = null
   }
 
   get diagnostico(): {
-    instancias: number
+    setas: number
+    aparelhos: number
     trianguloDrone: number
     trianguloSeta: number
     renders: number
     metroEmMercator: number
   } {
     return {
-      instancias: this.#numInstancias,
+      setas: this.#numSetas,
+      aparelhos: this.#numDrones,
       trianguloDrone: (this.#drone?.numIndices ?? 0) / 3,
       trianguloSeta: (this.#seta?.numIndices ?? 0) / 3,
       renders: this.#renders,
@@ -239,20 +272,21 @@ export class CamadaDrones implements CustomLayerInterface {
     const programa = this.#programa
     const drone = this.#drone
     const seta = this.#seta
-    if (!programa || !drone || !seta || this.#numInstancias === 0) return
+    if (!programa || !drone || !seta || this.#numSetas === 0) return
 
     const principal = opcoes.defaultProjectionData?.mainMatrix
     if (!principal) return
 
     if (this.#precisaRecarregar) {
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.#bufferInstancias)
-      gl.bufferData(gl.ARRAY_BUFFER, this.#instancias, gl.DYNAMIC_DRAW)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.#bufferSetas)
+      gl.bufferData(gl.ARRAY_BUFFER, this.#instanciasSetas, gl.DYNAMIC_DRAW)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.#bufferDrones)
+      gl.bufferData(gl.ARRAY_BUFFER, this.#instanciasDrones, gl.DYNAMIC_DRAW)
       this.#precisaRecarregar = false
     }
 
     gl.useProgram(programa)
     gl.uniformMatrix4fv(this.#localMatriz, false, matrizComTranslacao(principal, this.#origem))
-    gl.uniform2f(this.#localEscala, this.#aumento(), this.#metro)
 
     /*
      * A profundidade tem de estar ligada, senao as helices de um aparelho
@@ -264,15 +298,16 @@ export class CamadaDrones implements CustomLayerInterface {
     gl.depthFunc(gl.LEQUAL)
     gl.disable(gl.CULL_FACE)
 
-    for (const malha of [drone, seta]) {
+    // Cada peca com o seu tamanho: a escala vai no uniforme, entre os desenhos.
+    const desenhos: [MalhaCarregada, number, number][] = [
+      [seta, this.#numSetas, PIXEIS_SETA],
+      [drone, this.#numDrones, PIXEIS_APARELHO],
+    ]
+    for (const [malha, quantas, pixeis] of desenhos) {
+      if (quantas === 0) continue
+      gl.uniform2f(this.#localEscala, this.#aumento(pixeis), this.#metro)
       gl.bindVertexArray(malha.vao)
-      gl.drawElementsInstanced(
-        gl.TRIANGLES,
-        malha.numIndices,
-        gl.UNSIGNED_SHORT,
-        0,
-        this.#numInstancias,
-      )
+      gl.drawElementsInstanced(gl.TRIANGLES, malha.numIndices, gl.UNSIGNED_SHORT, 0, quantas)
     }
     gl.bindVertexArray(null)
   }
@@ -282,30 +317,50 @@ export class CamadaDrones implements CustomLayerInterface {
   /**
    * Quantas vezes aumentar a malha, que esta a tamanho real.
    *
-   * Um Mini tem 15 cm de corpo: a escala do mapa seria um ponto invisivel. O
-   * aparelho desenha-se com um tamanho constante no ecra, limitado em cima para
-   * nao tapar o mapa quando se afasta a vista, e em baixo para nao desaparecer
+   * Um Mini mede 33 cm de ponta a ponta: a escala do mapa seria um ponto
+   * invisivel. Desenha-se com tamanho constante no ecra, limitado em cima para
+   * nao tapar o mapa quando se afasta a vista e em baixo para nao desaparecer
    * quando se aproxima.
+   *
+   * A medida de referencia e a envergadura, e nao o comprimento do corpo. Com o
+   * corpo, o aparelho saia duas vezes e meia maior do que o tamanho pedido,
+   * porque as helices ficam muito para la do nariz e da cauda - era essa a razao
+   * de aparecerem enormes no mapa.
    */
-  #aumento(): number {
+  #aumento(pixeis: number): number {
     const mapa = this.#mapa
     if (!mapa) return 1
 
     const centro = mapa.getCenter()
     const circunferencia = 40075016.686 * Math.cos((centro.lat * Math.PI) / 180)
     const metrosPorPixel = circunferencia / (512 * Math.pow(2, mapa.getZoom()))
-    const alvo = PIXEIS_ALVO * metrosPorPixel
+    const alvo = pixeis * metrosPorPixel
 
     const tamanho = Math.max(MINIMO_MUNDO, Math.min(MAXIMO_MUNDO, alvo))
-    return tamanho / comprimentoDoDrone()
+    return tamanho / envergaduraDoDrone()
   }
 
+  /**
+   * Monta os dois conjuntos: setas em todos os pontos, aparelhos so onde foram
+   * pedidos.
+   *
+   * A origem e a mesma para os dois, senao as matrizes nao batiam certo: quem a
+   * define e o conjunto das setas, que tem sempre pelo menos tantos pontos como
+   * o outro.
+   */
   #construirInstancias(): void {
-    const { dados, origem, metro } = construirInstancias(this.#pontos, this.#exagero)
-    this.#instancias = dados
-    this.#origem = origem
-    this.#metro = metro
-    this.#numInstancias = this.#pontos.length
+    const setas = construirInstancias(this.#pontos, this.#exagero)
+    this.#instanciasSetas = setas.dados
+    this.#origem = setas.origem
+    this.#metro = setas.metro
+    this.#numSetas = this.#pontos.length
+
+    const comAparelho = this.#pontos.filter((p) => p.comAparelho === true)
+    this.#numDrones = comAparelho.length
+    this.#instanciasDrones =
+      comAparelho.length === 0
+        ? new Float32Array(0)
+        : construirInstancias(comAparelho, this.#exagero, setas.origem).dados
   }
 
   /**
@@ -318,6 +373,7 @@ export class CamadaDrones implements CustomLayerInterface {
     programa: WebGLProgram,
     malha: MalhaDrone,
     desvioOrientacao: number,
+    bufferInstancias: WebGLBuffer | null,
   ): MalhaCarregada {
     const vao = gl.createVertexArray()
     gl.bindVertexArray(vao)
@@ -340,8 +396,8 @@ export class CamadaDrones implements CustomLayerInterface {
     ligar(gl, programa, 'aNormal', 3, porVertice, 3 * 4, 0)
     ligar(gl, programa, 'aCor', 4, porVertice, 6 * 4, 0)
 
-    // Atributos por instancia, do buffer partilhado.
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.#bufferInstancias)
+    // Atributos por instancia, do buffer desta malha.
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufferInstancias)
     ligar(gl, programa, 'aCentro', 3, BYTES_POR_INSTANCIA, 0, 1)
     ligar(gl, programa, 'aOrientacao', 2, BYTES_POR_INSTANCIA, desvioOrientacao, 1)
     ligar(gl, programa, 'aTinta', 4, BYTES_POR_INSTANCIA, DESVIO_TINTA, 1)
@@ -383,6 +439,7 @@ function ligar(
 export function construirInstancias(
   pontos: readonly DroneNoMapa[],
   exagero = 1,
+  origemImposta?: readonly [number, number, number],
 ): {
   dados: Float32Array<ArrayBuffer>
   origem: [number, number, number]
@@ -395,7 +452,9 @@ export function construirInstancias(
     [primeiro.lon, primeiro.lat],
     primeiro.alturaVoo * exagero,
   )
-  const origem: [number, number, number] = [ancora.x, ancora.y, ancora.z]
+  const origem: [number, number, number] = origemImposta
+    ? [origemImposta[0], origemImposta[1], origemImposta[2]]
+    : [ancora.x, ancora.y, ancora.z]
   const metro = ancora.meterInMercatorCoordinateUnits()
 
   const dados = new Float32Array(pontos.length * FLUTUANTES_POR_INSTANCIA)

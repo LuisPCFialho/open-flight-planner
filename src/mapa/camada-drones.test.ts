@@ -167,3 +167,32 @@ describe('exagero vertical', () => {
     expect(esticado.origem[2]).toBeCloseTo(normal.origem[2] * 2, 12)
   })
 })
+
+describe('aparelho so onde foi pedido', () => {
+  it('a marca vai no ponto, e nao muda mais nada', () => {
+    const semMarca = construirInstancias([ponto()])
+    const comMarca = construirInstancias([ponto({ comAparelho: true })])
+    expect(Array.from(comMarca.dados)).toEqual(Array.from(semMarca.dados))
+  })
+
+  it('a origem pode ser imposta, para os dois conjuntos baterem certo', () => {
+    /*
+     * As setas e os aparelhos vao em buffers separados mas partilham a matriz,
+     * logo tem de partilhar a origem local. Sem isto, o aparelho do waypoint
+     * escolhido aparecia deslocado do sitio onde a seta dele estava.
+     */
+    const referencia = construirInstancias([ponto(), ponto({ lon: -8.4 })])
+    const soOSegundo = construirInstancias([ponto({ lon: -8.4 })], 1, referencia.origem)
+
+    const esperado = instancia(referencia.dados, 1)
+    const obtido = instancia(soOSegundo.dados, 0)
+    expect(obtido.centro[0]).toBeCloseTo(esperado.centro[0] ?? 0, 12)
+    expect(obtido.centro[1]).toBeCloseTo(esperado.centro[1] ?? 0, 12)
+    expect(obtido.centro[2]).toBeCloseTo(esperado.centro[2] ?? 0, 12)
+  })
+
+  it('sem origem imposta continua a ancorar-se no primeiro ponto', () => {
+    const { dados } = construirInstancias([ponto({ lon: -8.4 }), ponto()])
+    expect(instancia(dados, 0).centro[0]).toBe(0)
+  })
+})

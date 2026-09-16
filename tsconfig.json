@@ -19,5 +19,5 @@
     "allowImportingTsExtensions": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "ferramentas", "vite.config.ts"]
 }

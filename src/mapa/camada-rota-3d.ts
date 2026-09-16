@@ -32,6 +32,8 @@ export type PontoRota3D = {
   seleccionado: boolean
   /** Assinalado a vermelho quando esta fora do intervalo seguro acima do solo. */
   alerta: boolean
+  /** Desenhar o aparelho, e nao so a seta da camara. Ver `camada-drones`. */
+  comAparelho?: boolean
 }
 
 /**
