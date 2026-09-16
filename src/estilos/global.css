@@ -94,10 +94,10 @@ button.activo {
  * quebram para uma segunda linha em vez de se sobreporem ao resto.
  */
 .barra-superior {
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 6px 12px;
   padding: 6px 12px;
   background: var(--fundo-painel);
   border-bottom: 1px solid var(--borda);
@@ -105,29 +105,49 @@ button.activo {
 
 .titulo-rota {
   display: flex;
+  flex: 0 1 auto;
   align-items: baseline;
   gap: 8px;
-  justify-content: center;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
 }
 
 .titulo-rota strong,
+/*
+ * Quem cede primeiro quando a barra aperta.
+ *
+ * Os botoes de rota sao comandos e ficam com o seu tamanho; o nome do aparelho e
+ * leitura e corta-se com reticencias. Antes nao cedia nenhum dos dois: os botoes
+ * transbordavam do seu lugar e iam pintar por cima do nome.
+ */
 .titulo-rota .subtitulo {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--texto-suave);
 }
 
-.titulo-rota .subtitulo {
-  color: var(--texto-suave);
+.titulo-rota .selector-rota {
+  flex: 0 0 auto;
+  /* Rede de seguranca: num ecra muito estreito corta-se, nao se sobrepoe. */
+  overflow: hidden;
 }
 
 .accoes-superiores {
   display: flex;
+  /*
+   * Quando ja nao cabe ao lado, desce inteiro para a linha de baixo em vez de
+   * espremer as leituras e o nome da rota. Sao doze botoes: chega a haver
+   * larguras em que nao cabem, e deixa-los quebrar la dentro fazia-os partir ao
+   * meio no sitio errado.
+   */
+  flex: 1 1 360px;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
 }
 
 /*
@@ -441,6 +461,7 @@ button.activo {
 
 .grupo-esquerda {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: 16px;
   min-width: 0;
