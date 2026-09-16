@@ -157,6 +157,15 @@ export function Mapa(props: PropsMapa) {
     const tela = instancia.getCanvas()
     let arrasto: { x: number; y: number } | null = null
 
+    /*
+     * Os marcadores em locais, e nao em `.current`, para a limpeza os apanhar.
+     *
+     * Sao contentores criados uma vez e nunca substituidos, mas quem le o
+     * codigo - e o linter - nao tem como saber isso olhando so para a limpeza.
+     */
+    const marcadoresNoMapa = marcadores.current
+    const poisNoMapa = marcadoresPOI.current
+
     const comecarArrasto = (evento: MouseEvent): void => {
       if (!arrastoDeOrientacao(evento)) return
       evento.preventDefault()
@@ -498,10 +507,10 @@ export function Mapa(props: PropsMapa) {
       tela.removeEventListener('mousedown', aoPremirParaClique)
       window.removeEventListener('mousemove', aoMoverParaClique)
       window.removeEventListener('mouseup', aoLargarParaClique)
-      for (const marcador of marcadores.current.values()) marcador.remove()
-      marcadores.current.clear()
-      for (const marcador of marcadoresPOI.current.values()) marcador.remove()
-      marcadoresPOI.current.clear()
+      for (const marcador of marcadoresNoMapa.values()) marcador.remove()
+      marcadoresNoMapa.clear()
+      for (const marcador of poisNoMapa.values()) marcador.remove()
+      poisNoMapa.clear()
       camada3D.current = null
       camadaDrones.current = null
 
@@ -627,7 +636,7 @@ export function Mapa(props: PropsMapa) {
       center: [seguir.posicao.lon, seguir.posicao.lat],
       bearing: seguir.guinada,
     })
-  }, [props.seguir])
+  }, [props.seguir, pronto])
 
   // Levar a vista a um waypoint, a pedido da lista ou do perfil.
   useEffect(() => {

@@ -14,7 +14,32 @@ export default defineConfig({
    */
   preview: { port: 5173, strictPort: true },
   test: {
-    environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    /*
+     * Dois conjuntos, porque sao duas coisas diferentes.
+     *
+     * O nucleo e geometria, ficheiros e contas: corre em node, depressa e sem
+     * DOM nenhum. Os componentes precisam de um documento para serem montados, e
+     * o jsdom custa quase um segundo a levantar - nao vale a pena pagar isso nos
+     * quatrocentos testes que nao lhe tocam.
+     */
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'nucleo',
+          environment: 'node',
+          include: ['src/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'componentes',
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx'],
+          setupFiles: ['src/teste/preparar.ts'],
+        },
+      },
+    ],
   },
 })

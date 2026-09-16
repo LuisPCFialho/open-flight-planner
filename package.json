@@ -6,12 +6,13 @@
   "description": "Planeador de rotas de drone com saida KMZ para DJI Fly e DJI Pilot 2",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "oxlint && tsc --noEmit && vite build",
     "preview": "vite preview",
     "tipos": "tsc --noEmit",
     "test": "vitest run",
     "test:unidade": "vitest run --exclude \"**/*.integracao.test.ts\"",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "oxlint"
   },
   "dependencies": {
     "dexie": "^4.4.6",
@@ -24,10 +25,15 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^26.5.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.83.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
