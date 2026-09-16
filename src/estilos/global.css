@@ -1632,12 +1632,19 @@ button,
  * Fica onde o HUD do voo virtual fica, porque os dois nunca aparecem ao mesmo
  * tempo: sao duas aeronaves no mesmo sitio, e so uma delas manda de cada vez.
  */
-.player-replay {
+/* As barras flutuantes empilham-se ao fundo do mapa, sem se sobreporem. */
+.barras-flutuantes {
   position: absolute;
   left: 50%;
   bottom: 30px;
   transform: translateX(-50%);
   z-index: 6;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.player-replay {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1786,11 +1793,6 @@ button,
 /* --- regua ---------------------------------------------------------------- */
 
 .regua {
-  position: absolute;
-  left: 50%;
-  bottom: 30px;
-  transform: translateX(-50%);
-  z-index: 6;
   display: flex;
   align-items: center;
   gap: 14px;

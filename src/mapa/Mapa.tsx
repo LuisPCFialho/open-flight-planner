@@ -196,7 +196,6 @@ export function Mapa(props: PropsMapa) {
       callbacks.current.aoErro(evento.error?.message ?? 'falha no mapa')
     })
 
-    instancia.setStyle(estiloBase())
 
     if (import.meta.env.DEV) {
       /*
@@ -216,7 +215,34 @@ export function Mapa(props: PropsMapa) {
       })
     }
 
-    instancia.on('load', () => {
+    /*
+     * Instalar as nossas fontes e camadas, quando o estilo estiver de pe.
+     *
+     * Nao basta ouvir o `load`. O estilo e aplicado depois de o mapa existir - e
+     * tem de ser, para haver a quem entregar um erro de estilo - e o MapLibre
+     * avisa que esta a reconstruir o estilo de raiz porque o anterior ainda nao
+     * acabara de carregar. Nessa corrida o `load` pode ja ter passado, e entao
+     * nunca mais volta: o mapa fica com a ortofoto e mais nada, sem rota, sem
+     * areas e sem marcadores, e sem erro nenhum que o explique.
+     *
+     * Ouvem-se os dois eventos e a instalacao e idempotente: corre quem chegar
+     * primeiro, e a segunda vez nao faz nada.
+     */
+    let instalado = false
+    const instalar = (): void => {
+      if (instalado) return
+      /*
+       * Enquanto o estilo nao estiver de pe, `addSource` atira "Style is not
+       * done loading". Nao ha aqui nada a fazer senao esperar pelo aviso
+       * seguinte: a excepcao e apanhada, o estado fica como estava - nada foi
+       * acrescentado, porque esta e a primeira chamada - e tenta-se outra vez.
+       *
+       * Deixar a excepcao sair daqui e o que nao se pode fazer: ela propaga para
+       * o React, que desmonta o componente, e o que fica no ecra e a aplicacao
+       * sem mapa nenhum.
+       */
+      try {
+
       /*
        * As areas de referencia entram primeiro, e por isso ficam por baixo.
        *
@@ -328,8 +354,42 @@ export function Mapa(props: PropsMapa) {
       camadaDrones.current = drones
       instancia.addLayer(drones)
 
-      setPronto(true)
-    })
+        instalado = true
+        setPronto(true)
+      } catch {
+        // O estilo ainda nao estava pronto. Tenta-se no aviso seguinte.
+      }
+    }
+
+    /*
+     * A ordem aqui e o que faltava, e custou um mapa em branco.
+     *
+     * O `setStyle` estava antes de se subscrever o `load`. Em desenvolvimento
+     * ninguem dava por isso - o codigo nao esta minificado, ha o recarregamento
+     * a quente pelo meio, e a subscricao chegava a tempo. Na versao construida o
+     * estilo fica pronto primeiro, o `load` passa sem ninguem a ouvir, e o mapa
+     * nasce com a ortofoto e mais nada: sem rota, sem areas, sem marcadores, sem
+     * erro nenhum que o explique.
+     *
+     * Agora subscreve-se antes, aplica-se o estilo depois, e ainda se tenta
+     * instalar a mao - para o caso de o estilo ja estar de pe quando chegarmos
+     * aqui. As tres tentativas sao inofensivas porque a instalacao e idempotente.
+     */
+    /*
+     * Ouvem-se os dois eventos, e subscreve-se antes de aplicar o estilo.
+     *
+     * So com o `load` a versao construida nascia com a ortofoto e mais nada -
+     * sem rota, sem areas, sem marcadores - e sem erro nenhum que o explicasse.
+     * Em desenvolvimento nunca acontecia, o que e a pior especie de defeito: o
+     * `load` de um mapa a que se troca o estilo logo a seguir pode passar antes
+     * de alguem estar a ouvir, e nao volta.
+     *
+     * O `styledata` volta sempre que o estilo muda, e e esse que salva. A
+     * instalacao corre uma so vez, seja quem for a chegar primeiro.
+     */
+    instancia.on('load', instalar)
+    instancia.on('styledata', instalar)
+    instancia.setStyle(estiloBase())
 
     /*
      * Distinguir o clique do arrasto.
@@ -640,7 +700,15 @@ export function Mapa(props: PropsMapa) {
     instancia.getCanvas().style.cursor = props.modoMapa === 'navegar' ? '' : 'crosshair'
   }, [props.modoMapa, pronto])
 
-  return <div className="mapa" ref={contentor} />
+  /*
+   * O estado de instalacao fica no proprio elemento.
+   *
+   * E a unica forma de, de fora, distinguir "o mapa nao tem camadas nossas" de
+   * "o mapa tem-nas e estao vazias" - e essa distincao ja custou uma manha. Os
+   * acessores de diagnostico so existem em desenvolvimento, e o defeito que
+   * aconteceu so aparecia na versao construida.
+   */
+  return <div className="mapa" data-pronto={pronto ? 'sim' : 'nao'} ref={contentor} />
 }
 
 // --- desenho -----------------------------------------------------------------

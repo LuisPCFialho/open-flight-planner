@@ -1233,17 +1233,26 @@ export function App() {
               />
             ) : null}
 
-            {replay.activo ? (
-              <PlayerReplay replay={replay} totalWaypoints={rota.waypoints.length} />
-            ) : null}
-
-            {modoMapa === 'medir' ? (
-              <Regua
-                pontos={medicao}
-                aoDesfazerPonto={() => setMedicao((pontos) => pontos.slice(0, -1))}
-                aoLimpar={() => setMedicao([])}
-                aoFechar={() => alternarModo('medir')}
-              />
+            {/*
+              * As barras que flutuam sobre o mapa empilham-se em vez de se
+              * sobreporem: o leitor e a regua sao para usar ao mesmo tempo -
+              * mede-se uma distancia com a aeronave parada onde interessa - e
+              * ambos moravam no mesmo sitio do ecra.
+              */}
+            {replay.activo || modoMapa === 'medir' ? (
+              <div className="barras-flutuantes">
+                {modoMapa === 'medir' ? (
+                  <Regua
+                    pontos={medicao}
+                    aoDesfazerPonto={() => setMedicao((pontos) => pontos.slice(0, -1))}
+                    aoLimpar={() => setMedicao([])}
+                    aoFechar={() => alternarModo('medir')}
+                  />
+                ) : null}
+                {replay.activo ? (
+                  <PlayerReplay replay={replay} totalWaypoints={rota.waypoints.length} />
+                ) : null}
+              </div>
             ) : null}
 
 
