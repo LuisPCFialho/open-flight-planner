@@ -57,8 +57,8 @@ export function EditorAccoes({
 
       {waypoint === null ? (
         <p className="nota">
-          Com varios waypoints seleccionados so e possivel acrescentar accoes a todos.
-          Selecciona um so para editar a lista.
+          Com vários waypoints seleccionados só é possível acrescentar ações a todos.
+          Selecciona um só para editar a lista.
         </p>
       ) : waypoint.acoes.length === 0 ? (
         <p className="nota">Sem acções neste waypoint.</p>

@@ -223,7 +223,7 @@ export function ConfiguracoesRota({
           <p className="nota">
             30 m serve o registo fotografico de obra. A inspeccao de paineis faz-se entre
             20 e 40 m, e com o limite em 30 m uma rota dessas nao chegaria a exportar.
-            O maximo de 120 m nao se mexe: e regulamentar.
+            O máximo de 120 m não se mexe: é regulamentar.
           </p>
         </section>
 

@@ -961,7 +961,7 @@ export function App() {
                   }`}
                   onClick={() => setAbaInferior('validacoes')}
                 >
-                  Validacoes
+                  Validações
                   {validacoes.length > 0 ? (
                     <span className="contador numerico">{validacoes.length}</span>
                   ) : null}

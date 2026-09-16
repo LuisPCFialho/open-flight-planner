@@ -98,7 +98,7 @@ export function HudVoo({
           Gravar waypoint
         </button>
         <span className="hud-ajuda">
-          Setas apontam o gimbal e R recentra-o. Arrastar na vista da camara aponta
+          Setas apontam o gimbal e R recentra-o. Arrastar na vista da câmara aponta
           directamente. Mais e menos mudam a velocidade, Alt abranda tudo para o
           ajuste fino. Shift+Space grava, Shift+F junta foto, Esc sai.
         </span>
