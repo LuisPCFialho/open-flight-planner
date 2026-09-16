@@ -73,6 +73,15 @@ export type PropsMapa = {
   aoEliminarWaypoint: (id: string) => void
   /** Avisa quando os waypoints saem ou voltam a entrar na janela visivel. */
   aoMudarVisibilidadeDaRota: (visivel: boolean) => void
+  /**
+   * Rumo e inclinacao, a cada mudanca da vista.
+   *
+   * Vai para um canal e nao para estado: isto muda a cada fotograma enquanto se
+   * arrasta, e em estado renderizava a aplicacao inteira 60 vezes por segundo.
+   */
+  aoMudarOrientacao: (orientacao: { rumo: number; inclinacao: number }) => void
+  /** Pedido de apontar a norte, vindo da bussola. */
+  apontarANorte: number
   aoErro: (mensagem: string) => void
 }
 
@@ -346,6 +355,17 @@ export function Mapa(props: PropsMapa) {
     instancia.on('move', verificarVisibilidade)
     instancia.on('moveend', verificarVisibilidade)
 
+    const reportarOrientacao = (): void => {
+      callbacks.current.aoMudarOrientacao({
+        rumo: instancia.getBearing(),
+        inclinacao: instancia.getPitch(),
+      })
+    }
+    instancia.on('rotate', reportarOrientacao)
+    instancia.on('pitch', reportarOrientacao)
+    instancia.on('move', reportarOrientacao)
+    reportarOrientacao()
+
     /*
      * A leitura de coordenadas sob o cursor, a um por fotograma.
      *
@@ -517,6 +537,13 @@ export function Mapa(props: PropsMapa) {
       duration: 500,
     })
   }, [props.centrarEm])
+
+  // A bussola pede o norte. O `pedido` distingue dois cliques seguidos.
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto || props.apontarANorte === 0) return
+    instancia.easeTo({ bearing: 0, pitch: 0, duration: 400 })
+  }, [props.apontarANorte, pronto])
 
   // O cursor diz de imediato que o proximo clique cria um POI, nao um waypoint.
   useEffect(() => {

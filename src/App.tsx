@@ -51,6 +51,9 @@ import {
 import { droneComId } from './drones.ts'
 import { Mapa } from './mapa/Mapa.tsx'
 import { LeituraCursor, useCanalCursor } from './ui/LeituraCursor.tsx'
+import { Bussola, type Orientacao } from './ui/Bussola.tsx'
+import { useCanal } from './ui/canal.ts'
+import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
 import type { DroneNoMapa } from './mapa/camada-drones.ts'
 import { BarraEstatisticas } from './ui/BarraEstatisticas.tsx'
@@ -131,6 +134,11 @@ export function App() {
    * orcamento de cada fotograma. Ver `LeituraCursor`.
    */
   const canalCursor = useCanalCursor()
+  /** Orientacao do mapa, pelo mesmo caminho e pela mesma razao que o cursor. */
+  const canalOrientacao = useCanal<Orientacao>({ rumo: 0, inclinacao: 0 })
+  const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
+  const [larguraEsquerda, setLarguraEsquerda] = useLarguraPersistida('painel-esquerdo', 240)
+  const [larguraDireita, setLarguraDireita] = useLarguraPersistida('painel-direito', 300)
   const [arranque, setArranque] = useState<string | null>(null)
   const [erroMapa, setErroMapa] = useState<string | null>(null)
 
@@ -961,7 +969,12 @@ export function App() {
         </div>
       </header>
 
-      <main className="corpo">
+      <main
+        className="corpo"
+        style={{
+          gridTemplateColumns: `${larguraEsquerda}px 5px minmax(0, 1fr) 5px ${larguraDireita}px`,
+        }}
+      >
         <ListaWaypoints
           rota={rota}
           linhas={linhas}
@@ -977,6 +990,13 @@ export function App() {
             aplicar((atual) => removerWaypoints(atual, [id]))
             seleccao.limpar()
           }}
+        />
+
+        <PuxadorPainel
+          lado="esquerda"
+          largura={larguraEsquerda}
+          aoRedimensionar={setLarguraEsquerda}
+          rotulo="Largura da lista de trajetórias"
         />
 
         <section className="zona-mapa">
@@ -1011,9 +1031,13 @@ export function App() {
               aoMoverWaypoint={aoMoverWaypoint}
               aoSeleccionar={(id, juntar) => seleccao.seleccionar(id, juntar)}
               aoMoverCursor={canalCursor.escrever}
+            aoMudarOrientacao={canalOrientacao.escrever}
+            apontarANorte={pedidoDeNorte}
               aoRemoverPOI={(id) => aplicar((atual) => removerPOI(atual, id))}
               aoErro={setErroMapa}
             />
+
+            <Bussola canal={canalOrientacao} aoApontarANorte={() => setPedidoDeNorte(Date.now())} />
 
             {configuracoesAbertas ? (
               <ConfiguracoesRota
@@ -1189,6 +1213,13 @@ export function App() {
             </div>
           ) : null}
         </section>
+
+        <PuxadorPainel
+          lado="direita"
+          largura={larguraDireita}
+          aoRedimensionar={setLarguraDireita}
+          rotulo="Largura do painel de propriedades"
+        />
 
         <PainelPropriedades
           rota={rota}

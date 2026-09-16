@@ -1,5 +1,5 @@
-import { useMemo, useSyncExternalStore } from 'react'
 import type { CursorTerreno } from '../mapa/Mapa.tsx'
+import { criarCanal, useCanal, useValorDoCanal, type Canal } from './canal.ts'
 
 /**
  * As coordenadas e a cota sob o cursor, com estado proprio.
@@ -14,32 +14,15 @@ import type { CursorTerreno } from '../mapa/Mapa.tsx'
  * nao provoca render nenhum a nao ser aqui.
  */
 
-export type CanalCursor = {
-  escrever: (cursor: CursorTerreno | null) => void
-  subscrever: (aviso: () => void) => () => void
-  ler: () => CursorTerreno | null
-}
+export type CanalCursor = Canal<CursorTerreno | null>
 
 export function criarCanalCursor(): CanalCursor {
-  let actual: CursorTerreno | null = null
-  const ouvintes = new Set<() => void>()
-
-  return {
-    escrever(cursor) {
-      actual = cursor
-      for (const aviso of ouvintes) aviso()
-    },
-    subscrever(aviso) {
-      ouvintes.add(aviso)
-      return () => ouvintes.delete(aviso)
-    },
-    ler: () => actual,
-  }
+  return criarCanal<CursorTerreno | null>(null)
 }
 
 /** Liga um canal novo, estavel durante toda a vida do componente. */
 export function useCanalCursor(): CanalCursor {
-  return useMemo(criarCanalCursor, [])
+  return useCanal<CursorTerreno | null>(null)
 }
 
 export function LeituraCursor({
@@ -50,7 +33,7 @@ export function LeituraCursor({
   /** Separacao entre o geoide e o elipsoide, para dar a altura HAE. */
   ondulacaoGeoide: number
 }) {
-  const cursor = useSyncExternalStore(canal.subscrever, canal.ler, canal.ler)
+  const cursor = useValorDoCanal(canal)
   const cota = cursor?.cotaTerreno ?? null
 
   return (

@@ -119,10 +119,44 @@ button.activo {
   gap: 6px;
 }
 
+/*
+ * Tres paineis e as duas bordas por onde se puxam.
+ *
+ * As colunas vem do estilo em linha, porque as larguras sao do utilizador e
+ * ficam guardadas no posto de trabalho. Os valores aqui sao os de arranque, e o
+ * que se ve enquanto nada disser o contrario.
+ */
 .corpo {
   display: grid;
-  grid-template-columns: 240px 1fr 300px;
+  grid-template-columns: 240px 5px minmax(0, 1fr) 5px 300px;
   min-height: 0;
+}
+
+.puxador-painel {
+  position: relative;
+  z-index: 7;
+  background: var(--borda);
+  cursor: col-resize;
+}
+
+/*
+ * A area sensivel e mais larga do que a linha que se ve.
+ *
+ * A borda tem cinco pixeis; acertar-lhe com o rato em movimento a essa largura
+ * custa. O pseudo-elemento alarga a area para dezassete sem alargar o desenho.
+ */
+.puxador-painel::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline: -6px;
+}
+
+.puxador-painel:hover,
+.puxador-painel:focus-visible,
+.puxador-painel.a-arrastar {
+  background: var(--destaque);
+  outline: none;
 }
 
 /*
@@ -1608,4 +1642,58 @@ button,
 .player-velocidades button {
   padding: 3px 7px;
   font-size: 11px;
+}
+
+/* --- bussola -------------------------------------------------------------- */
+
+.bussola {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  padding: 3px;
+  line-height: 0;
+  background: rgba(11, 14, 17, 0.78);
+  border: 1px solid var(--borda-forte);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.bussola:hover:not(:disabled) {
+  background: rgba(26, 33, 42, 0.92);
+  border-color: var(--destaque);
+}
+
+/* Ja esta a norte e a pique: nao ha para onde apontar. */
+.bussola:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.bussola-anel,
+.bussola-anel-interno {
+  fill: none;
+  stroke: var(--borda-forte);
+  stroke-width: 1;
+}
+
+.bussola-anel-interno {
+  stroke-dasharray: 2 4;
+}
+
+.bussola-norte { fill: var(--alerta); }
+.bussola-norte-sombra { fill: #a63c32; }
+.bussola-sul { fill: #7d8fa5; }
+.bussola-sul-sombra { fill: #52627a; }
+
+.bussola-letras text {
+  fill: var(--texto-suave);
+  font-family: var(--fonte);
+  font-size: 9px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.bussola-letras .bussola-letra-norte {
+  fill: var(--texto);
 }
