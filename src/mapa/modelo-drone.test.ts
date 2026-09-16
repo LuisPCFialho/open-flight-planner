@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { comprimentoDoDrone, malhaDrone } from './modelo-drone.ts'
+import { comprimentoDoDrone, malhaDrone, malhaSetaCamara } from './modelo-drone.ts'
 
 const malha = malhaDrone()
+const seta = malhaSetaCamara()
 
 describe('malha do drone', () => {
   it('tem os quatro conjuntos com o mesmo numero de vertices', () => {
@@ -103,5 +104,67 @@ describe('proporcoes do aparelho', () => {
 
   it('o comprimento anunciado bate com o corpo', () => {
     expect(comprimentoDoDrone()).toBeCloseTo(0.145, 3)
+  })
+})
+
+describe('seta da camara', () => {
+  it('tem os conjuntos coerentes e sem numeros invalidos', () => {
+    const vertices = seta.posicoes.length / 3
+    expect(seta.normais.length / 3).toBe(vertices)
+    expect(seta.cores.length / 4).toBe(vertices)
+    expect(seta.indices.length % 3).toBe(0)
+    for (const indice of seta.indices) expect(indice).toBeLessThan(vertices)
+    for (const valor of seta.posicoes) expect(Number.isFinite(valor)).toBe(true)
+  })
+
+  it('e leve, que e o ponto de a desenhar em vez de carregar um modelo', () => {
+    expect(seta.indices.length / 3).toBeLessThan(200)
+  })
+
+  it('aponta para a frente: sai da camara e estende-se pelo nariz fora', () => {
+    let minimo = Infinity
+    let maximo = -Infinity
+    for (let i = 1; i < seta.posicoes.length; i += 3) {
+      const y = seta.posicoes[i] ?? 0
+      minimo = Math.min(minimo, y)
+      maximo = Math.max(maximo, y)
+    }
+
+    // Nasce a frente do centro e vai bem alem do nariz, senao nao se ve.
+    expect(minimo).toBeGreaterThan(0)
+    expect(maximo).toBeGreaterThan(comprimentoDoDrone())
+  })
+
+  it('a ponta fecha num bico', () => {
+    // O vertice mais avancado tem de estar no eixo, ou a seta acaba a direito.
+    let pontaY = -Infinity
+    let raioNaPonta = Infinity
+    for (let i = 0; i < seta.posicoes.length; i += 3) {
+      const y = seta.posicoes[i + 1] ?? 0
+      if (y <= pontaY) continue
+      pontaY = y
+      raioNaPonta = Math.hypot(seta.posicoes[i] ?? 0, seta.posicoes[i + 2] ?? 0)
+    }
+    expect(raioNaPonta).toBeCloseTo(0, 6)
+  })
+
+  it('e simetrica em torno do seu eixo', () => {
+    let maiorX = 0
+    let menorX = 0
+    for (let i = 0; i < seta.posicoes.length; i += 3) {
+      maiorX = Math.max(maiorX, seta.posicoes[i] ?? 0)
+      menorX = Math.min(menorX, seta.posicoes[i] ?? 0)
+    }
+    expect(menorX).toBeCloseTo(-maiorX, 6)
+  })
+
+  it('e mais fina do que comprida, para nao tapar o terreno', () => {
+    let maiorX = 0
+    let maiorY = 0
+    for (let i = 0; i < seta.posicoes.length; i += 3) {
+      maiorX = Math.max(maiorX, Math.abs(seta.posicoes[i] ?? 0))
+      maiorY = Math.max(maiorY, seta.posicoes[i + 1] ?? 0)
+    }
+    expect(maiorY).toBeGreaterThan(maiorX * 8)
   })
 })

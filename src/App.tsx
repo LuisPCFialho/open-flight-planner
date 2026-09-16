@@ -4,6 +4,7 @@ import { paraASL } from './nucleo/geodesia.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
 import { calcularPerfil } from './nucleo/perfil.ts'
+import { atitudeNoWaypoint } from './nucleo/camara-trajecto.ts'
 import { AGL_MAXIMO, PASSO_COLISAO, temErros, validarRota } from './nucleo/validacoes.ts'
 import {
   acrescentarWaypoint,
@@ -275,8 +276,15 @@ export function App() {
   const pontos3D = useMemo<PontoRota3D[]>(() => {
     if (!rota) return []
     const pontos: PontoRota3D[] = []
-    for (const linha of linhas) {
+    for (const [i, linha] of linhas.entries()) {
       if (linha.cotaTerreno === null) continue
+      /*
+       * Os angulos vem do modo de camara da rota, e nao so do que esta gravado
+       * no waypoint. E o que faz o aparelho desenhado no mapa mostrar o que a
+       * camara vai mesmo fazer quando se escolhe seguir o proximo waypoint ou
+       * olhar para o terreno.
+       */
+      const atitude = atitudeNoWaypoint(rota, i)
       pontos.push({
         lat: linha.waypoint.lat,
         lon: linha.waypoint.lon,
@@ -285,6 +293,9 @@ export function App() {
           cotaTerreno: linha.cotaTerreno,
         }),
         cotaTerreno: linha.cotaTerreno,
+        guinada: atitude.guinada,
+        gimbalPitch: atitude.gimbalPitch,
+        gimbalYaw: atitude.gimbalYaw,
         seleccionado: seleccao.ids.has(linha.waypoint.id),
         alerta: linha.alerta,
       })

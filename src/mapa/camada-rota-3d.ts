@@ -1,4 +1,5 @@
 import { MercatorCoordinate, type CustomLayerInterface, type Map as MapaLibre } from 'maplibre-gl'
+import { ligarPrograma, matrizComTranslacao } from './webgl.ts'
 
 /**
  * Camada WebGL que desenha a rota a altitude verdadeira sobre o terreno.
@@ -21,6 +22,12 @@ export type PontoRota3D = {
   alturaVoo: number
   /** Cota do terreno na vertical do ponto, ortometrica em metros. */
   cotaTerreno: number
+  /** Rumo da aeronave em graus, ja resolvido pelo modo de camara da rota. */
+  guinada: number
+  /** Inclinacao do gimbal em graus, negativa para baixo. */
+  gimbalPitch: number
+  /** Rotacao do gimbal em graus, relativa ao nariz. */
+  gimbalYaw: number
   seleccionado: boolean
   /** Assinalado a vermelho quando esta fora do intervalo seguro acima do solo. */
   alerta: boolean
@@ -40,7 +47,6 @@ const COR_ROTA: Cor = [0.31, 0.85, 0.45, 1]
 const COR_ROTA_ALERTA: Cor = [0.95, 0.35, 0.3, 1]
 const COR_VERTICAL: Cor = [0.85, 0.88, 0.92, 0.55]
 const COR_VERTICAL_ALERTA: Cor = [0.95, 0.35, 0.3, 0.7]
-const COR_SELECCAO: Cor = [0.35, 0.72, 1, 1]
 
 const VERTICE_FONTE = `#version 300 es
 precision highp float;
@@ -88,7 +94,7 @@ export class CamadaRota3D implements CustomLayerInterface {
     this.#mapa = mapa
 
 
-    const programa = ligarPrograma(gl, VERTICE_FONTE, FRAGMENTO_FONTE)
+    const programa = ligarPrograma(gl, VERTICE_FONTE, FRAGMENTO_FONTE, 'rota 3D')
     this.#programa = programa
     this.#localMatriz = gl.getUniformLocation(programa, 'uMatriz')
 
@@ -228,13 +234,16 @@ export class CamadaRota3D implements CustomLayerInterface {
       empurrar(linhas, para, cor)
     }
 
-    // Marca no waypoint e no solo.
-    for (const [i, ponto] of pontos.entries()) {
-      const cima = voo[i]
+    /*
+     * Marca so no solo, ao pe da vertical.
+     *
+     * No waypoint ja nao ha marca: e onde fica o aparelho desenhado, e as duas
+     * coisas sobrepostas nao se liam. A do solo fica, porque e o que diz onde a
+     * vertical assenta quando o terreno esta inclinado.
+     */
+    for (const [i] of pontos.entries()) {
       const baixo = solo[i]
-      if (!cima || !baixo) continue
-      const cor = ponto.seleccionado ? COR_SELECCAO : ponto.alerta ? COR_ROTA_ALERTA : COR_ROTA
-      empurrar(marcas, cima, cor)
+      if (!baixo) continue
       empurrar(marcas, baixo, COR_VERTICAL)
     }
 
@@ -242,67 +251,4 @@ export class CamadaRota3D implements CustomLayerInterface {
     this.#numPontos = marcas.length / 7
     this.#vertices = new Float32Array([...linhas, ...marcas])
   }
-}
-
-/**
- * Compoe `mvp` com uma translacao para a origem local, ainda em dupla precisao,
- * e so depois converte para float32. Fazer a conta ao contrario devolveria
- * vertices com erro de metros.
- */
-function matrizComTranslacao(
-  mvp: ArrayLike<number>,
-  origem: readonly [number, number, number],
-): Float32Array {
-  const m = new Float32Array(16)
-  const [ox, oy, oz] = origem
-
-  for (let coluna = 0; coluna < 3; coluna++) {
-    for (let linha = 0; linha < 4; linha++) {
-      m[coluna * 4 + linha] = mvp[coluna * 4 + linha] ?? 0
-    }
-  }
-  for (let linha = 0; linha < 4; linha++) {
-    m[12 + linha] =
-      (mvp[linha] ?? 0) * ox +
-      (mvp[4 + linha] ?? 0) * oy +
-      (mvp[8 + linha] ?? 0) * oz +
-      (mvp[12 + linha] ?? 0)
-  }
-  return m
-}
-
-function ligarPrograma(
-  gl: WebGL2RenderingContext,
-  fonteVertice: string,
-  fonteFragmento: string,
-): WebGLProgram {
-  const programa = gl.createProgram()
-  const vertice = compilar(gl, gl.VERTEX_SHADER, fonteVertice)
-  const fragmento = compilar(gl, gl.FRAGMENT_SHADER, fonteFragmento)
-
-  gl.attachShader(programa, vertice)
-  gl.attachShader(programa, fragmento)
-  gl.linkProgram(programa)
-  gl.deleteShader(vertice)
-  gl.deleteShader(fragmento)
-
-  if (!gl.getProgramParameter(programa, gl.LINK_STATUS)) {
-    const registo = gl.getProgramInfoLog(programa)
-    gl.deleteProgram(programa)
-    throw new Error(`nao foi possivel ligar o programa da rota 3D: ${registo ?? 'sem detalhe'}`)
-  }
-  return programa
-}
-
-function compilar(gl: WebGL2RenderingContext, tipo: number, fonte: string): WebGLShader {
-  const shader = gl.createShader(tipo)
-  if (!shader) throw new Error('nao foi possivel criar o shader da rota 3D')
-  gl.shaderSource(shader, fonte)
-  gl.compileShader(shader)
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const registo = gl.getShaderInfoLog(shader)
-    gl.deleteShader(shader)
-    throw new Error(`shader da rota 3D nao compila: ${registo ?? 'sem detalhe'}`)
-  }
-  return shader
 }

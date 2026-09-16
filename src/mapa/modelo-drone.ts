@@ -41,6 +41,9 @@ const CORPO = { x: 0.045, y: 0.0725, z: 0.028 }
 const MOTOR = { x: 0.087, frente: 0.087, tras: 0.093 }
 const RAIO_HELICE = 0.0785
 
+/** Amarelo da seta, o mesmo do poligono de enquadramento. */
+const SETA: Cor = [0.94, 0.71, 0.16, 1]
+
 class Construtor {
   readonly #posicoes: number[] = []
   readonly #normais: number[] = []
@@ -136,6 +139,42 @@ class Construtor {
     this.disco([cx, cy, cz + altura / 2], raio, lados, cor)
   }
 
+  /**
+   * Tronco de cone ao longo do eixo y, de `deY` a ateY.
+   *
+   * Serve a seta da camara: com raios iguais e uma haste, com o raio de chegada
+   * a zero e uma ponta.
+   */
+  tuboEmY(
+    deY: number,
+    ateY: number,
+    raioDe: number,
+    raioAte: number,
+    lados: number,
+    cor: Cor,
+  ): void {
+    const base = this.#posicoes.length / 3
+
+    for (let i = 0; i <= lados; i++) {
+      const angulo = (i / lados) * Math.PI * 2
+      const nx = Math.cos(angulo)
+      const nz = Math.sin(angulo)
+
+      this.#posicoes.push(nx * raioDe, deY, nz * raioDe)
+      this.#normais.push(nx, 0, nz)
+      this.#cores.push(...cor)
+
+      this.#posicoes.push(nx * raioAte, ateY, nz * raioAte)
+      this.#normais.push(nx, 0, nz)
+      this.#cores.push(...cor)
+    }
+
+    for (let i = 0; i < lados; i++) {
+      const a = base + i * 2
+      this.#indices.push(a, a + 1, a + 3, a, a + 3, a + 2)
+    }
+  }
+
   terminar(): MalhaDrone {
     return {
       posicoes: new Float32Array(this.#posicoes),
@@ -203,4 +242,33 @@ export function malhaDrone(): MalhaDrone {
 /** Comprimento do nariz a cauda, em metros. Serve para escalar. */
 export function comprimentoDoDrone(): number {
   return CORPO.y * 2
+}
+
+/** Comprimento da seta, nas mesmas unidades da malha do drone. */
+const SETA_COMPRIMENTO = 0.34
+const SETA_RAIO = 0.006
+/** Onde acaba a haste e comeca a ponta, em fraccao do comprimento. */
+const SETA_OMBRO = 0.7
+const SETA_RAIO_PONTA = 0.018
+
+/**
+ * Seta que diz para onde a camara esta a olhar.
+ *
+ * Sai da camara e aponta ao longo do eixo do gimbal. Nasce em `y` positivo,
+ * como o nariz do drone: quem desenha e que lhe aplica a guinada da aeronave
+ * mais a rotacao e a inclinacao do gimbal.
+ *
+ * E uma haste fina com uma ponta conica, e nao um cone so, porque o que
+ * interessa ler de longe e a direccao; uma ponta gorda a apontar ao chao lia-se
+ * mal e escondia o terreno por baixo.
+ */
+export function malhaSetaCamara(): MalhaDrone {
+  const c = new Construtor()
+  const lados = 8
+  const ombro = SETA_COMPRIMENTO * SETA_OMBRO
+
+  c.tuboEmY(CORPO.y * 0.9, ombro, SETA_RAIO, SETA_RAIO, lados, SETA)
+  c.tuboEmY(ombro, SETA_COMPRIMENTO, SETA_RAIO_PONTA, 0, lados, SETA)
+
+  return c.terminar()
 }

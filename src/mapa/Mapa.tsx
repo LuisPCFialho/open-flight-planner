@@ -13,6 +13,7 @@ import { algumDentroDaVista, contornoFechado } from '../nucleo/areas.ts'
 import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
 import { estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
+import { CamadaDrones } from './camada-drones.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
 
 const FONTE_SEGMENTOS = 'rota-segmentos'
@@ -72,6 +73,7 @@ export function Mapa(props: PropsMapa) {
   const contentor = useRef<HTMLDivElement>(null)
   const mapa = useRef<MapaLibre | null>(null)
   const camada3D = useRef<CamadaRota3D | null>(null)
+  const camadaDrones = useRef<CamadaDrones | null>(null)
   const marcadores = useRef(new Map<string, Marker>())
   const marcadoresPOI = useRef(new Map<string, Marker>())
   /*
@@ -175,7 +177,10 @@ export function Mapa(props: PropsMapa) {
         configurable: true,
         get: () => mapa.current,
       })
-      Object.assign(window, { __camada3D: () => camada3D.current })
+      Object.assign(window, {
+        __camada3D: () => camada3D.current,
+        __camadaDrones: () => camadaDrones.current,
+      })
     }
 
     instancia.on('load', () => {
@@ -247,6 +252,11 @@ export function Mapa(props: PropsMapa) {
       const camada = new CamadaRota3D()
       camada3D.current = camada
       instancia.addLayer(camada)
+
+      // Depois da rota, para os aparelhos ficarem por cima das linhas.
+      const drones = new CamadaDrones()
+      camadaDrones.current = drones
+      instancia.addLayer(drones)
 
       setPronto(true)
     })
@@ -380,6 +390,7 @@ export function Mapa(props: PropsMapa) {
       for (const marcador of marcadoresPOI.current.values()) marcador.remove()
       marcadoresPOI.current.clear()
       camada3D.current = null
+      camadaDrones.current = null
 
       instancia.remove()
       mapa.current = null
@@ -428,9 +439,9 @@ export function Mapa(props: PropsMapa) {
   }, [waypoints, pronto])
 
   useEffect(() => {
-    const camada = camada3D.current
-    if (!camada || !pronto) return
-    camada.definirPontos(props.pontos3D)
+    if (!pronto) return
+    camada3D.current?.definirPontos(props.pontos3D)
+    camadaDrones.current?.definirPontos(props.pontos3D)
   }, [props.pontos3D, pronto])
 
   useEffect(() => {
