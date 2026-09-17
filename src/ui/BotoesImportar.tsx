@@ -2,7 +2,6 @@ import type { Area, LatLon } from '../nucleo/tipos.ts'
 import { areaDoContorno, centroDasAreas, envolvente, formatarArea } from '../nucleo/areas.ts'
 import { importarAreas } from '../kmz/ficheiro.ts'
 import { FonteTerrenoDXF } from '../terreno/fonte-dxf.ts'
-import { lerDXF } from '../terreno/dxf.ts'
 
 /**
  * Os dois botoes que trazem ficheiros de fora para dentro da rota.
@@ -108,9 +107,17 @@ export function BotaoTopografia({
           evento.target.value = ''
           if (!ficheiro) return
 
+          /*
+           * O leitor de DXF entra a pedido.
+           *
+           * Traz consigo o analisador de DXF, que so faz falta a quem importa
+           * topografia - e isso e uma vez por projecto, quando ha. Carregado de
+           * origem, atrasava o arranque de toda a gente.
+           */
           void ficheiro
             .text()
-            .then((texto) => {
+            .then(async (texto) => {
+              const { lerDXF } = await import('../terreno/dxf.ts')
               const lida = lerDXF(texto)
               aoImportar(
                 new FonteTerrenoDXF(lida),

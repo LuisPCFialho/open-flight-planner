@@ -1,4 +1,4 @@
-import JSZip from 'jszip'
+import type JSZip from 'jszip'
 
 /**
  * Empacotamento e leitura do `.kmz`.
@@ -6,7 +6,23 @@ import JSZip from 'jszip'
  * Um KMZ de rota e um zip com exactamente dois ficheiros, `wpmz/template.kml` e
  * `wpmz/waylines.wpml`. Acrescentar outros pode fazer o aparelho recusar o
  * ficheiro sem dizer porque.
+ *
+ * ## Porque e que a biblioteca de zip entra a pedido
+ *
+ * Sao cem kilobytes que so fazem falta quando alguem importa ou exporta, e isso
+ * acontece uma vez por sessao - nao a abrir a aplicacao. Carregada de origem,
+ * ia no pacote principal e atrasava o arranque de toda a gente para servir o
+ * momento de ninguem.
+ *
+ * O `import type` acima e o que permite continuar a escrever os tipos sem
+ * trazer o codigo: apaga-se na compilacao.
  */
+
+/** Traz a biblioteca de zip, uma vez. */
+async function jszip(): Promise<typeof JSZip> {
+  const modulo = await import('jszip')
+  return modulo.default
+}
 
 export const CAMINHO_TEMPLATE = 'wpmz/template.kml'
 export const CAMINHO_WAYLINES = 'wpmz/waylines.wpml'
@@ -14,6 +30,7 @@ export const CAMINHO_WAYLINES = 'wpmz/waylines.wpml'
 export type ConteudoKMZ = { template: string; waylines: string }
 
 export async function criarKMZ(conteudo: ConteudoKMZ): Promise<Blob> {
+  const JSZip = await jszip()
   const zip = new JSZip()
   zip.file(CAMINHO_TEMPLATE, conteudo.template)
   zip.file(CAMINHO_WAYLINES, conteudo.waylines)
@@ -22,6 +39,7 @@ export async function criarKMZ(conteudo: ConteudoKMZ): Promise<Blob> {
 
 /** Versao para Node, usada nos testes. */
 export async function criarKMZBytes(conteudo: ConteudoKMZ): Promise<Uint8Array> {
+  const JSZip = await jszip()
   const zip = new JSZip()
   zip.file(CAMINHO_TEMPLATE, conteudo.template)
   zip.file(CAMINHO_WAYLINES, conteudo.waylines)
@@ -29,6 +47,7 @@ export async function criarKMZBytes(conteudo: ConteudoKMZ): Promise<Uint8Array> 
 }
 
 export async function lerKMZ(dados: ArrayBuffer | Uint8Array | Blob): Promise<ConteudoKMZ> {
+  const JSZip = await jszip()
   const zip = await JSZip.loadAsync(dados as ArrayBuffer)
 
   const template = await lerEntrada(zip, CAMINHO_TEMPLATE, '.kml')

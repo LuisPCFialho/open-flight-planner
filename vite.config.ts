@@ -4,6 +4,23 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   worker: { format: 'es' },
+  /*
+   * O MapLibre num pedaco so dele.
+   *
+   * Sao oitocentos kilobytes que nao mudam de uma versao da aplicacao para a
+   * outra. No mesmo ficheiro que o nosso codigo, cada correccao nossa obrigava
+   * quem estiver em obra a descarregar tudo outra vez; a parte - e com o nome
+   * marcado pelo conteudo - o browser guarda-o e so volta a busca-lo quando a
+   * biblioteca mesmo mudar.
+   */
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id: string) =>
+          id.includes('node_modules/maplibre-gl') ? 'maplibre' : undefined,
+      },
+    },
+  },
   server: { port: 5173 },
   /*
    * A mesma porta do servidor de desenvolvimento, de proposito.
