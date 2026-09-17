@@ -156,7 +156,7 @@ export async function criarRota(dados: {
 /** Duplica uma rota dentro do mesmo projeto, com identificadores novos. */
 export async function duplicarRota(rotaId: string): Promise<Rota> {
   const original = await bd.rotas.get(rotaId)
-  if (!original) throw new Error('rota nao encontrada')
+  if (!original) throw new Error('rota não encontrada')
 
   const copia = copiarRota(original, original.projetoId, `${original.nome} (copia)`)
   await bd.rotas.add(copia)

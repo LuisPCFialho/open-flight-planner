@@ -73,7 +73,7 @@ export function ListaWaypoints({
                     title={
                       origemCota === 'dxf'
                         ? 'Cota do levantamento topografico'
-                        : 'Cota dos mosaicos publicos, com dezenas de metros de resolucao'
+                        : 'Cota dos mosaicos públicos, com dezenas de metros de resolução'
                     }
                   >
                     {origemCota === 'dxf' ? 'topo' : 'srtm'}

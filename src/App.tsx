@@ -35,6 +35,7 @@ import { useAtalhos } from './estado/useAtalhos.ts'
 import { linhasDaRota, pontos3DdaRota } from './estado/derivados.ts'
 import { usePersistenciaDaRota } from './estado/usePersistencia.ts'
 import { useProjetoEmCurso } from './estado/useProjetoEmCurso.ts'
+import { CHAVE_PROJETO, CHAVE_ROTA, useValorGuardado } from './estado/ondeEstava.ts'
 import {
   aeronaveDoReplay,
   aeronaveDoVoo,
@@ -90,8 +91,15 @@ const AJUDA_DO_MODO: Record<'waypoint' | 'poi' | 'medir', string> = {
 const fonteMosaicos = new FonteTerrariumAWS({ descodificador: descodificarPNGBrowser })
 
 export function App() {
-  const [projetoAberto, setProjetoAberto] = useState<string | null>(null)
-  const [rotaAberta, setRotaAberta] = useState<string | null>(null)
+  /*
+   * Guardados, para um recarregamento nao devolver ao ecra de projetos.
+   *
+   * O identificador pode ficar velho - projeto apagado, outra conta neste
+   * browser - e o `useProjetoEmCurso` trata disso, caindo para o primeiro
+   * projeto em vez de deixar a aplicacao presa num ecra vazio.
+   */
+  const [projetoAberto, setProjetoAberto] = useValorGuardado(CHAVE_PROJETO)
+  const [rotaAberta, setRotaAberta] = useValorGuardado(CHAVE_ROTA)
   const [centrarEm, setCentrarEm] = useState<{
     posicao: LatLon
     pedido: number

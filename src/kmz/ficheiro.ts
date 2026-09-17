@@ -73,7 +73,7 @@ export async function importarFicheiro(
       ...importada,
       avisos: [
         ...importada.avisos,
-        'o ficheiro nao traz a cota do ponto de descolagem e nao foi possivel obte-la do terreno: a altura acima do solo vai aparecer errada',
+        'o ficheiro não traz a cota do ponto de descolagem e não foi possível obtê-la do terreno: a altura acima do solo vai aparecer errada',
       ],
     }
   }

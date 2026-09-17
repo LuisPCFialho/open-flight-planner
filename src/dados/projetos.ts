@@ -57,7 +57,7 @@ export async function renomearProjeto(
 /** Copia o projeto e todas as suas rotas, com identificadores novos. */
 export async function duplicarProjeto(projetoId: string): Promise<Projeto> {
   const original = await lerProjetoComRotas(projetoId)
-  if (!original) throw new Error('projeto nao encontrado')
+  if (!original) throw new Error('projeto não encontrado')
 
   const copia: Projeto = {
     ...original.projeto,
@@ -97,28 +97,28 @@ export class FicheiroInvalido extends Error {}
  */
 export function deFicheiro(bruto: unknown): ProjetoComRotas {
   if (typeof bruto !== 'object' || bruto === null) {
-    throw new FicheiroInvalido('o ficheiro nao contem um objecto')
+    throw new FicheiroInvalido('o ficheiro não contém um objecto')
   }
   const dados = bruto as Partial<FicheiroProjeto>
 
   if (typeof dados.formato !== 'string' || !MARCAS_ACEITES.includes(dados.formato)) {
-    throw new FicheiroInvalido('o ficheiro nao e um projeto do Open Flight Planner')
+    throw new FicheiroInvalido('o ficheiro não é um projeto do Open Flight Planner')
   }
   if (typeof dados.versao !== 'number' || dados.versao > VERSAO_FICHEIRO) {
     throw new FicheiroInvalido(
-      `o ficheiro e da versao ${String(dados.versao)} e esta aplicacao le ate a ${VERSAO_FICHEIRO}`,
+      `o ficheiro é da versão ${String(dados.versao)} e esta aplicação lê até à ${VERSAO_FICHEIRO}`,
     )
   }
   if (typeof dados.projeto !== 'object' || dados.projeto === null) {
-    throw new FicheiroInvalido('o ficheiro nao traz projeto')
+    throw new FicheiroInvalido('o ficheiro não traz projeto')
   }
   if (!Array.isArray(dados.rotas)) {
-    throw new FicheiroInvalido('o ficheiro nao traz a lista de rotas')
+    throw new FicheiroInvalido('o ficheiro não traz a lista de rotas')
   }
 
   const projetoBruto = dados.projeto as Partial<Projeto>
   if (typeof projetoBruto.nome !== 'string' || projetoBruto.nome.trim() === '') {
-    throw new FicheiroInvalido('o projeto nao tem nome')
+    throw new FicheiroInvalido('o projeto não tem nome')
   }
 
   const projeto: Projeto = {
@@ -149,13 +149,13 @@ function areaValida(bruto: unknown): boolean {
 
 function validarRota(bruto: unknown, ordem: number, projetoId: string): Rota {
   if (typeof bruto !== 'object' || bruto === null) {
-    throw new FicheiroInvalido(`a rota ${ordem + 1} nao e um objecto`)
+    throw new FicheiroInvalido(`a rota ${ordem + 1} não é um objecto`)
   }
   const rota = bruto as Partial<Rota>
 
-  if (typeof rota.nome !== 'string') throw new FicheiroInvalido(`a rota ${ordem + 1} nao tem nome`)
+  if (typeof rota.nome !== 'string') throw new FicheiroInvalido(`a rota ${ordem + 1} não tem nome`)
   if (!Array.isArray(rota.waypoints)) {
-    throw new FicheiroInvalido(`a rota "${rota.nome}" nao tem lista de waypoints`)
+    throw new FicheiroInvalido(`a rota "${rota.nome}" não tem lista de waypoints`)
   }
   const descolagem = rota.pontoDescolagem
   if (
@@ -164,17 +164,17 @@ function validarRota(bruto: unknown, ordem: number, projetoId: string): Rota {
     !Number.isFinite(descolagem.lat) ||
     !Number.isFinite(descolagem.lon)
   ) {
-    throw new FicheiroInvalido(`a rota "${rota.nome}" nao tem ponto de descolagem valido`)
+    throw new FicheiroInvalido(`a rota "${rota.nome}" não tem ponto de descolagem válido`)
   }
 
   for (const [i, waypoint] of rota.waypoints.entries()) {
     if (!Number.isFinite(waypoint?.lat) || !Number.isFinite(waypoint?.lon)) {
       throw new FicheiroInvalido(
-        `o waypoint ${i + 1} da rota "${rota.nome}" nao tem coordenadas validas`,
+        `o waypoint ${i + 1} da rota "${rota.nome}" não tem coordenadas válidas`,
       )
     }
     if (!Number.isFinite(waypoint?.altura)) {
-      throw new FicheiroInvalido(`o waypoint ${i + 1} da rota "${rota.nome}" nao tem altura`)
+      throw new FicheiroInvalido(`o waypoint ${i + 1} da rota "${rota.nome}" não tem altura`)
     }
   }
 

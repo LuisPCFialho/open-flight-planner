@@ -207,7 +207,7 @@ export function estadoNoInstante(
 
 function noWaypoint(rota: Rota, indice: number, modo: ModoCamaraTrajecto): EstadoReplay {
   const waypoint = rota.waypoints[indice]
-  if (!waypoint) throw new Error(`waypoint ${indice} nao existe`)
+  if (!waypoint) throw new Error(`waypoint ${indice} não existe`)
 
   return {
     indice,

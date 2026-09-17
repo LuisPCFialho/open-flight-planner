@@ -24,7 +24,7 @@ export type PontoPTTM06 = { x: number; y: number }
 export function ptTm06ParaWgs84(ponto: PontoPTTM06): LatLon {
   const [lon, lat] = proj4(EPSG_3763, EPSG_4326, [ponto.x, ponto.y])
   if (lon === undefined || lat === undefined) {
-    throw new Error(`nao foi possivel converter ${ponto.x}, ${ponto.y} de PT-TM06`)
+    throw new Error(`não foi possível converter ${ponto.x}, ${ponto.y} de PT-TM06`)
   }
   return { lat, lon }
 }
@@ -32,7 +32,7 @@ export function ptTm06ParaWgs84(ponto: PontoPTTM06): LatLon {
 export function wgs84ParaPtTm06(ponto: LatLon): PontoPTTM06 {
   const [x, y] = proj4(EPSG_4326, EPSG_3763, [ponto.lon, ponto.lat])
   if (x === undefined || y === undefined) {
-    throw new Error(`nao foi possivel converter ${ponto.lat}, ${ponto.lon} para PT-TM06`)
+    throw new Error(`não foi possível converter ${ponto.lat}, ${ponto.lon} para PT-TM06`)
   }
   return { x, y }
 }

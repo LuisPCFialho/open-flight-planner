@@ -46,7 +46,7 @@ export class DXFSemCotas extends Error {}
 export function lerDXF(fonte: string): Topografia {
   const analisador = new DxfParser()
   const desenho = analisador.parseSync(fonte) as { entities?: EntidadeDXF[] } | null
-  if (!desenho?.entities) throw new DXFSemCotas('o ficheiro DXF nao tem entidades')
+  if (!desenho?.entities) throw new DXFSemCotas('o ficheiro DXF não tem entidades')
 
   const pontos: PontoCotado[] = []
   const triangulos: TrianguloCotado[] = []
@@ -127,7 +127,7 @@ export function lerDXF(fonte: string): Topografia {
 
   if (pontos.length === 0 && triangulos.length === 0) {
     throw new DXFSemCotas(
-      'o DXF nao traz nenhuma cota: nao ha curvas de nivel com elevacao, superficies 3DFACE nem pontos cotados',
+      'o DXF não traz nenhuma cota: não há curvas de nível com elevação, superfícies 3DFACE nem pontos cotados',
     )
   }
 
@@ -135,7 +135,7 @@ export function lerDXF(fonte: string): Topografia {
   // ter-se perdido na leitura. Mais vale recusar do que planear por cima disto.
   if (pontos.length > 0 && triangulos.length === 0 && pontos.every((p) => p.cota === 0)) {
     throw new DXFSemCotas(
-      'todas as cotas do DXF sao zero, o que quer dizer que se perderam na leitura. Grava as curvas de nivel como LWPOLYLINE, ou a superficie como 3DFACE.',
+      'todas as cotas do DXF são zero, o que quer dizer que se perderam na leitura. Grava as curvas de nível como LWPOLYLINE, ou a superfície como 3DFACE.',
     )
   }
 

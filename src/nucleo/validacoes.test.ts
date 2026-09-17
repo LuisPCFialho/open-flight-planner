@@ -166,7 +166,7 @@ describe('colisao entre waypoints', () => {
 
     const colisao = comId(validacoes, 'colisao-troco')
     expect(colisao?.severidade).toBe('erro')
-    expect(colisao?.detalhe).toContain('Folga minima')
+    expect(colisao?.detalhe).toContain('Folga mínima')
   })
 
   it('distingue passar rente de passar por baixo do terreno', () => {

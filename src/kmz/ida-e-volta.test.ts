@@ -289,6 +289,6 @@ describe('ficheiro truncado', () => {
 
     expect(lida.waypoints).toHaveLength(0)
     // Sem isto a rota ficava calada no Golfo da Guine.
-    expect(avisos.join(' ')).toMatch(/sem posicao conhecida|nao traz waypoints/)
+    expect(avisos.join(' ')).toMatch(/sem posição conhecida|não traz waypoints/)
   })
 })

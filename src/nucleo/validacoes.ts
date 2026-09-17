@@ -112,7 +112,7 @@ function validarAlturaAcimaDoSolo(rota: Rota, contexto: ContextoValidacao): Vali
       id: 'agl-baixo',
       severidade: 'erro',
       titulo: `${baixos.length} waypoint${baixos.length === 1 ? '' : 's'} abaixo de ${minimo} m do solo`,
-      detalhe: `O mais baixo e o ${pior.indice + 1}, a ${pior.agl.toFixed(0)} m acima do terreno.`,
+      detalhe: `O mais baixo é o ${pior.indice + 1}, a ${pior.agl.toFixed(0)} m acima do terreno.`,
       waypoints: baixos.map((b) => b.indice),
     })
   }
@@ -123,7 +123,7 @@ function validarAlturaAcimaDoSolo(rota: Rota, contexto: ContextoValidacao): Vali
       id: 'agl-alto',
       severidade: 'erro',
       titulo: `${altos.length} waypoint${altos.length === 1 ? '' : 's'} acima de ${AGL_MAXIMO} m do solo`,
-      detalhe: `O mais alto e o ${pior.indice + 1}, a ${pior.agl.toFixed(0)} m acima do terreno. ${AGL_MAXIMO} m e o limite regulamentar.`,
+      detalhe: `O mais alto é o ${pior.indice + 1}, a ${pior.agl.toFixed(0)} m acima do terreno. ${AGL_MAXIMO} m é o limite regulamentar.`,
       waypoints: altos.map((a) => a.indice),
     })
   }
@@ -201,7 +201,7 @@ function validarColisaoNosTrocos(rota: Rota, contexto: ContextoValidacao): Valid
         pior.folga < 0
           ? 'A rota passa por baixo do terreno entre waypoints'
           : `A rota passa a menos de ${aglMinimoDe(rota)} m do solo entre waypoints`,
-      detalhe: `Folga minima de ${pior.folga.toFixed(0)} m aos ${pior.distancia.toFixed(0)} m de percurso. Os waypoints podem estar folgados e o troco entre eles nao.`,
+      detalhe: `Folga mínima de ${pior.folga.toFixed(0)} m aos ${pior.distancia.toFixed(0)} m de percurso. Os waypoints podem estar folgados e o troço entre eles não.`,
     },
   ]
 }
@@ -227,7 +227,7 @@ function validarAfastamento(rota: Rota): Validacao[] {
       id: 'afastamento',
       severidade: 'aviso',
       titulo: `A rota afasta-se ${maxima.toFixed(0)} m do ponto de descolagem`,
-      detalhe: `O waypoint ${indice + 1} e o mais distante. Acima de ${DISTANCIA_AVISO} m ja e dificil manter o aparelho a vista.`,
+      detalhe: `O waypoint ${indice + 1} é o mais distante. Acima de ${DISTANCIA_AVISO} m já é difícil manter o aparelho à vista.`,
       waypoints: [indice],
     },
   ]
@@ -249,7 +249,7 @@ function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
       id: 'velocidade-global-invalida',
       severidade: 'erro',
       titulo: 'A velocidade global da rota não é voável',
-      detalhe: `Esta a ${rota.velocidadeGlobal} m/s. Tem de ser maior do que zero.`,
+      detalhe: `Está a ${rota.velocidadeGlobal} m/s. Tem de ser maior do que zero.`,
     })
   }
 
@@ -258,7 +258,7 @@ function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
     validacoes.push({
       id: 'velocidade-waypoint-invalida',
       severidade: 'erro',
-      titulo: `${parados.length} waypoint${parados.length === 1 ? '' : 's'} com velocidade nao voavel`,
+      titulo: `${parados.length} waypoint${parados.length === 1 ? '' : 's'} com velocidade não voável`,
       detalhe: 'A velocidade própria de um waypoint tem de ser maior do que zero.',
       waypoints: parados.map((w) => w.index),
     })
@@ -274,7 +274,7 @@ function validarVelocidades(rota: Rota, drone: Drone): Validacao[] {
         titulo: `Velocidade acima dos ${maxima} m/s do ${drone.nome}`,
         detalhe:
           rapidos.length > 0
-            ? `Afecta ${rapidos.length} waypoint${rapidos.length === 1 ? '' : 's'}.`
+            ? `Afeta ${rapidos.length} waypoint${rapidos.length === 1 ? '' : 's'}.`
             : 'A velocidade global da rota está acima do máximo do aparelho.',
         ...(rapidos.length > 0 ? { waypoints: rapidos.map((w) => w.index) } : {}),
       })
@@ -331,7 +331,7 @@ function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
         id: 'autonomia-desconhecida',
         severidade: 'aviso',
         titulo: 'Autonomia do drone por confirmar',
-        detalhe: `A duracao da rota nao foi comparada com nada porque a autonomia do ${drone.nome} ainda nao foi preenchida.`,
+        detalhe: `A duração da rota não foi comparada com nada porque a autonomia do ${drone.nome} ainda não foi preenchida.`,
       },
     ]
   }
@@ -347,7 +347,7 @@ function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
       id: 'autonomia',
       severidade: 'erro',
       titulo: 'A rota não cabe na autonomia',
-      detalhe: `Estimam-se ${formatarDuracao(duracao)} de voo, contando a ida ao primeiro ponto e o regresso, e a margem prudente para o ${drone.nome} sao ${formatarDuracao(limite)}, ou seja ${Math.round(MARGEM_AUTONOMIA * 100)}% de ${autonomia} minutos.`,
+      detalhe: `Estimam-se ${formatarDuracao(duracao)} de voo, contando a ida ao primeiro ponto e o regresso, e a margem prudente para o ${drone.nome} são ${formatarDuracao(limite)}, ou seja ${Math.round(MARGEM_AUTONOMIA * 100)}% de ${autonomia} minutos.`,
     },
   ]
 }
@@ -361,8 +361,8 @@ function validarAccoes(rota: Rota, drone: Drone): Validacao[] {
     {
       id: 'accoes-nao-suportadas',
       severidade: 'erro',
-      titulo: `O ${drone.nome} nao suporta ${tipos.join(', ')}`,
-      detalhe: `Afecta ${problemas.length} accao${problemas.length === 1 ? '' : 'es'}. Troca de drone ou remove as accoes.`,
+      titulo: `O ${drone.nome} não suporta ${tipos.join(', ')}`,
+      detalhe: `Afeta ${problemas.length} ação${problemas.length === 1 ? '' : 'ões'}. Troca de drone ou remove as ações.`,
       waypoints: [...new Set(problemas.map((p) => p.indiceWaypoint))],
     },
   ]
@@ -378,7 +378,7 @@ function validarFotos(rota: Rota, contexto: ContextoValidacao): Validacao[] {
     {
       id: 'sem-foto',
       severidade: 'aviso',
-      titulo: `${semFoto.length} waypoint${semFoto.length === 1 ? '' : 's'} sem accao de foto`,
+      titulo: `${semFoto.length} waypoint${semFoto.length === 1 ? '' : 's'} sem ação de foto`,
       detalhe: 'Numa rota de registo fotográfico cada ponto costuma ter a sua foto.',
       waypoints: semFoto.map((w) => w.index),
     },
@@ -393,7 +393,7 @@ function validarPOIs(rota: Rota): Validacao[] {
     {
       id: 'poi-perdido',
       severidade: 'erro',
-      titulo: `${perdidos.length} waypoint${perdidos.length === 1 ? '' : 's'} a apontar a um POI que nao existe`,
+      titulo: `${perdidos.length} waypoint${perdidos.length === 1 ? '' : 's'} a apontar a um POI que não existe`,
       detalhe: 'O ficheiro sairia com um ponto de interesse inválido.',
       waypoints: perdidos,
     },

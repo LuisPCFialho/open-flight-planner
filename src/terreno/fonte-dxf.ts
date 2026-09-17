@@ -78,14 +78,14 @@ export class FonteTerrenoDXF implements FonteTerreno {
 
   async cota(lat: number, lon: number): Promise<number> {
     const valor = this.cotaSincrona(lat, lon)
-    if (valor === null) throw new Error('o ponto esta fora da area do levantamento topografico')
+    if (valor === null) throw new Error('o ponto está fora da área do levantamento topográfico')
     return valor
   }
 
   async perfil(pontos: readonly LatLon[], passo: number): Promise<number[]> {
     return amostrarPercurso(pontos, passo).map((ponto) => {
       const valor = this.cotaSincrona(ponto.lat, ponto.lon)
-      if (valor === null) throw new Error('o percurso sai da area do levantamento topografico')
+      if (valor === null) throw new Error('o percurso sai da área do levantamento topográfico')
       return valor
     })
   }

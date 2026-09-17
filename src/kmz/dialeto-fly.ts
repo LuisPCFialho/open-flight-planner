@@ -204,7 +204,7 @@ function parametrosGuinada(
    */
   if (waypoint.modoGuinada === 'towardPOI' && !poi) {
     throw new Error(
-      `o waypoint ${waypoint.index + 1} aponta a um ponto de interesse que nao existe na rota`,
+      `o waypoint ${waypoint.index + 1} aponta a um ponto de interesse que não existe na rota`,
     )
   }
 

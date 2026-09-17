@@ -35,18 +35,18 @@ export class DocumentoInvalido extends Error {}
 
 function lerJSON(conteudo: unknown, onde: string): Record<string, unknown> {
   if (typeof conteudo !== 'string') {
-    throw new DocumentoInvalido(`o conteudo de ${onde} nao e texto`)
+    throw new DocumentoInvalido(`o conteúdo de ${onde} não é texto`)
   }
 
   let lido: unknown
   try {
     lido = JSON.parse(conteudo)
   } catch {
-    throw new DocumentoInvalido(`o conteudo de ${onde} nao e JSON valido`)
+    throw new DocumentoInvalido(`o conteúdo de ${onde} não é JSON válido`)
   }
 
   if (typeof lido !== 'object' || lido === null || Array.isArray(lido)) {
-    throw new DocumentoInvalido(`o conteudo de ${onde} nao e um objecto`)
+    throw new DocumentoInvalido(`o conteúdo de ${onde} não é um objecto`)
   }
   return lido as Record<string, unknown>
 }

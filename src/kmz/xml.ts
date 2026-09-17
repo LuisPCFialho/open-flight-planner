@@ -72,7 +72,7 @@ export function decimal(valor: number, casas: number): string {
  * escreve: `-8.41066700000000`, `40.7465720000000`.
  */
 export function coordenada(valor: number): string {
-  if (!Number.isFinite(valor)) throw new Error(`coordenada invalida para WPML: ${valor}`)
+  if (!Number.isFinite(valor)) throw new Error(`coordenada inválida para WPML: ${valor}`)
   return valor.toPrecision(15)
 }
 

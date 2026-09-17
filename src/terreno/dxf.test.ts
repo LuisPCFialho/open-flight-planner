@@ -154,7 +154,7 @@ describe('cotas a partir da topografia', () => {
     const longe = ptTm06ParaWgs84({ x: base.x + 5000, y: base.y })
     expect(fonte.cotaSincrona(longe.lat, longe.lon)).toBeNull()
     expect(fonte.cobre(longe.lat, longe.lon)).toBe(false)
-    await expect(fonte.cota(longe.lat, longe.lon)).rejects.toThrow(/fora da area/)
+    await expect(fonte.cota(longe.lat, longe.lon)).rejects.toThrow(/fora da área/)
   })
 })
 

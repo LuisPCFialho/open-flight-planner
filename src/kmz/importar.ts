@@ -72,7 +72,7 @@ export function importarKMZ(
   }
 
   const pasta = filho(documento, 'Folder')
-  if (!pasta) throw new Error('waylines.wpml sem Folder: nao ha percurso para ler')
+  if (!pasta) throw new Error('waylines.wpml sem Folder: não há percurso para ler')
 
   const modoAltura = textoEm(pasta, 'wpml:executeHeightMode') ?? 'relativeToStartPoint'
   const pois: POI[] = []
@@ -147,7 +147,7 @@ function lerPontoDescolagem(
     // Sem waypoints e sem `takeOffRefPoint` nao ha de onde tirar a descolagem, e
     // o zero por omissao poe a rota no Golfo da Guine sem ninguem dar por isso.
     avisos.push(
-      'o ficheiro nao traz waypoints nem ponto de descolagem: a rota fica sem posicao conhecida',
+      'o ficheiro não traz waypoints nem ponto de descolagem: a rota fica sem posição conhecida',
     )
     return { lat: 0, lon: 0, cotaTerreno: null }
   }
@@ -222,7 +222,7 @@ function lerWaypoint(placemark: NoLido, ordem: number, pois: POI[], avisos: stri
     if (poi) waypoint.poiId = poi.id
     else {
       waypoint.modoGuinada = 'followWayline'
-      avisos.push(`waypoint ${ordem}: aponta a um POI mas o ficheiro nao traz as coordenadas`)
+      avisos.push(`waypoint ${ordem}: aponta a um POI mas o ficheiro não traz as coordenadas`)
     }
   }
 
@@ -276,7 +276,7 @@ function lerAccoes(placemark: NoLido, ordem: number, avisos: string[]): Accao[] 
       const funcao = textoEm(elemento, 'wpml:actionActuatorFunc') ?? ''
       const tipo = ACCAO_DE[funcao]
       if (!tipo) {
-        avisos.push(`waypoint ${ordem}: accao desconhecida "${funcao}", ignorada`)
+        avisos.push(`waypoint ${ordem}: ação desconhecida "${funcao}", ignorada`)
         continue
       }
 

@@ -109,7 +109,7 @@ describe('troca em JSON', () => {
 
   it('recusa uma versao mais recente do que sabe ler', () => {
     const futuro = { ...paraFicheiro(conteudo), versao: 99 }
-    expect(() => deFicheiro(futuro)).toThrow(/versao 99/)
+    expect(() => deFicheiro(futuro)).toThrow(/versão 99/)
   })
 
   it('recusa waypoints sem coordenadas, dizendo qual', () => {
@@ -127,7 +127,7 @@ describe('troca em JSON', () => {
 
   it('recusa um projeto sem nome', () => {
     const semNome = { ...paraFicheiro(conteudo), projeto: { ...conteudo.projeto, nome: '  ' } }
-    expect(() => deFicheiro(semNome)).toThrow(/nao tem nome/)
+    expect(() => deFicheiro(semNome)).toThrow(/não tem nome/)
   })
 
   it('preenche os campos em falta com o que uma rota nova teria', () => {
