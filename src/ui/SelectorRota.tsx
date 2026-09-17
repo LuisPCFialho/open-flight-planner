@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import type { Rota } from '../nucleo/tipos.ts'
-import { bd } from '../dados/bd.ts'
+import { armazem } from '../dados/armazem.ts'
+import { useConsulta } from '../dados/useConsulta.ts'
 import { IconeEliminar } from './icones.tsx'
 
 /**
@@ -26,8 +26,16 @@ type Props = {
 export function SelectorRota({ rota, aoAbrir, aoCriar, aoDuplicar, aoApagar, aoRenomear }: Props) {
   const [aRenomear, setARenomear] = useState(false)
 
-  const rotas = useLiveQuery(
-    () => bd.rotas.where('projetoId').equals(rota.projetoId).sortBy('nome'),
+  /*
+   * A ordenacao por nome passou a ser feita aqui.
+   *
+   * O `sortBy` do Dexie ordenava na base; o armazem remoto ordena por data e
+   * nao por nome, e pedir-lhe as duas coisas era acrescentar um indice para uma
+   * lista de meia duzia de linhas. Ordenar aqui da o mesmo resultado nos dois.
+   */
+  const { dados: rotas } = useConsulta(
+    async () =>
+      (await armazem.listarRotas(rota.projetoId)).sort((a, b) => a.nome.localeCompare(b.nome)),
     [rota.projetoId],
   )
 

@@ -29,6 +29,10 @@ Para levar o que já existe: no ecrã de projetos, **Exportar JSON** de cada
 projeto antes, e **Importar JSON** depois, já no sítio novo. É o mesmo problema
 que se tem ao mudar de computador, e é a mesma solução.
 
+É também o problema que as contas resolvem de vez: com o armazém remoto ligado,
+os projetos vivem numa conta em vez de num browser, e seguem-na de computador
+para computador. Ver [contas](contas.md).
+
 ### Fica acessível a quem tiver o endereço
 
 Um deploy do Vercel é público por omissão. Um planeador de voo com os perímetros

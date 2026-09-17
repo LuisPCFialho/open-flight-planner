@@ -7,7 +7,10 @@ Browser-based waypoint planner for DJI drones. Plans a survey, follows the
 terrain, and exports a `.kmz` that **DJI Fly and DJI Pilot 2 accept directly** —
 no conversion step, no cloud account, no subscription.
 
-Everything runs in the browser. Your routes never leave the machine.
+Everything runs in the browser. By default your routes never leave the machine —
+there is no backend and no account. Optionally, they can live in an account
+instead, so they follow you between computers and each person sees only their
+own; see [accounts](docs/contas.md).
 
 **[Open it](https://open-flight-planner.vercel.app)** — nothing to install, no
 account. The routes you make there stay in that browser.
@@ -103,7 +106,19 @@ Deploying to a static host is one step — see [docs/alojamento.md](docs/alojame
 
 ## How it is built
 
-TypeScript, React 19, MapLibre GL, Dexie (IndexedDB). No backend.
+TypeScript, React 19, MapLibre GL. No backend of its own.
+
+Storage sits behind one small interface with two implementations: **IndexedDB**,
+which is what this repository does by default and needs no configuration, and
+**Postgres with one account per person**, which switches on when two environment
+variables are present. The second exists because the published site has to
+outlive a browser profile; the first exists because `npm install && npm run dev`
+has to be enough for anyone who clones this.
+
+Nothing in the client filters rows by owner. That is done by row-level security
+in [`supabase/esquema.sql`](supabase/esquema.sql), because the key the browser
+carries is readable by whoever opens the developer tools — a filter in the
+client would be decoration.
 
 The drone on the map is drawn in code — 1500 triangles, original geometry, built
 from published dimensions. No third-party model is bundled.

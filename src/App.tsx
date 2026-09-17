@@ -48,15 +48,7 @@ import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
 import { descarregarTexto, nomeSeguro } from './descarregar.ts'
 import { envolvente } from './nucleo/areas.ts'
-import {
-  apagarRota,
-  bd,
-  criarRota,
-  gravarTrocos,
-  duplicarRota,
-  gravarRota,
-  renomearRota,
-} from './dados/bd.ts'
+import { armazem } from './dados/armazem.ts'
 import { droneComId } from './drones.ts'
 import { Mapa } from './mapa/Mapa.tsx'
 import { LeituraCursor, useCanalCursor } from './ui/LeituraCursor.tsx'
@@ -218,7 +210,7 @@ export function App() {
    * Sem a gravacao a pedido, trocar de rota dentro da folga perdia a ultima
    * edicao sem uma palavra. O detalhe esta em `usePersistencia`.
    */
-  const { gravarPendente, esquecerPendente } = usePersistenciaDaRota(rota, gravarRota)
+  const { gravarPendente, esquecerPendente } = usePersistenciaDaRota(rota, armazem.gravarRota)
 
   // --- cotas do terreno -----------------------------------------------------
   const posicoes = useMemo(() => {
@@ -583,14 +575,14 @@ export function App() {
               setRotaAberta(id)
             }}
             aoRenomear={(nome) => {
-              tentar(renomearRota(rota.id, nome))
+              tentar(armazem.renomearRota(rota.id, nome))
               editor.alterarRota({ nome })
             }}
             aoCriar={() => {
               gravarPendente()
               voo.parar()
               tentar(
-                criarRota({
+                armazem.criarRota({
                   nome: `Rota ${new Date().toLocaleDateString('pt-PT')}`,
                   projetoId: rota.projetoId,
                   droneId: rota.droneId,
@@ -605,7 +597,7 @@ export function App() {
             aoDuplicar={() => {
               gravarPendente()
               voo.parar()
-              tentar(duplicarRota(rota.id), (copia) => {
+              tentar(armazem.duplicarRota(rota.id), (copia) => {
                 seleccao.limpar()
                 setRotaAberta(copia.id)
               })
@@ -616,9 +608,9 @@ export function App() {
               esquecerPendente()
               voo.parar()
               tentar(
-                apagarRota(rota.id).then(() =>
-                  bd.rotas.where('projetoId').equals(rota.projetoId).toArray(),
-                ),
+                armazem
+                  .apagarRota(rota.id)
+                  .then(() => armazem.listarRotas(rota.projetoId)),
                 (restantes) => {
                   seleccao.limpar()
                   setRotaAberta(restantes[0]?.id ?? null)
@@ -684,7 +676,7 @@ export function App() {
               onClick={() => {
                 gravarPendente()
                 voo.parar()
-                tentar(gravarTrocos(divisao.trocos), (novas) => {
+                tentar(armazem.gravarTrocos(divisao.trocos), (novas) => {
                   seleccao.limpar()
                   const primeira = novas[0]
                   if (primeira) setRotaAberta(primeira.id)

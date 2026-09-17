@@ -2,6 +2,9 @@ node_modules/
 dist/
 .npm-cache/
 *.local
+# `*.local` ja apanha o `.env.local`. Este e para o `.env` sem sufixo, que e
+# onde uma chave a serio acaba por ir parar quando se tem pressa.
+.env
 .DS_Store
 sqlite_mcp_server.db
 iniciar.log

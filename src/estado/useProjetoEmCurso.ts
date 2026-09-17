@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { LatLon, Rota } from '../nucleo/tipos.ts'
 import { rotaVazia } from '../nucleo/operacoes-rota.ts'
-import { criarProjeto, gravarRota, listarProjetos, listarRotas } from '../dados/bd.ts'
+import { armazem } from '../dados/armazem.ts'
 import type { FonteTerreno } from '../terreno/fonte.ts'
 
 /**
@@ -37,13 +37,13 @@ export function useProjetoEmCurso(opcoes: {
     let cancelado = false
 
     const iniciar = async (): Promise<void> => {
-      const projetos = await listarProjetos()
+      const projetos = await armazem.listarProjetos()
       const projeto =
         projetos.find((p) => p.id === projetoAberto) ??
         projetos[0] ??
-        (await criarProjeto({ nome: 'Projeto sem nome' }))
+        (await armazem.criarProjeto({ nome: 'Projeto sem nome' }))
 
-      const rotas = await listarRotas(projeto.id)
+      const rotas = await armazem.listarRotas(projeto.id)
       const aAbrir = rotaAAbrir(rotas, rotaAberta)
 
       if (aAbrir) {
@@ -69,7 +69,7 @@ export function useProjetoEmCurso(opcoes: {
        * pela primeira vez.
        */
       if (cancelado) return
-      await gravarRota(nova)
+      await armazem.gravarRota(nova)
       if (cancelado) return
       carregar(nova)
       aoAbrirRota(nova.id)

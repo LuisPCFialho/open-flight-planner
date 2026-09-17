@@ -8,22 +8,22 @@ import { SelectorRota } from './SelectorRota.tsx'
 /**
  * Escolher a rota dentro do projeto.
  *
- * O que aqui importa nao e a consulta a base de dados - essa e do Dexie e ja se
- * verifica noutro sitio. E o resto: qual a rota que fica escolhida, quando e que
- * apagar esta ao alcance, e o que a pergunta de confirmacao diz. Apagar nao tem
- * desfazer, e e a unica coisa nesta ferramenta que nao tem.
+ * O que aqui importa nao e a consulta ao armazem - essa verifica-se noutro
+ * sitio, e ha dois armazens. E o resto: qual a rota que fica escolhida, quando e
+ * que apagar esta ao alcance, e o que a pergunta de confirmacao diz. Apagar nao
+ * tem desfazer, e e a unica coisa nesta ferramenta que nao tem.
  */
 
 /*
- * A consulta a base de dados e substituida.
+ * A consulta ao armazem e substituida.
  *
  * Levantar uma IndexedDB de mentira so para o componente listar nomes trocava um
- * teste do componente por um teste do Dexie, mais lento e a dizer menos.
+ * teste do componente por um teste do armazem, mais lento e a dizer menos.
  */
 const rotasDoProjeto = vi.hoisted(() => ({ actual: undefined as Rota[] | undefined }))
 
-vi.mock('dexie-react-hooks', () => ({
-  useLiveQuery: () => rotasDoProjeto.actual,
+vi.mock('../dados/useConsulta.ts', () => ({
+  useConsulta: () => ({ dados: rotasDoProjeto.actual, erro: null }),
 }))
 
 const DESCOLAGEM = { lat: 40.746552, lon: -8.41061, cotaTerreno: 356 }

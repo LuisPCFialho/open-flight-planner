@@ -1850,3 +1850,143 @@ button,
   margin: 0;
   text-align: right;
 }
+
+/* --- entrada e conta -------------------------------------------------------- */
+
+.ecra-arranque,
+.ecra-entrada {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 24px;
+}
+
+.ecra-arranque {
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.cartao-entrada {
+  width: 100%;
+  max-width: 380px;
+  background: var(--fundo-painel);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 24px;
+}
+
+.cartao-entrada h1 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.cartao-entrada .subtitulo {
+  margin: 6px 0 20px;
+  font-size: 12px;
+  color: var(--texto-suave);
+  line-height: 1.5;
+}
+
+.cartao-entrada form {
+  display: grid;
+  gap: 6px;
+}
+
+.cartao-entrada label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.cartao-entrada input {
+  background: var(--fundo);
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.cartao-entrada input:focus {
+  outline: none;
+  border-color: var(--destaque);
+}
+
+.cartao-entrada button.principal {
+  margin-top: 8px;
+  padding: 8px;
+  justify-content: center;
+}
+
+.entrada-enviada p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.entrada-enviada .nota {
+  color: var(--texto-suave);
+}
+
+/*
+ * Um botao com aspecto de ligacao.
+ *
+ * E um botao e nao um `<a>` de proposito: nao navega para lado nenhum, e um
+ * `href="#"` poe o endereco a mudar e o teclado a tratar disto como navegacao.
+ */
+button.ligacao {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--destaque);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.conta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  padding-right: 8px;
+  border-right: 1px solid var(--borda);
+}
+
+.conta-email {
+  font-size: 11px;
+  color: var(--texto-suave);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aviso-migracao {
+  margin: 14px 14px 0;
+  padding: 12px 14px;
+  background: var(--fundo-painel);
+  border: 1px solid var(--borda-forte);
+  border-left: 3px solid var(--destaque);
+  border-radius: var(--raio);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.aviso-migracao p {
+  margin: 0;
+}
+
+.aviso-migracao-accoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.aviso-migracao .erro {
+  margin-top: 8px;
+  color: var(--alerta);
+}

@@ -1,17 +1,11 @@
 import { descarregarTexto, nomeSeguro } from '../descarregar.ts'
 import { useRef, useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import type { Projeto } from '../nucleo/tipos.ts'
-import { bd, criarProjeto, apagarProjeto } from '../dados/bd.ts'
-import {
-  deFicheiro,
-  duplicarProjeto,
-  gravarProjetoImportado,
-  lerProjetoComRotas,
-  paraFicheiro,
-  renomearProjeto,
-  FicheiroInvalido,
-} from '../dados/projetos.ts'
+import { armazem } from '../dados/armazem.ts'
+import { useConsulta } from '../dados/useConsulta.ts'
+import { deFicheiro, paraFicheiro, FicheiroInvalido } from '../dados/projetos.ts'
+import { useSessao } from '../dados/sessao.ts'
+import { AvisoProjetosLocais } from './AvisoProjetosLocais.tsx'
 import { IconeCarregar, IconeDescarregar, IconeEliminar } from './icones.tsx'
 
 /**
@@ -30,19 +24,12 @@ export function EcraProjetos({ aoAbrir }: Props) {
   const entrada = useRef<HTMLInputElement>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [aRenomear, setARenomear] = useState<string | null>(null)
+  const sessao = useSessao()
 
-  const linhas = useLiveQuery(async () => {
-    const projetos = await bd.projetos.orderBy('criadoEm').reverse().toArray()
-    return Promise.all(
-      projetos.map(async (projeto) => ({
-        projeto,
-        rotas: await bd.rotas.where('projetoId').equals(projeto.id).count(),
-      })),
-    )
-  }, [])
+  const { dados: linhas, erro: erroDaLista } = useConsulta(() => armazem.listarResumos(), [])
 
   const exportar = async (projeto: Projeto): Promise<void> => {
-    const conteudo = await lerProjetoComRotas(projeto.id)
+    const conteudo = await armazem.lerProjetoComRotas(projeto.id)
     if (!conteudo) return
 
     descarregarTexto(
@@ -55,7 +42,7 @@ export function EcraProjetos({ aoAbrir }: Props) {
   const importar = async (ficheiro: File): Promise<void> => {
     try {
       const conteudo = deFicheiro(JSON.parse(await ficheiro.text()))
-      await gravarProjetoImportado(conteudo)
+      await armazem.gravarProjetoImportado(conteudo)
       setErro(null)
     } catch (causa: unknown) {
       setErro(
@@ -72,7 +59,17 @@ export function EcraProjetos({ aoAbrir }: Props) {
         <h1>Projetos</h1>
         <span />
         <div className="accoes-superiores">
-          <button type="button" onClick={() => void criarProjeto({ nome: 'Projeto sem nome' })}>
+          {sessao.estado === 'dentro' ? (
+            <span className="conta">
+              <span className="conta-email" title="Só tu vês estes projetos">
+                {sessao.email}
+              </span>
+              <button type="button" onClick={() => void sessao.sair()}>
+                Sair
+              </button>
+            </span>
+          ) : null}
+          <button type="button" onClick={() => void armazem.criarProjeto({ nome: 'Projeto sem nome' })}>
             Novo projeto
           </button>
           <button type="button" onClick={() => entrada.current?.click()}>
@@ -93,11 +90,17 @@ export function EcraProjetos({ aoAbrir }: Props) {
         </div>
       </header>
 
-      {erro ? <p className="aviso-ficheiro erro estatico">{erro}</p> : null}
+      <AvisoProjetosLocais />
+
+      {erro ?? erroDaLista ? (
+        <p className="aviso-ficheiro erro estatico">{erro ?? erroDaLista}</p>
+      ) : null}
 
       <div className="lista-projetos">
         {linhas === undefined ? (
-          <p className="vazio">A abrir a base de dados local...</p>
+          <p className="vazio">
+            {armazem.remoto ? 'A ler os teus projetos...' : 'A abrir a base de dados local...'}
+          </p>
         ) : linhas.length === 0 ? (
           <p className="vazio">
             Ainda não há projetos. Cria um, ou importa um JSON exportado noutro posto.
@@ -123,7 +126,7 @@ export function EcraProjetos({ aoAbrir }: Props) {
                         autoFocus
                         defaultValue={projeto.nome}
                         onBlur={(e) => {
-                          void renomearProjeto(projeto.id, { nome: e.target.value.trim() || projeto.nome })
+                          void armazem.renomearProjeto(projeto.id, { nome: e.target.value.trim() || projeto.nome })
                           setARenomear(null)
                         }}
                         onKeyDown={(e) => {
@@ -141,14 +144,14 @@ export function EcraProjetos({ aoAbrir }: Props) {
                     <input
                       defaultValue={projeto.cliente}
                       placeholder="cliente"
-                      onBlur={(e) => void renomearProjeto(projeto.id, { cliente: e.target.value })}
+                      onBlur={(e) => void armazem.renomearProjeto(projeto.id, { cliente: e.target.value })}
                     />
                   </td>
                   <td>
                     <input
                       defaultValue={projeto.local}
                       placeholder="local"
-                      onBlur={(e) => void renomearProjeto(projeto.id, { local: e.target.value })}
+                      onBlur={(e) => void armazem.renomearProjeto(projeto.id, { local: e.target.value })}
                     />
                   </td>
                   <td className="numerico">{rotas}</td>
@@ -161,7 +164,7 @@ export function EcraProjetos({ aoAbrir }: Props) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => void duplicarProjeto(projeto.id)}
+                      onClick={() => void armazem.duplicarProjeto(projeto.id)}
                       title="Duplicar com todas as rotas"
                     >
                       Duplicar
@@ -177,7 +180,7 @@ export function EcraProjetos({ aoAbrir }: Props) {
                           rotas > 0
                             ? `Apagar "${projeto.nome}" leva ${rotas} rota${rotas === 1 ? '' : 's'}. Não há desfazer.`
                             : `Apagar "${projeto.nome}"?`
-                        if (window.confirm(aviso)) void apagarProjeto(projeto.id)
+                        if (window.confirm(aviso)) void armazem.apagarProjeto(projeto.id)
                       }}
                     >
                       <IconeEliminar />
