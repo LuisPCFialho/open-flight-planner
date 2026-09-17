@@ -1,0 +1,19 @@
+# O repositorio tem ficheiros com fins de linha dos dois tipos, herdados de ter
+# nascido em Windows. O `.gitattributes` normaliza o que entra no historico;
+# isto trata do que sai do editor, para nao voltarem a misturar-se.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# Duas espacos no fim de uma linha sao uma quebra em markdown.
+trim_trailing_whitespace = false
+
+[*.ps1]
+end_of_line = crlf

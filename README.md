@@ -91,6 +91,11 @@ npm run build
 npm run preview
 ```
 
+On Windows, `iniciar.ps1` serves the built bundle on the same port as the dev
+server and opens it — a desktop shortcut can point at it. The port has to
+match: routes live in IndexedDB, which is per origin, so another port opens
+the app empty as if the work had been lost.
+
 Deploying to a static host is one step — see [docs/alojamento.md](docs/alojamento.md).
 
 ## How it is built
