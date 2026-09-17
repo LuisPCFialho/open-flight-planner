@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Parcela de ensaio: um rectangulo de 400 por 300 metros perto de Sever do Vouga.
+
+  Desenhada a mao e de proposito simples. O percurso de ponta a ponta nao esta a
+  verificar geometria - isso e o que os testes de unidade da cobertura fazem, e
+  fazem-no melhor. Aqui so tem de ser um limite que se importe e se cubra.
+-->
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Parcela de ensaio</name>
+    <Placemark>
+      <name>Limite</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              -8.410610,40.746552,0
+              -8.405870,40.746552,0
+              -8.405870,40.749265,0
+              -8.410610,40.749265,0
+              -8.410610,40.746552,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

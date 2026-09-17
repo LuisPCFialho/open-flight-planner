@@ -7,3 +7,5 @@ sqlite_mcp_server.db
 iniciar.log
 preview-teste.log
 coverage
+test-results
+playwright-report
