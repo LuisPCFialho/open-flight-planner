@@ -279,3 +279,45 @@ describe('forma da fuselagem', () => {
     expect(pes.some((p) => p.y < -0.05)).toBe(true)
   })
 })
+
+describe('o nariz do aparelho le-se de cima', () => {
+  /*
+   * Um quadricoptero visto de cima e quase simetrico a quatro voltas: rodado
+   * noventa graus fica com a mesma silhueta. Sem uma marca que distinga a
+   * frente, o aparelho roda no mapa e ninguem da por isso - e foi exactamente
+   * essa a queixa.
+   *
+   * As pontas das pas da frente sao quentes e as de tras frias. Estes ensaios
+   * pinam isso: sem eles, a proxima mexida nas cores volta a por as quatro
+   * iguais e ninguem se lembra porque e que nao podiam ser.
+   */
+  const pontas = (quente: boolean): number[] => {
+    const ys: number[] = []
+    for (let i = 0; i < malha.cores.length / 4; i++) {
+      const [r, , b] = [malha.cores[i * 4] ?? 0, 0, malha.cores[i * 4 + 2] ?? 0]
+      const alfa = malha.cores[i * 4 + 3] ?? 1
+      // As pas sao as unicas superficies com alfa abaixo de um.
+      if (alfa >= 1) continue
+      const eQuente = r > 0.9 && b < 0.3
+      const eFria = b > 0.9 && r < 0.5
+      if (quente ? eQuente : eFria) ys.push(malha.posicoes[i * 3 + 1] ?? 0)
+    }
+    return ys
+  }
+
+  it('as pontas quentes existem, e estao todas a frente', () => {
+    const frente = pontas(true)
+    expect(frente.length).toBeGreaterThan(0)
+    expect(Math.min(...frente)).toBeGreaterThan(0)
+  })
+
+  it('as pontas frias existem, e estao todas atras', () => {
+    const tras = pontas(false)
+    expect(tras.length).toBeGreaterThan(0)
+    expect(Math.max(...tras)).toBeLessThan(0)
+  })
+
+  it('sao tantas de um lado como do outro: dois motores a frente, dois atras', () => {
+    expect(pontas(true).length).toBe(pontas(false).length)
+  })
+})

@@ -55,8 +55,21 @@ const CINZENTO_ESCURO: Cor = [0.22, 0.24, 0.27, 1]
 const PRETO: Cor = [0.09, 0.1, 0.12, 1]
 const VIDRO: Cor = [0.14, 0.22, 0.34, 1]
 const HELICE: Cor = [0.17, 0.18, 0.2, 0.92]
-/** Ponta da pa. Alfa abaixo de um, como o resto da pa: e assim que os testes as separam. */
-const PONTA_HELICE: Cor = [1, 0.62, 0.12, 0.92]
+/**
+ * Pontas das pas: as da frente cor de laranja, as de tras azuis.
+ *
+ * Nao e enfeite. Um quadricoptero visto de cima e quase simetrico a quatro
+ * voltas: rodado noventa graus fica com a mesma silhueta, e a unica coisa que
+ * diz onde e a frente e a camara do gimbal, que a escala do mapa sao dois ou
+ * tres pixeis. O aparelho rodava e ninguem dava por isso.
+ *
+ * Duas cores frias contra duas quentes leem-se a qualquer tamanho, e e o que os
+ * proprios aparelhos fazem com os LEDs dos bracos.
+ *
+ * Alfa abaixo de um, como o resto da pa: e assim que os testes as separam.
+ */
+const PONTA_HELICE_FRENTE: Cor = [1, 0.62, 0.12, 0.92]
+const PONTA_HELICE_TRAS: Cor = [0.35, 0.72, 1, 0.92]
 /** Amarelo da seta, o mesmo do poligono de enquadramento. */
 const SETA: Cor = [0.94, 0.71, 0.16, 1]
 
@@ -404,7 +417,13 @@ function larguraDaPa(t: number): number {
  * campanula ficava um risco de fundo entre as duas, e a helice parecia colada e
  * nao encaixada.
  */
-function pa(c: Construtor, centro: Vec3, anguloBase: number, sentido: number): void {
+function pa(
+  c: Construtor,
+  centro: Vec3,
+  anguloBase: number,
+  sentido: number,
+  corPonta: Cor,
+): void {
   const passos = 6
   const raizRaio = 0.006
   const cordaMaxima = 0.0118
@@ -455,11 +474,11 @@ function pa(c: Construtor, centro: Vec3, anguloBase: number, sentido: number): v
    * longo do troco e nao num corte seco - que e como a tinta acaba numa pa a
    * serio, e o que evita um degrau visivel num modelo com tao poucos aneis.
    */
-  c.superficie(aneis, (_, anel) => (anel >= passos - 1 ? PONTA_HELICE : HELICE))
+  c.superficie(aneis, (_, anel) => (anel >= passos - 1 ? corPonta : HELICE))
   const raiz = aneis[0]
   const ponta = aneis[aneis.length - 1]
   if (raiz) c.tampa(raiz, [0, 0, 1], HELICE)
-  if (ponta) c.tampa(ponta, [0, 0, 1], PONTA_HELICE)
+  if (ponta) c.tampa(ponta, [0, 0, 1], corPonta)
 }
 
 /**
@@ -514,7 +533,13 @@ function bracoAchatado(
   if (fim) c.tampa(fim, eixo, cor)
 }
 
-function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void {
+function bracoEMotor(
+  c: Construtor,
+  mx: number,
+  my: number,
+  fase: number,
+  corPonta: Cor,
+): void {
   const anca: Vec3 = [Math.sign(mx) * 0.031, my > 0 ? 0.035 : -0.04, 0.004]
   bracoAchatado(c, anca, [mx, my, 0.005], 0.0078, 0.007, 0.0045, 0.004, BRACO)
 
@@ -530,7 +555,7 @@ function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void 
 
   // Duas pas opostas. A fase de cada motor e diferente para nao ficarem alinhadas.
   const sentido = mx * my > 0 ? 1 : -1
-  for (const volta of [0, Math.PI]) pa(c, [mx, my, 0.0298], fase + volta, sentido)
+  for (const volta of [0, Math.PI]) pa(c, [mx, my, 0.0298], fase + volta, sentido, corPonta)
 }
 
 /**
@@ -618,13 +643,13 @@ export function malhaDrone(): MalhaDrone {
   gimbalECamara(c)
   trem(c)
 
-  const motores: [number, number, number][] = [
-    [-MOTOR.x, MOTOR.frente, 0.0],
-    [MOTOR.x, MOTOR.frente, 0.8],
-    [-MOTOR.x, -MOTOR.tras, 1.7],
-    [MOTOR.x, -MOTOR.tras, 2.4],
+  const motores: [number, number, number, Cor][] = [
+    [-MOTOR.x, MOTOR.frente, 0.0, PONTA_HELICE_FRENTE],
+    [MOTOR.x, MOTOR.frente, 0.8, PONTA_HELICE_FRENTE],
+    [-MOTOR.x, -MOTOR.tras, 1.7, PONTA_HELICE_TRAS],
+    [MOTOR.x, -MOTOR.tras, 2.4, PONTA_HELICE_TRAS],
   ]
-  for (const [mx, my, fase] of motores) bracoEMotor(c, mx, my, fase)
+  for (const [mx, my, fase, corPonta] of motores) bracoEMotor(c, mx, my, fase, corPonta)
 
   return c.terminar()
 }

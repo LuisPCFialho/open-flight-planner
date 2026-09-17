@@ -155,21 +155,34 @@ export function aeronaveDoVoo(estado: EstadoVoo, alturaASL: number): DroneNoMapa
   }
 }
 
+/** Um canto do enquadramento, e se ele chegou mesmo ao terreno. */
+export type PontaDoEnquadramento = {
+  lat: number
+  lon: number
+  alt: number
+  /** `false` quando o raio nunca cortou o terreno e a ponta foi projectada. */
+  noTerreno: boolean
+}
+
 /**
- * As arestas da piramide que a camara projecta no terreno.
+ * Os quatro cantos do enquadramento, no terreno quando la chegam e na propria
+ * linha de vista quando nao chegam.
  *
- * Quatro do aparelho ate aos cantos que ele apanha, mais a base que os une.
- * Desenhada assim, ela diz duas coisas que o poligono no chao nao diz: de que
- * altura se esta a olhar, e com que inclinacao - um poligono igual pode vir de
- * um voo rasante ou de um voo alto a olhar para baixo.
+ * E a unica conta: a piramide em 3D e o poligono no chao saem os dois daqui. O
+ * poligono tinha conta propria, que exigia tres cantos no terreno, e por isso
+ * as duas figuras discordavam - com o gimbal pouco inclinado aparecia a
+ * piramide e nao aparecia a mancha, e quem estava a ver nao tinha como saber
+ * porque e que a mesma coisa umas vezes se via e outras nao.
  *
- * Com menos de tres cantos nao ha piramide: acontece quando os raios saem do
- * terreno carregado, e um triangulo solto nao quer dizer nada.
+ * Exigir que os cantos tocassem no chao era o que os fazia desaparecer
+ * precisamente nas rotas de inspeccao: com o gimbal a doze graus e um campo de
+ * visao de oitenta e quatro, os dois raios de cima apontam mais de vinte graus
+ * acima do horizonte e nunca cortam o terreno.
  */
-export function arestasDoEnquadramento(
+export function pontasDoEnquadramento(
   alvo: Alvo,
   enquadramento: Pick<Enquadramento, 'cantos' | 'centro' | 'direccoesDosCantos'> | null | undefined,
-): Segmento3D[] {
+): PontaDoEnquadramento[] {
   if (!enquadramento) return []
 
   const direccoes = enquadramento.direccoesDosCantos
@@ -178,34 +191,39 @@ export function arestasDoEnquadramento(
   /*
    * Ate onde se estende um raio que nao chega ao chao.
    *
-   * Uma vez e meia a distancia ao centro do enquadramento: assim a piramide
+   * Uma vez e meia a distancia ao centro do enquadramento: assim a figura
    * cresce com o que se esta a ver, em vez de ter um tamanho fixo que fica
    * enorme de perto e minusculo de longe. Sem centro visado - camara toda acima
    * do horizonte - usa-se uma distancia de recurso.
    */
   const alcance = enquadramento.centro ? enquadramento.centro.distancia * 1.5 : 400
 
-  const aparelho = { lat: alvo.posicao.lat, lon: alvo.posicao.lon, alt: alvo.alturaASL }
-
-  /*
-   * Cada canto vem do terreno quando o raio la chega, e da propria linha de
-   * vista quando nao chega.
-   *
-   * Exigir que os quatro tocassem no chao era o que fazia a piramide nao
-   * aparecer quase nunca: com o gimbal a doze graus e um campo de visao de
-   * oitenta e quatro, os dois raios de cima apontam mais de vinte graus acima
-   * do horizonte e nunca cortam o terreno. A figura ficava por desenhar
-   * precisamente nas rotas de inspeccao, que sao as que mais precisam dela.
-   */
-  const pontas = direccoes.map((direccao, i) => {
+  return direccoes.map((direccao, i) => {
     const canto = enquadramento.cantos[i]
     if (canto) {
-      return { lat: canto.ponto.lat, lon: canto.ponto.lon, alt: canto.cotaTerreno }
+      return { lat: canto.ponto.lat, lon: canto.ponto.lon, alt: canto.cotaTerreno, noTerreno: true }
     }
     const longe = pontoAoLongoDoRaio(alvo.posicao, alvo.alturaASL, direccao, alcance)
-    return { lat: longe.ponto.lat, lon: longe.ponto.lon, alt: longe.altura }
+    return { lat: longe.ponto.lat, lon: longe.ponto.lon, alt: longe.altura, noTerreno: false }
   })
+}
 
+/**
+ * As arestas da piramide que a camara projecta no terreno.
+ *
+ * Quatro do aparelho ate aos cantos que ele apanha, mais a base que os une.
+ * Desenhada assim, ela diz duas coisas que o poligono no chao nao diz: de que
+ * altura se esta a olhar, e com que inclinacao - um poligono igual pode vir de
+ * um voo rasante ou de um voo alto a olhar para baixo.
+ */
+export function arestasDoEnquadramento(
+  alvo: Alvo,
+  enquadramento: Pick<Enquadramento, 'cantos' | 'centro' | 'direccoesDosCantos'> | null | undefined,
+): Segmento3D[] {
+  const pontas = pontasDoEnquadramento(alvo, enquadramento)
+  if (pontas.length < 4) return []
+
+  const aparelho = { lat: alvo.posicao.lat, lon: alvo.posicao.lon, alt: alvo.alturaASL }
   const arestas: Segmento3D[] = pontas.map((ponta) => ({ de: aparelho, para: ponta }))
 
   // A base fecha-se: e ela que faz a figura ler-se como piramide e nao como leque.

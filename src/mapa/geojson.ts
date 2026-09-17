@@ -1,7 +1,7 @@
 import type { Feature, FeatureCollection } from 'geojson'
 import type { Area, LatLon, Rota } from '../nucleo/tipos.ts'
 import { contornoFechado } from '../nucleo/areas.ts'
-import type { Enquadramento } from '../nucleo/camara.ts'
+import type { PontaDoEnquadramento } from '../estado/alvo-camara.ts'
 
 /**
  * O que o mapa desenha por fontes GeoJSON: a rota em planta, as areas de
@@ -143,38 +143,46 @@ export function medicaoGeoJSON(pontos: readonly LatLon[]): FeatureCollection {
 }
 
 /**
- * O que a camara apanha, projectado no terreno.
+ * O que a camara apanha, no chao.
  *
- * E o poligono dos cantos mais os raios que vao da aeronave a cada canto e ao
- * centro. Os raios sao o que deixa perceber de onde a camara esta a olhar -
- * so com o poligono nao se distingue uma vista de cima de uma vista rasante.
+ * O poligono dos quatro cantos mais os raios que vao da aeronave a cada um e ao
+ * centro. Os raios sao o que deixa perceber de onde a camara esta a olhar - so
+ * com o poligono nao se distingue uma vista de cima de uma vista rasante.
  *
- * Com menos de tres cantos nao ha poligono nenhum: acontece quando os raios
- * saem do terreno carregado, e nesse caso vale mais nao desenhar nada do que
- * desenhar um triangulo que nao quer dizer nada.
+ * As pontas vem ja calculadas, das mesmas de que sai a piramide em 3D. Aqui
+ * havia conta propria, que exigia tres cantos assentes no terreno: com o gimbal
+ * pouco inclinado aparecia a piramide e nao aparecia a mancha, e quem estava a
+ * ver so via a mesma coisa umas vezes sim e outras nao.
+ *
+ * `completo` diz se os quatro cantos chegaram mesmo ao chao. Quando nao
+ * chegaram, o poligono nao e o que a foto cobre - e para onde ela olha, com a
+ * parte de cima a sair pelo horizonte - e o mapa desenha-o mais fraco para nao
+ * se ler como uma medicao.
  */
 export function enquadramentoGeoJSON(
-  // So os cantos e o centro interessam aqui; o resto do enquadramento e numeros
-  // que vao para a leitura no ecra, e pedi-los obrigava os testes a inventa-los.
-  enquadramento: Pick<Enquadramento, 'cantos' | 'centro'> | null | undefined,
+  pontas: readonly PontaDoEnquadramento[],
+  centro: LatLon | null | undefined,
   aeronave: LatLon | null,
 ): FeatureCollection {
-  if (!enquadramento) return VAZIO
+  if (pontas.length < 3) return VAZIO
 
-  const cantos = enquadramento.cantos.filter((c) => c !== null)
-  if (cantos.length < 3) return VAZIO
-
-  const anel = cantos.map((c) => coordenada(c.ponto))
+  const anel = pontas.map((p) => coordenada(p))
   const primeiro = anel[0]
   if (primeiro) anel.push(primeiro)
 
+  const completo = pontas.every((p) => p.noTerreno)
+
   const features: Feature[] = [
-    { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [anel] } },
+    {
+      type: 'Feature',
+      properties: { completo },
+      geometry: { type: 'Polygon', coordinates: [anel] },
+    },
   ]
 
   if (aeronave) {
-    for (const canto of cantos) features.push(linha(aeronave, canto.ponto))
-    if (enquadramento.centro) features.push(linha(aeronave, enquadramento.centro.ponto))
+    for (const ponta of pontas) features.push(linha(aeronave, ponta))
+    if (centro) features.push(linha(aeronave, centro))
   }
 
   return { type: 'FeatureCollection', features }

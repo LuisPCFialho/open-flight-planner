@@ -22,7 +22,7 @@ import {
   segmentosGeoJSON,
   trajectoCasaGeoJSON,
 } from './geojson.ts'
-import type { Enquadramento } from '../nucleo/camara.ts'
+import type { PontaDoEnquadramento } from '../estado/alvo-camara.ts'
 
 const FONTE_SEGMENTOS = 'rota-segmentos'
 const CAMADA_SEGMENTOS = 'rota-terreno'
@@ -72,8 +72,16 @@ export type PropsMapa = {
   sombreado: boolean
   /** Pontos da regua. Vazio quando nao se esta a medir. */
   medicao: readonly LatLon[]
-  /** O que a camara do waypoint seleccionado vai apanhar, projectado no terreno. */
-  enquadramento: Enquadramento | null
+  /**
+   * Os quatro cantos do que a camara apanha, ja resolvidos.
+   *
+   * Vem das mesmas contas de que sai a piramide em 3D, de proposito: tinham
+   * conta propria e discordavam - com o gimbal pouco inclinado aparecia a
+   * piramide e nao aparecia a mancha no chao.
+   */
+  pontasEnquadramento: readonly PontaDoEnquadramento[]
+  /** O ponto visado ao centro, para se desenhar o raio que la vai. */
+  centroEnquadramento: LatLon | null
   /** Arestas da piramide que a camara projecta, desenhadas a altura de voo. */
   arestasEnquadramento: readonly Segmento3D[]
   /** Posicao da aeronave em voo virtual ou no leitor, para o mapa a seguir. */
@@ -338,7 +346,15 @@ export function Mapa(props: PropsMapa) {
         type: 'fill',
         source: FONTE_ENQUADRAMENTO,
         filter: ['==', ['geometry-type'], 'Polygon'],
-        paint: { 'fill-color': '#f0b429', 'fill-opacity': 0.22 },
+        /*
+         * Mais fraco quando os cantos nao chegaram todos ao chao.
+         *
+         * Nesse caso o poligono nao e o que a foto cobre - e para onde ela
+         * olha, com a parte de cima a sair pelo horizonte. Desenha-se na mesma,
+         * para nao desaparecer a meio de uma rota, mas nao com o peso de uma
+         * medicao.
+         */
+        paint: { 'fill-color': '#f0b429', 'fill-opacity': ['case', ['get', 'completo'], 0.22, 0.1] },
       })
       instancia.addLayer({
         id: CAMADA_ENQUADRAMENTO_LINHA,
@@ -659,10 +675,23 @@ export function Mapa(props: PropsMapa) {
     const instancia = mapa.current
     if (!instancia || !pronto) return
     const fonte = instancia.getSource(FONTE_ENQUADRAMENTO) as GeoJSONSource | undefined
-    fonte?.setData(enquadramentoGeoJSON(props.enquadramento, posicaoDaAeronave(props)))
+    fonte?.setData(
+      enquadramentoGeoJSON(
+        props.pontasEnquadramento,
+        props.centroEnquadramento,
+        posicaoDaAeronave(props),
+      ),
+    )
     // O enquadramento sai da camara do ponto seleccionado ou da aeronave em voo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.enquadramento, props.seguir, props.seleccionados, waypoints, pronto])
+  }, [
+    props.pontasEnquadramento,
+    props.centroEnquadramento,
+    props.seguir,
+    props.seleccionados,
+    waypoints,
+    pronto,
+  ])
 
   useEffect(() => {
     const instancia = mapa.current

@@ -41,6 +41,7 @@ import {
   aeronaveNoPerfil,
   alvoDaCamara,
   arestasDoEnquadramento,
+  pontasDoEnquadramento,
 } from './estado/alvo-camara.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
@@ -380,6 +381,18 @@ export function App() {
    * altura e com que inclinacao - um poligono igual pode vir de um voo rasante
    * ou de um voo alto a olhar para baixo.
    */
+  /*
+   * Os quatro cantos, calculados uma vez.
+   *
+   * A piramide em 3D e a mancha no chao saem daqui os dois. Tinham conta
+   * propria cada uma, e a do chao exigia tres cantos assentes no terreno: com o
+   * gimbal pouco inclinado aparecia uma e nao aparecia a outra.
+   */
+  const pontasEnquadramento = useMemo(
+    () => (alvoCamara ? pontasDoEnquadramento(alvoCamara, enquadramento) : []),
+    [alvoCamara, enquadramento],
+  )
+
   const arestasEnquadramento = useMemo(
     () => (alvoCamara ? arestasDoEnquadramento(alvoCamara, enquadramento) : []),
     [alvoCamara, enquadramento],
@@ -802,7 +815,8 @@ export function App() {
               seleccionados={seleccao.ids}
               modo3D={modo3D}
               modoMapa={modoMapa}
-              enquadramento={enquadramento}
+              pontasEnquadramento={pontasEnquadramento}
+              centroEnquadramento={enquadramento?.centro?.ponto ?? null}
               seguir={
                 replay.activo && replay.estado
                   ? { posicao: replay.estado.posicao }

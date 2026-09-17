@@ -104,6 +104,36 @@ export function VistaCamara({
 
     instancia.on('load', () => {
       instancia.setTerrain({ source: FONTE_TERRENO, exaggeration: 1 })
+
+      /*
+       * A fonte e as camadas dos limites, que faltavam por inteiro.
+       *
+       * O efeito que escreve os dados existia e chamava `setData` numa fonte
+       * que nunca tinha sido criada. O `getSource` devolvia `undefined`, o `?.`
+       * engolia a chamada, e nao havia erro nenhum a dizer que o desenho nao
+       * estava a acontecer - so uma vista de camara com ortofoto e mais nada.
+       *
+       * As cores sao as mesmas do mapa principal de proposito: e o mesmo
+       * limite visto de outro sitio, e tem de se ler como o mesmo.
+       */
+      instancia.addSource(FONTE_AREAS_CAMARA, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      instancia.addLayer({
+        id: 'areas-camara-preenchimento',
+        type: 'fill',
+        source: FONTE_AREAS_CAMARA,
+        paint: { 'fill-color': '#4fd973', 'fill-opacity': 0.14 },
+      })
+      instancia.addLayer({
+        id: 'areas-camara-contorno',
+        type: 'line',
+        source: FONTE_AREAS_CAMARA,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#4fd973', 'line-width': 3, 'line-dasharray': [3, 2] },
+      })
+
       setPronto(true)
     })
 

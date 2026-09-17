@@ -143,38 +143,55 @@ describe('regua', () => {
 })
 
 describe('enquadramento da camara', () => {
-  const canto = (lat: number, lon: number) => ({
-    ponto: { lat, lon },
-    cotaTerreno: 356,
-    distancia: 100,
+  const ponta = (lat: number, lon: number, noTerreno = true) => ({
+    lat,
+    lon,
+    alt: 356,
+    noTerreno,
   })
-  const cheio = {
-    cantos: [canto(40.7, -8.4), canto(40.7, -8.39), canto(40.71, -8.39), canto(40.71, -8.4)],
-    centro: canto(40.705, -8.395),
-  }
+  const CENTRO = { lat: 40.705, lon: -8.395 }
+  const cheio = [
+    ponta(40.7, -8.4),
+    ponta(40.7, -8.39),
+    ponta(40.71, -8.39),
+    ponta(40.71, -8.4),
+  ]
 
-  it('sem enquadramento nao ha nada', () => {
-    expect(enquadramentoGeoJSON(null, CANTO).features).toHaveLength(0)
-    expect(enquadramentoGeoJSON(undefined, CANTO).features).toHaveLength(0)
-  })
-
-  it('com menos de tres cantos tambem nao', () => {
-    /*
-     * Acontece quando os raios saem do terreno carregado. Vale mais nao
-     * desenhar nada do que desenhar um triangulo que nao quer dizer nada.
-     */
-    const curto = { cantos: [canto(40.7, -8.4), canto(40.7, -8.39)], centro: null }
-    expect(enquadramentoGeoJSON(curto, CANTO).features).toHaveLength(0)
+  it('sem pontas nao ha nada', () => {
+    expect(enquadramentoGeoJSON([], CENTRO, CANTO).features).toHaveLength(0)
   })
 
-  it('um canto que o raio nao alcancou nao conta', () => {
-    const comFalha = { cantos: [...cheio.cantos.slice(0, 2), null], centro: null }
-    expect(enquadramentoGeoJSON(comFalha, CANTO).features).toHaveLength(0)
+  it('com menos de tres pontas tambem nao: um segmento nao e uma mancha', () => {
+    const curto = [ponta(40.7, -8.4), ponta(40.7, -8.39)]
+    expect(enquadramentoGeoJSON(curto, CENTRO, CANTO).features).toHaveLength(0)
+  })
+
+  /*
+   * O caso que fazia a mancha desaparecer. Com o gimbal a doze ou treze graus -
+   * o que uma rota de inspeccao usa - os dois raios de cima passam acima do
+   * horizonte e nunca cortam o chao. Antes isso apagava o poligono e deixava a
+   * piramide: a mesma coisa via-se umas vezes sim, outras nao.
+   */
+  it('pontas projectadas desenham na mesma, marcadas como incompletas', () => {
+    const comCeu = [
+      ponta(40.7, -8.4, false),
+      ponta(40.7, -8.39, false),
+      ponta(40.71, -8.39),
+      ponta(40.71, -8.4),
+    ]
+    const features = enquadramentoGeoJSON(comCeu, CENTRO, null).features
+    expect(features).toHaveLength(1)
+    expect(features[0]?.properties?.completo).toBe(false)
+  })
+
+  it('com os quatro cantos no terreno, o poligono conta-se como completo', () => {
+    const features = enquadramentoGeoJSON(cheio, CENTRO, null).features
+    expect(features[0]?.properties?.completo).toBe(true)
   })
 
   it('sem aeronave desenha-se so o poligono', () => {
     // E o que sobra quando nada esta seleccionado e nao ha voo a decorrer.
-    const features = enquadramentoGeoJSON(cheio, null).features
+    const features = enquadramentoGeoJSON(cheio, CENTRO, null).features
     expect(features).toHaveLength(1)
     expect(features[0]?.geometry.type).toBe('Polygon')
   })
@@ -184,25 +201,26 @@ describe('enquadramento da camara', () => {
      * Os raios sao o que deixa perceber de onde a camara esta a olhar: so com o
      * poligono nao se distingue uma vista de cima de uma vista rasante.
      */
-    const features = enquadramentoGeoJSON(cheio, CANTO).features
+    const features = enquadramentoGeoJSON(cheio, CENTRO, CANTO).features
     expect(features).toHaveLength(1 + 4 + 1)
     expect(features.filter((f) => f.geometry.type === 'LineString')).toHaveLength(5)
   })
 
   it('sem centro nao ha raio ao centro', () => {
-    const semCentro = { ...cheio, centro: null }
-    expect(enquadramentoGeoJSON(semCentro, CANTO).features).toHaveLength(1 + 4)
+    expect(enquadramentoGeoJSON(cheio, null, CANTO).features).toHaveLength(1 + 4)
   })
 
   it('cada raio parte da aeronave', () => {
-    const features = enquadramentoGeoJSON(cheio, CANTO).features
+    const features = enquadramentoGeoJSON(cheio, CENTRO, CANTO).features
     for (const f of features.filter((x) => x.geometry.type === 'LineString')) {
       expect(geometria<LineString>(f).coordinates[0]).toEqual([CANTO.lon, CANTO.lat])
     }
   })
 
   it('o poligono do que a foto apanha fecha-se', () => {
-    const anel = geometria<Polygon>(enquadramentoGeoJSON(cheio, null).features[0]).coordinates[0]
+    const anel = geometria<Polygon>(
+      enquadramentoGeoJSON(cheio, CENTRO, null).features[0],
+    ).coordinates[0]
     expect(anel?.at(0)).toEqual(anel?.at(-1))
   })
 })
