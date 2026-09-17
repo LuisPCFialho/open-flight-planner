@@ -13,7 +13,8 @@
     "test:unidade": "vitest run --exclude \"**/*.integracao.test.ts\"",
     "test:watch": "vitest",
     "lint": "oxlint",
-    "verificar-dist": "node ferramentas/verificar-dist.ts"
+    "verificar-dist": "node ferramentas/verificar-dist.ts",
+    "cobertura": "vitest run --coverage"
   },
   "dependencies": {
     "dexie": "^4.4.6",

@@ -33,6 +33,25 @@ export default defineConfig({
   preview: { port: 5173, strictPort: true },
   test: {
     /*
+     * A cobertura mede-se, e nunca se tinha medido.
+     *
+     * Nao ha limiar a travar nada, de proposito: um numero redondo imposto de
+     * um dia para o outro so leva a testes escritos para o subir. O que o
+     * relatorio serve e para dizer onde estao os buracos - e o primeiro que deu
+     * disse-o bem: 55% de linhas, com o nucleo coberto e a interface quase toda
+     * por tocar.
+     *
+     * O `main.tsx` fica de fora porque e so a montagem, e as pastas de teste
+     * porque medir o que mede nao quer dizer nada.
+     */
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.*', 'src/teste/**', 'src/main.tsx'],
+      reporter: ['text-summary', 'html'],
+      reportsDirectory: 'coverage',
+    },
+    /*
      * Dois conjuntos, porque sao duas coisas diferentes.
      *
      * O nucleo e geometria, ficheiros e contas: corre em node, depressa e sem
