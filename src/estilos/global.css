@@ -1990,3 +1990,27 @@ button.ligacao {
   margin-top: 8px;
   color: var(--alerta);
 }
+
+/*
+ * Rota densa: os marcadores encolhem para pontos e o numero sai.
+ *
+ * Numa cobertura sao cento e oito circulos de vinte e dois pixeis a vinte
+ * metros uns dos outros - de cima, um bloco de onde nao se le nada. Quem
+ * precisar do numero aproxima a vista, e ele volta.
+ *
+ * O seleccionado fica por encolher de proposito: e o unico que se anda a
+ * procurar, e tem de se ver onde esta no meio dos outros.
+ */
+.mapa.marcadores-densos .marcador-waypoint {
+  width: 9px;
+  height: 9px;
+  border-width: 1px;
+  font-size: 0;
+}
+
+.mapa.marcadores-densos .marcador-waypoint.seleccionado {
+  width: 22px;
+  height: 22px;
+  border-width: 1.5px;
+  font-size: 11px;
+}

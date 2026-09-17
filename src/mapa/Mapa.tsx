@@ -15,6 +15,7 @@ import { CamadaRota3D, type PontoRota3D, type Segmento3D } from './camada-rota-3
 import { CamadaDrones, type DroneNoMapa } from './camada-drones.ts'
 import { ligarEstilo } from './arranque.ts'
 import { sincronizarMarcadores, sincronizarPOIs } from './marcadores.ts'
+import { marcadoresDensos } from './densidade.ts'
 import {
   areasGeoJSON,
   enquadramentoGeoJSON,
@@ -698,6 +699,35 @@ export function Mapa(props: PropsMapa) {
     if (!instancia || !pronto) return
     sincronizarMarcadores(instancia, marcadores.current, waypoints, props.seleccionados, callbacks)
   }, [waypoints, props.seleccionados, pronto])
+
+  /*
+   * Numa rota de cobertura os marcadores numerados atropelam-se.
+   *
+   * Vinte metros entre fotos, vistos de cima, sao circulos de vinte e dois
+   * pixeis a cair uns por cima dos outros: nao se le numero nenhum nem se
+   * percebe por onde a rota passa. A decisao e uma classe no contentor e o
+   * resto e do CSS - os marcadores encolhem para pontos e o numero sai, e quem
+   * precisar dele aproxima a vista, que e o gesto natural.
+   */
+  useEffect(() => {
+    const instancia = mapa.current
+    const elemento = contentor.current
+    if (!instancia || !elemento || !pronto) return
+
+    const rever = (): void => {
+      const centro = instancia.getCenter()
+      elemento.classList.toggle(
+        'marcadores-densos',
+        marcadoresDensos(waypoints, centro.lat, instancia.getZoom()),
+      )
+    }
+
+    rever()
+    instancia.on('zoomend', rever)
+    return () => {
+      instancia.off('zoomend', rever)
+    }
+  }, [waypoints, pronto])
 
   useEffect(() => {
     const instancia = mapa.current
