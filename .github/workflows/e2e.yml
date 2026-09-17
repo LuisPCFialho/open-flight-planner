@@ -14,7 +14,7 @@ on:
       endereco:
         description: Endereco a ensaiar
         required: false
-        default: https://pye-flight-planner.vercel.app
+        default: https://open-flight-planner.vercel.app
   schedule:
     - cron: '0 6 * * 1'
 
@@ -38,7 +38,7 @@ jobs:
 
       - name: Ensaios
         env:
-          E2E_URL: ${{ inputs.endereco || 'https://pye-flight-planner.vercel.app' }}
+          E2E_URL: ${{ inputs.endereco || 'https://open-flight-planner.vercel.app' }}
         run: npm run e2e
 
       # O rasto e o video so ficam guardados quando alguma coisa falha, que e

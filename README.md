@@ -9,6 +9,9 @@ no conversion step, no cloud account, no subscription.
 
 Everything runs in the browser. Your routes never leave the machine.
 
+**[Open it](https://open-flight-planner.vercel.app)** — nothing to install, no
+account. The routes you make there stay in that browser.
+
 > **Status: not yet flown.** The exporters are built against real KMZ files and
 > covered by 799 tests, but no route produced by this tool has been flown on an
 > aircraft yet. Read [what to verify in the field](docs/verificar-no-campo.md)
