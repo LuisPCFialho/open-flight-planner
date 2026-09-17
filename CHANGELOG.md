@@ -19,6 +19,13 @@ ordering below is the useful part, not the calendar.
 - **Virtual flight now shows the aircraft**, its heading, both gimbal angles,
   and the camera frustum as a 3D inverted pyramid rising from the terrain to the
   aircraft. The camera view also draws the imported parcel boundary.
+- **Direction of travel on every leg** — a chevron at the midpoint, in the leg's
+  own colour, lying in the plane of the climb. On a coverage route with parallel
+  legs, the order could only be read point by point off the marker numbers.
+- **The take-off point is drawn**, with the outbound and return legs dashed. The
+  route used to start in mid-air. The return leg is only drawn when the route
+  actually has one: with `autoLand` or `noAction` it would be showing a flight
+  that is not going to happen.
 - **Side panels shrink themselves** on a narrow window so the map keeps usable
   width. The stored preference is untouched and comes back when the window grows.
 - **Terrain relief is on by default.** In plan view, a route grazing a ridge and
@@ -33,6 +40,11 @@ ordering below is the useful part, not the calendar.
 
 ### Fixed
 
+- **Rotating in virtual flight moved nothing on screen.** The map turned to keep
+  the heading up while the 3D model turned with the heading in world
+  coordinates: equal angles, opposite directions, net zero. What you saw was the
+  terrain spinning around an apparently frozen aircraft. The map now follows the
+  position only, and the view's orientation belongs to whoever is looking.
 - **The MapLibre worker was dead in production builds.** It was bundled in a way
   that did not carry its own dependency, so the file it imported was served as
   HTML and the worker died on load, without an exception. No terrain relief, no
