@@ -35,7 +35,13 @@ import { useAtalhos } from './estado/useAtalhos.ts'
 import { linhasDaRota, pontos3DdaRota } from './estado/derivados.ts'
 import { usePersistenciaDaRota } from './estado/usePersistencia.ts'
 import { useProjetoEmCurso } from './estado/useProjetoEmCurso.ts'
-import { aeronaveDoReplay, aeronaveNoPerfil, alvoDaCamara } from './estado/alvo-camara.ts'
+import {
+  aeronaveDoReplay,
+  aeronaveDoVoo,
+  aeronaveNoPerfil,
+  alvoDaCamara,
+  arestasDoEnquadramento,
+} from './estado/alvo-camara.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
 import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
@@ -349,13 +355,17 @@ export function App() {
     [rota, cotas, comandoDaCamara],
   )
 
-  const aeronaveDeReplay = useMemo<DroneNoMapa | null>(
-    () =>
-      comandoDaCamara.replay && alvoCamara
-        ? aeronaveDoReplay(comandoDaCamara.replay, alvoCamara.alturaASL)
-        : null,
-    [comandoDaCamara.replay, alvoCamara],
-  )
+  /**
+   * A aeronave desenhada no mapa: a do leitor, ou a do voo virtual.
+   *
+   * Nunca as duas: sao duas aeronaves no mesmo sitio, e abrir uma para a outra.
+   */
+  const aeronaveNoMapa = useMemo<DroneNoMapa | null>(() => {
+    if (!alvoCamara) return null
+    if (comandoDaCamara.replay) return aeronaveDoReplay(comandoDaCamara.replay, alvoCamara.alturaASL)
+    if (comandoDaCamara.voo) return aeronaveDoVoo(comandoDaCamara.voo, alvoCamara.alturaASL)
+    return null
+  }, [comandoDaCamara.replay, comandoDaCamara.voo, alvoCamara])
 
   const aeronaveNoCorte = useMemo(
     () =>
@@ -369,6 +379,18 @@ export function App() {
     alvoCamara,
     drone ?? droneComId('mini5pro'),
     fonteMosaicos,
+  )
+
+  /**
+   * A piramide do enquadramento, em 3D.
+   *
+   * O poligono no chao ja dizia o que a camara apanha; as arestas dizem de que
+   * altura e com que inclinacao - um poligono igual pode vir de um voo rasante
+   * ou de um voo alto a olhar para baixo.
+   */
+  const arestasEnquadramento = useMemo(
+    () => (alvoCamara ? arestasDoEnquadramento(alvoCamara, enquadramento) : []),
+    [alvoCamara, enquadramento],
   )
 
   /** Liga o modo, ou volta a navegar se ele ja estiver ligado. */
@@ -780,7 +802,8 @@ export function App() {
             <Mapa
               rota={rota}
               pontos3D={pontos3D}
-              aeronave={aeronaveDeReplay}
+              aeronave={aeronaveNoMapa}
+              arestasEnquadramento={arestasEnquadramento}
             intervaloAcimaDoSolo={intervaloAGL}
             sombreado={sombreado}
             medicao={medicao}
@@ -886,6 +909,7 @@ export function App() {
 
             {alvoCamara ? (
               <VistaCamara
+              areas={rota.areas}
                 posicao={alvoCamara.posicao}
                 alturaASL={alvoCamara.alturaASL}
                 enquadramento={enquadramento}

@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { LngLat, Map as MapaLibre } from 'maplibre-gl'
-import type { LatLon } from '../nucleo/tipos.ts'
+import { LngLat, Map as MapaLibre, type GeoJSONSource } from 'maplibre-gl'
+import type { Area, LatLon } from '../nucleo/tipos.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
 import { estiloBase, FONTE_TERRENO } from '../mapa/estilo.ts'
+import { areasGeoJSON } from '../mapa/geojson.ts'
+
+/** Fonte propria: esta janela tem o seu mapa, separado do principal. */
+const FONTE_AREAS_CAMARA = 'areas-na-camara'
 
 /**
  * O que a camara ve, em primeira pessoa.
@@ -40,6 +44,14 @@ type Props = {
   /** Altura de voo ortometrica. */
   alturaASL: number
   enquadramento: Enquadramento | null
+  /**
+   * Os limites importados, desenhados tambem aqui.
+   *
+   * Sem eles a vista de camara mostrava ortofoto e mais nada, e quem pilotava
+   * nao tinha como saber se estava a apanhar a parcela ou o monte do lado - que
+   * e a unica pergunta que se faz a esta janela.
+   */
+  areas: readonly Area[] | undefined
   aCarregar: boolean
   /** Campo de visao horizontal em graus, para o arrasto ser de um para um. */
   fovHorizontal: number
@@ -53,6 +65,7 @@ export function VistaCamara({
   posicao,
   alturaASL,
   enquadramento,
+  areas,
   aCarregar,
   fovHorizontal,
   tamanho,
@@ -93,6 +106,13 @@ export function VistaCamara({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto.current) return
+    const fonte = instancia.getSource(FONTE_AREAS_CAMARA) as GeoJSONSource | undefined
+    fonte?.setData(areasGeoJSON(areas))
+  }, [areas])
 
   const centro = enquadramento?.centro
   const alvoLat = centro?.ponto.lat

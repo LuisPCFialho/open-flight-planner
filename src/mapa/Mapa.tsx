@@ -11,7 +11,7 @@ import type { LatLon, Rota } from '../nucleo/tipos.ts'
 import { algumDentroDaVista } from '../nucleo/areas.ts'
 import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
 import { CAMADA_SOMBREADO, estiloBase, FONTE_TERRENO } from './estilo.ts'
-import { CamadaRota3D, type PontoRota3D } from './camada-rota-3d.ts'
+import { CamadaRota3D, type PontoRota3D, type Segmento3D } from './camada-rota-3d.ts'
 import { CamadaDrones, type DroneNoMapa } from './camada-drones.ts'
 import { ligarEstilo } from './arranque.ts'
 import { sincronizarMarcadores, sincronizarPOIs } from './marcadores.ts'
@@ -69,6 +69,8 @@ export type PropsMapa = {
   medicao: readonly LatLon[]
   /** O que a camara do waypoint seleccionado vai apanhar, projectado no terreno. */
   enquadramento: Enquadramento | null
+  /** Arestas da piramide que a camara projecta, desenhadas a altura de voo. */
+  arestasEnquadramento: readonly Segmento3D[]
   /** Posicao da aeronave em voo virtual, para o mapa a seguir. */
   seguir: { posicao: LatLon; guinada: number } | null
   /**
@@ -581,6 +583,11 @@ export function Mapa(props: PropsMapa) {
     if (!pronto) return
     camada3D.current?.definirPontos(props.pontos3D, intervaloAGL)
   }, [props.pontos3D, intervaloAGL, pronto])
+
+  useEffect(() => {
+    if (!pronto) return
+    camada3D.current?.definirArestas(props.arestasEnquadramento)
+  }, [props.arestasEnquadramento, pronto])
 
   useEffect(() => {
     if (!pronto) return

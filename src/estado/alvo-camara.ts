@@ -5,6 +5,8 @@ import type { EstadoReplay } from '../nucleo/replay.ts'
 import type { EstadoVoo } from '../nucleo/voo.ts'
 import type { Perfil } from '../nucleo/perfil.ts'
 import type { Alvo } from './useEnquadramento.ts'
+import type { Enquadramento } from '../nucleo/camara.ts'
+import type { Segmento3D } from '../mapa/camada-rota-3d.ts'
 import { chaveDaPosicao } from './useCotasTerreno.ts'
 import type { DroneNoMapa } from '../mapa/camada-drones.ts'
 
@@ -119,6 +121,76 @@ export function aeronaveDoReplay(estado: EstadoReplay, alturaASL: number): Drone
     aumento: 1.6,
     tinta: [0.35, 0.85, 0.5, 0.3],
   }
+}
+
+/**
+ * A aeronave do voo virtual, desenhada onde ela esta e virada para onde aponta.
+ *
+ * Faltava: em voo virtual o mapa acompanhava a aeronave mas nao a desenhava, e
+ * quem estava a pilotar via o terreno a passar sem ver o aparelho nem para onde
+ * a camara estava voltada. Pilotar as cegas e o contrario do que o voo virtual
+ * serve.
+ *
+ * Vai com a guinada da aeronave e os dois angulos do gimbal, que e o que faz o
+ * desenho dizer alguma coisa - sem eles era um aparelho sempre virado a norte.
+ */
+export function aeronaveDoVoo(estado: EstadoVoo, alturaASL: number): DroneNoMapa {
+  return {
+    lat: estado.posicao.lat,
+    lon: estado.posicao.lon,
+    alturaVoo: alturaASL,
+    guinada: estado.guinada,
+    gimbalPitch: estado.gimbalPitch,
+    gimbalYaw: estado.gimbalYaw,
+    seleccionado: false,
+    alerta: false,
+    comAparelho: true,
+    /*
+     * Maior do que um waypoint e com um toque de ambar: e a aeronave que se
+     * esta a pilotar naquele instante, e tem de se distinguir de relance dos
+     * pontos ja gravados por onde ela passa.
+     */
+    aumento: 1.6,
+    tinta: [1, 0.72, 0.25, 0.3],
+  }
+}
+
+/**
+ * As arestas da piramide que a camara projecta no terreno.
+ *
+ * Quatro do aparelho ate aos cantos que ele apanha, mais a base que os une.
+ * Desenhada assim, ela diz duas coisas que o poligono no chao nao diz: de que
+ * altura se esta a olhar, e com que inclinacao - um poligono igual pode vir de
+ * um voo rasante ou de um voo alto a olhar para baixo.
+ *
+ * Com menos de tres cantos nao ha piramide: acontece quando os raios saem do
+ * terreno carregado, e um triangulo solto nao quer dizer nada.
+ */
+export function arestasDoEnquadramento(
+  alvo: Alvo,
+  enquadramento: Pick<Enquadramento, 'cantos'> | null | undefined,
+): Segmento3D[] {
+  if (!enquadramento) return []
+
+  const cantos = enquadramento.cantos.filter((c) => c !== null)
+  if (cantos.length < 3) return []
+
+  const aparelho = { lat: alvo.posicao.lat, lon: alvo.posicao.lon, alt: alvo.alturaASL }
+  const noChao = cantos.map((c) => ({
+    lat: c.ponto.lat,
+    lon: c.ponto.lon,
+    alt: c.cotaTerreno,
+  }))
+
+  const arestas: Segmento3D[] = noChao.map((canto) => ({ de: aparelho, para: canto }))
+
+  // A base fecha-se: e ela que faz a figura ler-se como piramide e nao como leque.
+  for (const [i, canto] of noChao.entries()) {
+    const seguinte = noChao[(i + 1) % noChao.length]
+    if (seguinte) arestas.push({ de: canto, para: seguinte })
+  }
+
+  return arestas
 }
 
 /**

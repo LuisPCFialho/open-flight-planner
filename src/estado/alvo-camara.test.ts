@@ -4,7 +4,13 @@ import { deslocar } from '../nucleo/geodesia.ts'
 import { acrescentarWaypoint, rotaVazia, waypointNovo } from '../nucleo/operacoes-rota.ts'
 import { calcularPerfil } from '../nucleo/perfil.ts'
 import { chaveDaPosicao } from './useCotasTerreno.ts'
-import { aeronaveDoReplay, aeronaveNoPerfil, alvoDaCamara, type Comando } from './alvo-camara.ts'
+import {
+  aeronaveDoReplay,
+  aeronaveNoPerfil,
+  alvoDaCamara,
+  arestasDoEnquadramento,
+  type Comando,
+} from './alvo-camara.ts'
 
 /**
  * O alvo da camara decide o que a pre-visualizacao do enquadramento mostra, e
@@ -251,5 +257,83 @@ describe('aeronave no corte do terreno', () => {
 
   it('a altura passa tal e qual', () => {
     expect(aeronaveNoPerfil(perfil, estadoDeReplay(0, 0), 777)?.aslVoo).toBe(777)
+  })
+})
+
+describe('piramide do enquadramento', () => {
+  const canto = (lat: number, lon: number) => ({
+    ponto: { lat, lon },
+    cotaTerreno: 350,
+    distancia: 100,
+  })
+  const cheio = {
+    cantos: [canto(40.75, -8.41), canto(40.75, -8.4), canto(40.76, -8.4), canto(40.76, -8.41)],
+  }
+  const alvo = {
+    posicao: { lat: 40.755, lon: -8.405 },
+    alturaASL: 420,
+    guinada: 90,
+    gimbalPitch: -45,
+    gimbalYaw: 0,
+  }
+
+  it('sem enquadramento nao ha piramide', () => {
+    expect(arestasDoEnquadramento(alvo, null)).toEqual([])
+    expect(arestasDoEnquadramento(alvo, undefined)).toEqual([])
+  })
+
+  it('com menos de tres cantos tambem nao', () => {
+    /* Acontece quando os raios saem do terreno carregado. */
+    expect(arestasDoEnquadramento(alvo, { cantos: [canto(40.75, -8.41)] })).toEqual([])
+  })
+
+  it('um canto que o raio nao alcancou nao conta', () => {
+    const comFalha = { cantos: [...cheio.cantos.slice(0, 2), null] }
+    expect(arestasDoEnquadramento(alvo, comFalha)).toEqual([])
+  })
+
+  it('sao quatro arestas do aparelho mais a base fechada', () => {
+    // Sem a base fechada a figura le-se como um leque, e nao como piramide.
+    expect(arestasDoEnquadramento(alvo, cheio)).toHaveLength(4 + 4)
+  })
+
+  it('as quatro primeiras partem todas do aparelho, a altura de voo', () => {
+    /*
+     * E este o ponto de tudo isto. Em GeoJSON os raios partiam do sitio do
+     * aparelho mas nao da altura dele, e o que se via era uma estrela desenhada
+     * no terreno em vez de um cone a descer.
+     */
+    const arestas = arestasDoEnquadramento(alvo, cheio)
+    for (const aresta of arestas.slice(0, 4)) {
+      expect(aresta.de).toEqual({ lat: alvo.posicao.lat, lon: alvo.posicao.lon, alt: 420 })
+    }
+  })
+
+  it('as pontas de baixo assentam na cota do terreno', () => {
+    const arestas = arestasDoEnquadramento(alvo, cheio)
+    for (const aresta of arestas.slice(0, 4)) {
+      expect(aresta.para.alt).toBe(350)
+    }
+  })
+
+  it('a base liga cantos seguidos e volta ao primeiro', () => {
+    const base = arestasDoEnquadramento(alvo, cheio).slice(4)
+    expect(base).toHaveLength(4)
+    expect(base[3]?.para).toEqual(base[0]?.de)
+  })
+
+  it('a base fica toda no terreno, sem subir ao aparelho', () => {
+    const base = arestasDoEnquadramento(alvo, cheio).slice(4)
+    for (const aresta of base) {
+      expect(aresta.de.alt).toBe(350)
+      expect(aresta.para.alt).toBe(350)
+    }
+  })
+
+  it('o aparelho fica acima da base: e uma piramide invertida', () => {
+    const arestas = arestasDoEnquadramento(alvo, cheio)
+    for (const aresta of arestas.slice(0, 4)) {
+      expect(aresta.de.alt).toBeGreaterThan(aresta.para.alt)
+    }
   })
 })

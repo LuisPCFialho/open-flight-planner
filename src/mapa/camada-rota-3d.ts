@@ -44,6 +44,20 @@ type OpcoesRender = {
   defaultProjectionData?: { mainMatrix: ArrayLike<number> }
 }
 
+/**
+ * Uma aresta solta no espaco, em coordenadas do mundo.
+ *
+ * Serve a piramide do enquadramento, e por isso as duas pontas trazem altura
+ * propria: uma fica no aparelho e a outra no terreno.
+ */
+export type Segmento3D = {
+  de: { lat: number; lon: number; alt: number }
+  para: { lat: number; lon: number; alt: number }
+}
+
+/** O ambar do poligono do enquadramento: as duas leituras sao da mesma coisa. */
+const COR_ENQUADRAMENTO: Cor = [0.94, 0.71, 0.16, 0.75]
+
 const COR_VERTICAL: Cor = [0.85, 0.88, 0.92, 0.55]
 /** A vertical leva a cor do ponto, mas mais apagada: e a linha, nao o aviso. */
 const OPACIDADE_VERTICAL = 0.6
@@ -95,6 +109,15 @@ export class CamadaRota3D implements CustomLayerInterface {
    * factor, a relacao entre elas mantem-se, que e o que se esta a ler.
    */
   #exagero = 1
+  /**
+   * Arestas soltas, desenhadas a altura que lhes for dada.
+   *
+   * Servem a piramide do enquadramento: quatro arestas do aparelho ate aos
+   * cantos que a camara apanha, mais a base que os une. Em GeoJSON isto saia
+   * rente ao chao - os raios partiam do sitio do aparelho mas nao da altura
+   * dele, e o que se via era uma estrela no terreno em vez de um cone a descer.
+   */
+  #arestas: readonly Segmento3D[] = []
   #vertices = new Float32Array(0)
   #numLinhas = 0
   #numPontos = 0
@@ -154,6 +177,14 @@ export class CamadaRota3D implements CustomLayerInterface {
       reconstrucoes: this.#reconstrucoes,
       origem: this.#origem,
     }
+  }
+
+  /** Substitui as arestas soltas - a piramide do enquadramento. */
+  definirArestas(arestas: readonly Segmento3D[]): void {
+    this.#arestas = arestas
+    this.#construirVertices()
+    this.#precisaRecarregar = true
+    this.#mapa?.triggerRepaint()
   }
 
   /** Substitui a rota desenhada. O trabalho pesado fica aqui, nao no render. */
@@ -276,6 +307,20 @@ export class CamadaRota3D implements CustomLayerInterface {
       const baixo = solo[i]
       if (!baixo) continue
       empurrar(marcas, baixo, COR_VERTICAL)
+    }
+
+    /*
+     * A piramide vai em ambar, a mesma cor do poligono que ela projecta no
+     * terreno: as duas leituras sao da mesma coisa e tem de se ler como uma.
+     */
+    for (const aresta of this.#arestas) {
+      for (const ponta of [aresta.de, aresta.para]) {
+        empurrar(
+          linhas,
+          MercatorCoordinate.fromLngLat([ponta.lon, ponta.lat], esticar(ponta.alt)),
+          COR_ENQUADRAMENTO,
+        )
+      }
     }
 
     this.#numLinhas = linhas.length / 7
