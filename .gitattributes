@@ -1,0 +1,16 @@
+# Finais de linha.
+#
+# O repositorio tinha ficheiros em CRLF e outros em LF, e alguns com os dois
+# dentro do mesmo ficheiro. Nao e questao de gosto: uma ferramenta que reescreva
+# um ficheiro de uma maneira diferente da que ele estava produz um diff de mil
+# linhas onde a alteracao foram tres, e a revisao deixa de servir para nada.
+#
+# Tudo o que e texto fica em LF no repositorio. O Windows le LF sem problema
+# nenhum ha muito tempo, e as ferramentas do projecto tambem.
+* text=auto eol=lf
+
+# Binarios: nem normalizar nem tocar.
+*.png binary
+*.jpg binary
+*.kmz binary
+*.zip binary
