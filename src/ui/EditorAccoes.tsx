@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Accao, Drone, TipoAccao, Waypoint } from '../nucleo/tipos.ts'
 import { accaoSuportada, NOME_DA_ACCAO } from '../nucleo/operacoes-accoes.ts'
 import { IconeEliminar } from './icones.tsx'
@@ -169,6 +170,19 @@ function ParametrosDaAccao({
   }
 }
 
+/**
+ * Campo numerico curto, com rascunho proprio.
+ *
+ * O rascunho nao e enfeite. Sem ele o campo mostrava sempre o valor confirmado,
+ * e escrever por cima de um numero era impossivel: seleccionar tudo e carregar
+ * em `-` deixava o campo com `-`, que nao e numero nenhum, a alteracao era
+ * ignorada e o React repunha o valor antigo - o sinal desaparecia debaixo dos
+ * dedos. Num campo de inclinacao de gimbal, que vai de -90 a 45, o negativo e o
+ * caso normal.
+ *
+ * Com rascunho, escreve-se o que se quiser; so se confirma o que for numero, e
+ * ao sair do campo o que nao for volta ao ultimo valor bom.
+ */
 function EntradaCurta({
   titulo,
   valor,
@@ -184,18 +198,25 @@ function EntradaCurta({
   sufixo: string
   aoAlterar: (valor: number) => void
 }) {
+  const [rascunho, setRascunho] = useState<string | null>(null)
+
+  const limitar = (lido: number): number => Math.min(max, Math.max(min, lido))
+
   return (
     <label className="entrada-curta" title={titulo}>
       <input
         className="numerico"
         type="number"
-        value={valor}
+        value={rascunho ?? String(valor)}
         min={min}
         max={max}
         onChange={(e) => {
-          const lido = Number.parseFloat(e.target.value)
-          if (Number.isFinite(lido)) aoAlterar(Math.min(max, Math.max(min, lido)))
+          const texto = e.target.value
+          setRascunho(texto)
+          const lido = Number.parseFloat(texto)
+          if (Number.isFinite(lido)) aoAlterar(limitar(lido))
         }}
+        onBlur={() => setRascunho(null)}
       />
       <span>{sufixo}</span>
     </label>
