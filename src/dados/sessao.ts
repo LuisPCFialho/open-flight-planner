@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from './supabase.ts'
+import {
+  isSignInWithEmailLink,
+  onAuthStateChanged,
+  sendSignInLinkToEmail,
+  signInWithEmailLink,
+  signOut,
+} from 'firebase/auth'
+import { autenticacao } from './firebase.ts'
 
 /**
  * Quem esta a usar a aplicacao.
@@ -9,14 +16,16 @@ import { supabase } from './supabase.ts'
  * acontece a quem clona o repositorio.
  *
  * Com armazem remoto, a entrada e por ligacao enviada para o correio. Nao ha
- * palavra-passe nenhuma - nem para escolher, nem para recuperar, nem para
- * guardar em lado nenhum. O que se prova e o acesso a caixa de correio, que e
- * o que qualquer recuperacao de palavra-passe acaba por provar de qualquer
- * maneira.
+ * palavra-passe - nem para escolher, nem para recuperar, nem para guardar em
+ * lado nenhum. O que se prova e o acesso a caixa de correio, que e o que
+ * qualquer recuperacao de palavra-passe acaba por provar de qualquer maneira.
  */
 
+/** Onde fica o endereco entre o pedido da ligacao e o regresso dela. */
+const CHAVE_EMAIL = 'open-flight-planner:email-de-entrada'
+
 export type EstadoSessao =
-  /** A perguntar ao Supabase se ja ha sessao guardada. */
+  /** A ver se ja ha sessao, ou a concluir a entrada pela ligacao. */
   | { estado: 'a-carregar' }
   /** Sem armazem remoto: nao ha entrada nem ha contas. */
   | { estado: 'local' }
@@ -24,76 +33,149 @@ export type EstadoSessao =
   | { estado: 'dentro'; email: string }
 
 export type Sessao = EstadoSessao & {
-  /** Pede a ligacao de entrada. Devolve o erro, ou `null` se foi enviada. */
+  /** Pede a ligacao de entrada. Devolve a razao da falha, ou `null`. */
   entrar: (email: string) => Promise<string | null>
+  /**
+   * Conclui a entrada quando a ligacao foi aberta noutro sitio.
+   *
+   * `null` quando nao ha ligacao nenhuma por concluir - o caso normal. Quando
+   * existe, o ecra de entrada pede a confirmacao do endereco em vez de mandar
+   * outra ligacao.
+   */
+  concluir: ((email: string) => Promise<string | null>) | null
   sair: () => Promise<void>
 }
 
+function guardarEmail(email: string): void {
+  try {
+    localStorage.setItem(CHAVE_EMAIL, email)
+  } catch {
+    /* Sem sitio onde guardar, a ligacao pede o endereco ao voltar. */
+  }
+}
+
+function lerEmailGuardado(): string | null {
+  try {
+    return localStorage.getItem(CHAVE_EMAIL)
+  } catch {
+    return null
+  }
+}
+
+function esquecerEmail(): void {
+  try {
+    localStorage.removeItem(CHAVE_EMAIL)
+  } catch {
+    /* Nada a fazer, e nada se perde por isso. */
+  }
+}
+
+/**
+ * Tira da barra de enderecos o que a ligacao de entrada la deixou.
+ *
+ * Sem isto, recarregar a pagina tentava usar outra vez uma ligacao ja gasta e o
+ * que aparecia era um erro em vez da aplicacao.
+ */
+function limparEndereco(): void {
+  window.history.replaceState({}, '', window.location.pathname)
+}
+
+/*
+ * A conclusao da ligacao so se tenta uma vez por carregamento.
+ *
+ * Em modo estrito o React monta o efeito duas vezes, e a segunda tentativa usa
+ * uma ligacao ja gasta: a entrada funcionava e aparecia um erro por cima.
+ */
+let jaTentouAEntrada = false
+
 export function useSessao(): Sessao {
   const [estado, setEstado] = useState<EstadoSessao>(
-    supabase ? { estado: 'a-carregar' } : { estado: 'local' },
+    autenticacao ? { estado: 'a-carregar' } : { estado: 'local' },
   )
+  const [porConcluir, setPorConcluir] = useState(false)
 
   useEffect(() => {
-    const cliente = supabase
-    if (!cliente) return
+    const auth = autenticacao
+    if (!auth) return
 
-    let cancelado = false
+    const naLigacao = isSignInWithEmailLink(auth, window.location.href)
+    const guardado = lerEmailGuardado()
 
-    const registar = (email: string | undefined): void => {
-      if (cancelado) return
-      setEstado(email ? { estado: 'dentro', email } : { estado: 'fora' })
+    if (naLigacao && !guardado) {
+      /*
+       * A ligacao foi aberta noutro browser - tipicamente no telemovel, porque
+       * foi la que o correio chegou. O Firebase exige o endereco para concluir,
+       * e ele ficou no browser onde se pediu. Pede-se de novo, uma vez.
+       */
+      setPorConcluir(true)
+      setEstado({ estado: 'fora' })
+      return
     }
 
-    /*
-     * A sessao guardada e lida uma vez, e depois ouve-se o que muda.
-     *
-     * So o `onAuthStateChange` nao chega: ele dispara na entrada, na saida e na
-     * renovacao, mas nao necessariamente para dizer "ja estavas dentro". Sem a
-     * leitura inicial, recarregar a pagina com sessao valida ficava a pedir o
-     * correio outra vez.
-     */
-    cliente.auth
-      .getSession()
-      .then(({ data }) => {
-        registar(data.session?.user.email)
-      })
-      .catch(() => {
-        if (!cancelado) setEstado({ estado: 'fora' })
-      })
+    if (naLigacao && guardado && !jaTentouAEntrada) {
+      jaTentouAEntrada = true
+      signInWithEmailLink(auth, guardado, window.location.href)
+        .then(() => {
+          esquecerEmail()
+          limparEndereco()
+        })
+        .catch(() => {
+          esquecerEmail()
+          limparEndereco()
+          setEstado({ estado: 'fora' })
+        })
+    }
 
-    const { data } = cliente.auth.onAuthStateChange((_evento, sessao) => {
-      registar(sessao?.user.email)
+    const largar = onAuthStateChanged(auth, (utilizador) => {
+      setEstado(
+        utilizador?.email ? { estado: 'dentro', email: utilizador.email } : { estado: 'fora' },
+      )
     })
 
-    return () => {
-      cancelado = true
-      data.subscription.unsubscribe()
-    }
+    return largar
   }, [])
 
   const entrar = useCallback(async (email: string): Promise<string | null> => {
-    const cliente = supabase
-    if (!cliente) return 'não há armazém remoto configurado'
+    const auth = autenticacao
+    if (!auth) return 'não há armazém remoto configurado'
 
-    const { error } = await cliente.auth.signInWithOtp({
-      email,
-      /*
-       * A ligacao volta para onde se saiu.
-       *
-       * Sem isto o Supabase manda para o endereco do sitio configurado no
-       * painel, que em pre-visualizacoes do Vercel nao e o que esta aberto -
-       * clicava-se na ligacao e entrava-se noutro sitio.
-       */
-      options: { emailRedirectTo: window.location.origin },
-    })
+    try {
+      await sendSignInLinkToEmail(auth, email, {
+        /*
+         * A ligacao volta para onde se saiu.
+         *
+         * Sem isto voltava para o endereco configurado no painel, que numa
+         * pre-visualizacao do Vercel nao e o que esta aberto - clicava-se na
+         * ligacao e entrava-se noutro sitio.
+         */
+        url: window.location.origin,
+        handleCodeInApp: true,
+      })
+      guardarEmail(email)
+      return null
+    } catch (causa: unknown) {
+      return causa instanceof Error ? causa.message : 'falha a enviar a ligação'
+    }
+  }, [])
 
-    return error ? error.message : null
+  const concluir = useCallback(async (email: string): Promise<string | null> => {
+    const auth = autenticacao
+    if (!auth) return 'não há armazém remoto configurado'
+
+    try {
+      await signInWithEmailLink(auth, email, window.location.href)
+      esquecerEmail()
+      limparEndereco()
+      setPorConcluir(false)
+      return null
+    } catch (causa: unknown) {
+      return causa instanceof Error ? causa.message : 'não foi possível concluir a entrada'
+    }
   }, [])
 
   const sair = useCallback(async (): Promise<void> => {
-    await supabase?.auth.signOut()
+    if (autenticacao) await signOut(autenticacao)
   }, [])
 
-  return { ...estado, entrar, sair }
+  return { ...estado, entrar, concluir: porConcluir ? concluir : null, sair }
 }

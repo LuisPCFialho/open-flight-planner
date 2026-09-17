@@ -25,7 +25,7 @@ import {
  * O armazem de sempre: IndexedDB, nesta maquina, sem conta nenhuma.
  *
  * E o que este repositorio faz por omissao, e o que corre quando as variaveis
- * do Supabase nao estao postas. As funcoes ja existiam em `bd.ts` e em
+ * do Firebase nao estao postas. As funcoes ja existiam em `bd.ts` e em
  * `projetos.ts`; o que se acrescenta aqui e o aviso de mudanca, que antes vinha
  * de graca no `useLiveQuery` do Dexie.
  */

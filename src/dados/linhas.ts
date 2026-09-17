@@ -1,83 +1,97 @@
 import type { Projeto, Rota } from '../nucleo/tipos.ts'
 
 /**
- * Traducao entre as linhas da base e os tipos da aplicacao.
+ * Traducao entre os documentos do Firestore e os tipos da aplicacao.
  *
  * Vive a parte do resto do armazem remoto porque e a unica parte que se pode
  * verificar sem rede nenhuma - e e onde os enganos passam despercebidos: trocar
- * `criado_em` por `criadoEm` nao rebenta nada, so faz a lista aparecer pela
- * ordem errada.
+ * `criadoEm` por `criado_em` nao rebenta nada, so faz a lista aparecer pela
+ * ordem errada, e quem a ve nao tem como saber porque.
  *
- * O conteudo vai em `jsonb` e as colunas so levam o que a base precisa para
- * ordenar, contar e ligar. Isso quer dizer que os mesmos valores existem nos
- * dois sitios, e que quem escreve tem de os por de acordo - e o que estas
- * funcoes garantem, ao serem o unico caminho.
+ * O conteudo vai como texto JSON e nao como objecto aninhado.
+ *
+ * O Firestore aceitaria o objecto, mas com tres condicoes que este formato nao
+ * pode prometer: nada de arrays dentro de arrays, nada de `undefined`, e um
+ * tecto de campos aninhados. Os waypoints tem campos opcionais - `velocidade`,
+ * `guinada`, `poiId` - e um `undefined` faz a escrita atirar, ou, com
+ * `ignoreUndefinedProperties`, desaparece em silencio. O formato da rota ainda
+ * vai mudar muitas vezes; em texto, nenhuma dessas mudancas se torna um defeito
+ * de gravacao. O que fica em campo proprio e so o que a base precisa para
+ * ordenar e filtrar.
  */
 
-export type LinhaProjeto = {
-  id: string
-  criado_em: number
-  conteudo: unknown
+export type DocumentoProjeto = {
+  criadoEm: number
+  conteudo: string
 }
 
-export type LinhaRota = {
-  id: string
-  projeto_id: string
-  alterada_em: number
-  conteudo: unknown
+export type DocumentoRota = {
+  projetoId: string
+  alteradaEm: number
+  conteudo: string
 }
 
-export class LinhaInvalida extends Error {}
+export class DocumentoInvalido extends Error {}
 
-function objecto(conteudo: unknown, onde: string): Record<string, unknown> {
-  if (typeof conteudo !== 'object' || conteudo === null || Array.isArray(conteudo)) {
-    throw new LinhaInvalida(`o conteudo de ${onde} nao e um objecto`)
+function lerJSON(conteudo: unknown, onde: string): Record<string, unknown> {
+  if (typeof conteudo !== 'string') {
+    throw new DocumentoInvalido(`o conteudo de ${onde} nao e texto`)
   }
-  return conteudo as Record<string, unknown>
+
+  let lido: unknown
+  try {
+    lido = JSON.parse(conteudo)
+  } catch {
+    throw new DocumentoInvalido(`o conteudo de ${onde} nao e JSON valido`)
+  }
+
+  if (typeof lido !== 'object' || lido === null || Array.isArray(lido)) {
+    throw new DocumentoInvalido(`o conteudo de ${onde} nao e um objecto`)
+  }
+  return lido as Record<string, unknown>
 }
 
 function texto(valor: unknown): string {
   return typeof valor === 'string' ? valor : ''
 }
 
-export function deLinhaProjeto(linha: LinhaProjeto): Projeto {
-  const conteudo = objecto(linha.conteudo, `projeto ${linha.id}`)
+export function deDocumentoProjeto(id: string, documento: DocumentoProjeto): Projeto {
+  const conteudo = lerJSON(documento.conteudo, `projeto ${id}`)
   return {
-    id: linha.id,
+    id,
     nome: texto(conteudo['nome']),
     cliente: texto(conteudo['cliente']),
     local: texto(conteudo['local']),
-    criadoEm: linha.criado_em,
+    criadoEm: documento.criadoEm,
   }
 }
 
-export function paraLinhaProjeto(projeto: Projeto): LinhaProjeto {
-  const { id, criadoEm, ...conteudo } = projeto
-  return { id, criado_em: criadoEm, conteudo }
+export function paraDocumentoProjeto(projeto: Projeto): DocumentoProjeto {
+  const { id: _id, criadoEm, ...conteudo } = projeto
+  return { criadoEm, conteudo: JSON.stringify(conteudo) }
 }
 
-export function deLinhaRota(linha: LinhaRota): Rota {
-  const conteudo = objecto(linha.conteudo, `rota ${linha.id}`)
+export function deDocumentoRota(id: string, documento: DocumentoRota): Rota {
+  const conteudo = lerJSON(documento.conteudo, `rota ${id}`)
   /*
-   * As colunas mandam sobre o que esta no conteudo.
+   * Os campos proprios mandam sobre o que esta no conteudo.
    *
-   * Sao elas que a base indexa e por onde a consulta filtrou; se as duas
-   * discordarem, a que trouxe a linha ate aqui e a coluna. O contrario deixava
-   * passar uma rota que aparece num projeto e diz pertencer a outro.
+   * Foi por eles que a consulta filtrou e foi por eles que a rota chegou aqui;
+   * se discordarem do conteudo, o que trouxe a linha e que conta. O contrario
+   * deixava passar uma rota que aparece num projeto e diz pertencer a outro.
    */
   return {
     ...(conteudo as unknown as Rota),
-    id: linha.id,
-    projetoId: linha.projeto_id,
-    alteradaEm: linha.alterada_em,
+    id,
+    projetoId: documento.projetoId,
+    alteradaEm: documento.alteradaEm,
   }
 }
 
-export function paraLinhaRota(rota: Rota): LinhaRota {
+export function paraDocumentoRota(rota: Rota): DocumentoRota {
   return {
-    id: rota.id,
-    projeto_id: rota.projetoId,
-    alterada_em: rota.alteradaEm,
-    conteudo: rota,
+    projetoId: rota.projetoId,
+    alteradaEm: rota.alteradaEm,
+    conteudo: JSON.stringify(rota),
   }
 }

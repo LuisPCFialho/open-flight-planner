@@ -24,7 +24,9 @@ export function Raiz() {
     )
   }
 
-  if (sessao.estado === 'fora') return <EcraEntrada aoEntrar={sessao.entrar} />
+  if (sessao.estado === 'fora') {
+    return <EcraEntrada aoEntrar={sessao.entrar} aoConcluir={sessao.concluir} />
+  }
 
   return <App />
 }

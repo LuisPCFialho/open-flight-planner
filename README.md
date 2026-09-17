@@ -115,10 +115,11 @@ variables are present. The second exists because the published site has to
 outlive a browser profile; the first exists because `npm install && npm run dev`
 has to be enough for anyone who clones this.
 
-Nothing in the client filters rows by owner. That is done by row-level security
-in [`supabase/esquema.sql`](supabase/esquema.sql), because the key the browser
-carries is readable by whoever opens the developer tools — a filter in the
-client would be decoration.
+Nothing in the client checks who owns what. The server does, through
+[`firestore.rules`](firestore.rules): everything belonging to a person lives
+under their own uid, so the rule is three lines rather than an ownership field
+to check on every document. The keys the browser carries are readable by whoever
+opens the developer tools, so a check in the client would be decoration.
 
 The drone on the map is drawn in code — 1500 triangles, original geometry, built
 from published dimensions. No third-party model is bundled.

@@ -15,24 +15,33 @@ import { useState } from 'react'
 
 type Props = {
   aoEntrar: (email: string) => Promise<string | null>
+  /**
+   * Presente quando a ligacao foi aberta noutro browser - tipicamente no
+   * telemovel, porque foi la que o correio chegou. Falta o endereco para
+   * concluir, e o que se pede e uma confirmacao, nao outra ligacao.
+   */
+  aoConcluir: ((email: string) => Promise<string | null>) | null
 }
 
-export function EcraEntrada({ aoEntrar }: Props) {
+export function EcraEntrada({ aoEntrar, aoConcluir }: Props) {
   const [email, setEmail] = useState('')
-  const [aEnviar, setAEnviar] = useState(false)
+  const [aTrabalhar, setATrabalhar] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
+  const aConcluir = aoConcluir !== null
+
   const submeter = async (): Promise<void> => {
-    setAEnviar(true)
+    setATrabalhar(true)
     setErro(null)
-    const razao = await aoEntrar(email.trim())
-    setAEnviar(false)
+    const razao = await (aoConcluir ?? aoEntrar)(email.trim())
+    setATrabalhar(false)
     if (razao) {
       setErro(razao)
       return
     }
-    setEnviado(true)
+    // A conclusao muda a sessao e este ecra sai; o pedido de ligacao fica aqui.
+    if (!aConcluir) setEnviado(true)
   }
 
   return (
@@ -40,7 +49,9 @@ export function EcraEntrada({ aoEntrar }: Props) {
       <div className="cartao-entrada">
         <h1>Open Flight Planner</h1>
         <p className="subtitulo">
-          Os teus projetos ficam na tua conta. Só tu os vês, em qualquer computador.
+          {aConcluir
+            ? 'Confirma o endereço para onde a ligação foi enviada. É a última coisa que falta.'
+            : 'Os teus projetos ficam na tua conta. Só tu os vês, em qualquer computador.'}
         </p>
 
         {enviado ? (
@@ -49,7 +60,7 @@ export function EcraEntrada({ aoEntrar }: Props) {
               Se <strong>{email.trim()}</strong> tiver conta, a ligação de entrada está a caminho.
             </p>
             <p className="nota">
-              Abre-a neste browser. A ligação serve uma vez e caduca ao fim de uma hora.
+              Abre-a de preferência neste browser. A ligação serve uma vez e caduca.
             </p>
             <button
               type="button"
@@ -80,8 +91,16 @@ export function EcraEntrada({ aoEntrar }: Props) {
               placeholder="nome@empresa.pt"
               onChange={(evento) => setEmail(evento.target.value)}
             />
-            <button type="submit" className="principal" disabled={aEnviar || email.trim() === ''}>
-              {aEnviar ? 'A enviar...' : 'Receber ligação de entrada'}
+            <button
+              type="submit"
+              className="principal"
+              disabled={aTrabalhar || email.trim() === ''}
+            >
+              {aTrabalhar
+                ? 'A trabalhar...'
+                : aConcluir
+                  ? 'Concluir entrada'
+                  : 'Receber ligação de entrada'}
             </button>
           </form>
         )}

@@ -1,4 +1,4 @@
-# Contas e projetos partilhados
+# Contas e projetos guardados na conta
 
 Por omissão, os projetos vivem na IndexedDB do browser: ficam nesta máquina,
 neste browser, e não vão a lado nenhum. É o que acontece a quem clona o
@@ -7,73 +7,88 @@ repositório, e não precisa de configuração nenhuma.
 Este documento é sobre a outra forma de funcionar: **os projetos numa conta**,
 que os segue de computador para computador, e **cada pessoa vê só os seus**.
 
-É o Supabase que faz o trabalho - Postgres, autenticação e políticas de linha.
-A aplicação continua sem servidor próprio: o browser fala directamente com a
-base, e quem decide o que cada pessoa pode ler é o Postgres.
+É o Firebase que faz o trabalho - Firestore para os dados, autenticação por
+ligação no correio, e regras de segurança. A aplicação continua sem servidor
+próprio: o browser fala directamente com o Firestore, e quem decide o que cada
+pessoa pode ler é o servidor, pelas regras.
 
 ---
 
 ## O que se monta, uma vez
 
-### 1. Criar o projeto Supabase
+### 1. Criar o projeto
 
-Em [supabase.com](https://supabase.com), **New project**. O plano gratuito
-chega com folga para o que esta ferramenta guarda - um projeto com rotas são
-uns quilobytes.
+Em [console.firebase.google.com](https://console.firebase.google.com), **Adicionar
+projeto**. O plano gratuito chega com muita folga: são 50 mil leituras e 20 mil
+escritas por dia, e uma rota são uns quilobytes.
 
-Guarda a palavra-passe da base de dados que ele te pede. Não é usada pela
-aplicação, mas é a única forma de lá chegar por fora.
+Podes desligar o Google Analytics - esta ferramenta não o usa.
 
-### 2. Criar as tabelas e as regras
+### 2. Criar a base de dados
 
-No painel, **SQL Editor** > **New query**. Cola o conteúdo de
-[`supabase/esquema.sql`](../supabase/esquema.sql) e corre.
+**Build** > **Firestore Database** > **Criar base de dados**.
 
-Isso cria duas tabelas e oito políticas de linha. **As políticas são a parte que
-importa**: sem elas, a chave que o browser usa dá acesso a tudo. Com elas, cada
-pedido só devolve as linhas de quem o fez, e isso não depende de o código da
-aplicação se lembrar de filtrar.
+- **Modo de produção**, não modo de teste. O modo de teste abre tudo a toda a
+  gente durante trinta dias, e é assim que estas coisas ficam abertas.
+- Região: uma na Europa, `eur3` ou `europe-west1`. A região não se muda depois.
 
-Podes correr o mesmo ficheiro outra vez sem estragar nada: cria o que falta e
-substitui as políticas.
+**Não são precisos índices compostos.** As duas consultas que a aplicação faz -
+ordenar projetos por data e filtrar rotas por projeto - usam um campo cada, e
+esses o Firestore indexa sozinho.
 
-### 3. Decidir quem pode entrar
+### 3. Publicar as regras
 
-**Authentication** > **Sign In / Providers** > **Email**.
+No Firestore, separador **Regras**. Cola o conteúdo de
+[`firestore.rules`](../firestore.rules) e publica.
 
-- **Email** tem de estar ligado. É o que permite a ligação de entrada.
-- **Allow new users to sign up** é a decisão que interessa. Ligado, qualquer
-  pessoa que encontre o endereço cria conta - vê só os projetos dela, mas usa a
-  tua quota. **Desligado, só entra quem tu convidares**, e é o que faz sentido
-  para uma ferramenta de empresa.
+**Esta é a parte que importa.** As chaves que a aplicação usa vão no pacote que
+o browser transfere e qualquer pessoa as pode ler - é assim que o Firebase do
+lado do cliente funciona. Sem as regras, quem quisesse pedia tudo. Com elas, o
+servidor só devolve o que está debaixo do `uid` de quem pediu.
 
-Com os registos desligados, os convites fazem-se em **Authentication** >
-**Users** > **Invite user**.
+### 4. Ligar a entrada por correio
 
-### 4. Dizer ao Supabase para onde voltar
+**Build** > **Authentication** > **Começar** > **Email/Password**.
 
-**Authentication** > **URL Configuration**:
+São dois interruptores no mesmo painel, e **os dois têm de ficar ligados**:
 
-- **Site URL**: `https://open-flight-planner.vercel.app`
-- **Redirect URLs**: acrescenta `http://localhost:5173/**` se quiseres entrar
-  também em desenvolvimento, e `https://*-luispcfialhos-projects.vercel.app/**`
-  para as pré-visualizações do Vercel.
+- **Email/Password**
+- **Email link (passwordless sign-in)** - é este que a aplicação usa
 
-Sem isto, a ligação do correio leva a pessoa para o sítio errado.
+### 5. Decidir quem pode entrar
 
-### 5. Copiar as duas chaves
+Ainda em **Authentication**, separador **Settings**, secção **User actions**.
+Aí há a opção de permitir ou não a criação de contas novas. (O Firebase muda os
+nomes destes painéis de tempos a tempos; procura pela opção de *sign-up*.)
 
-**Project Settings** > **API**:
+- **Permitida**: qualquer pessoa que encontre o endereço cria conta. Vê só os
+  projetos dela, mas usa a tua quota.
+- **Bloqueada**: só entra quem tu criares à mão, em **Authentication** >
+  **Users** > **Add user**. É o que faz sentido para uma ferramenta de empresa.
 
-- **Project URL** → `VITE_SUPABASE_URL`
-- **anon public** → `VITE_SUPABASE_ANON_KEY`
+### 6. Autorizar o domínio
 
-**A chave `service_role` não entra aqui.** Essa ignora as políticas de linha: no
-browser, dava a qualquer pessoa acesso a tudo o que está na base.
+**Authentication** > **Settings** > **Authorized domains**. Acrescenta
+`open-flight-planner.vercel.app`.
 
-### 6. Pôr as variáveis no Vercel
+O `localhost` já lá está. Sem isto a ligação do correio é recusada ao voltar,
+com uma mensagem que não aponta para aqui.
 
-**Settings** > **Environment Variables**, as duas, para Production, Preview e
+### 7. Copiar a configuração
+
+**Project settings** (a roda dentada) > **Your apps** > ícone da web (`</>`) >
+registar a aplicação. Do que ele mostra, interessam quatro valores:
+
+| Firebase | Variável |
+|---|---|
+| `apiKey` | `VITE_FIREBASE_API_KEY` |
+| `authDomain` | `VITE_FIREBASE_AUTH_DOMAIN` |
+| `projectId` | `VITE_FIREBASE_PROJECT_ID` |
+| `appId` | `VITE_FIREBASE_APP_ID` |
+
+### 8. Pôr as variáveis no Vercel
+
+**Settings** > **Environment Variables**, as quatro, para Production, Preview e
 Development. Depois **Deployments** > o último > **Redeploy**.
 
 As variáveis `VITE_` são lidas na construção, não em execução: sem novo deploy,
@@ -87,15 +102,15 @@ Para trabalhar localmente contra a mesma base, copia `.env.example` para
 ## Como fica
 
 - Quem abre o sítio vê o ecrã de entrada e escreve o endereço de correio.
-- Recebe uma ligação, abre-a **no mesmo browser**, e entra.
-- Os projetos que criar são dele. Mais ninguém os vê, nem o dono do projeto
-  Supabase pela aplicação.
-- A sessão fica guardada e renova-se: fechar o separador e voltar amanhã cai no
-  mesmo sítio.
+- Recebe uma ligação e abre-a. Se a abrir **no mesmo browser**, entra directamente; se a
+  abrir noutro - o telemóvel, tipicamente, porque foi lá que o correio chegou -
+  a aplicação pede a confirmação do endereço, porque o Firebase precisa dele
+  para concluir.
+- Os projetos que criar são dele. Mais ninguém os vê pela aplicação.
+- A sessão fica guardada: fechar o separador e voltar amanhã cai no mesmo sítio.
 
 Não há palavra-passe - nem para escolher, nem para recuperar, nem para esta
-aplicação guardar. O que se prova é o acesso à caixa de correio, que é o que
-qualquer recuperação de palavra-passe acaba por provar de qualquer maneira.
+aplicação guardar.
 
 ## O que se perde, e é preciso saber antes
 
@@ -105,11 +120,14 @@ central sem cobertura isso nota-se, e a solução seria manter a IndexedDB como
 espelho local - o que é sincronização a sério, com conflitos, e é outro
 trabalho.
 
-**O correio do Supabase é limitado.** O servidor de correio que vem incluído
-manda poucas mensagens por hora e serve para experimentar. Para uma equipa a
-usar isto a sério, configura SMTP próprio em **Authentication** > **Emails** -
-senão, a segunda pessoa a entrar numa manhã fica à espera de uma ligação que não
-chega, e parece avaria.
+**Uma rota tem um tecto de 1 MiB.** É o limite de um documento do Firestore.
+Uma rota de cobertura com perímetro importado fica muito abaixo disso, mas uma
+com milhares de waypoints e vários polígonos pode lá chegar. Se acontecer, a
+gravação falha com a razão em vez de falhar em silêncio.
+
+**Quem for dono do projeto Firebase vê tudo pela consola.** As regras protegem
+os pedidos da aplicação, não o painel de administração. É o normal em qualquer
+base de dados, mas vale a pena estar dito.
 
 **Os projetos que já estavam na máquina não vão sozinhos.** Ficam na IndexedDB,
 intactos. Na primeira vez que entrares, a aplicação dá por eles e pergunta se os
@@ -117,6 +135,6 @@ queres copiar para a tua conta. Nada é apagado deste computador.
 
 ## Voltar atrás
 
-Tira as duas variáveis de ambiente e faz deploy. A aplicação volta ao modo
-local, e os dados que estão no Supabase continuam lá - é só religar as variáveis
-para os ter outra vez.
+Tira as variáveis de ambiente e faz deploy. A aplicação volta ao modo local, e
+os dados que estão no Firestore continuam lá - é só religar as variáveis para os
+ter outra vez.

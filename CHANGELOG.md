@@ -14,16 +14,18 @@ ordering below is the useful part, not the calendar.
 
 - **Optional accounts, one person's projects per account.** Storage now sits
   behind one interface with two implementations. IndexedDB stays the default and
-  needs no configuration; Postgres with per-account isolation switches on when
-  two environment variables are present. The published site can use the second
+  needs no configuration; Firestore with per-account isolation switches on when
+  the Firebase environment variables are present. The published site can use the second
   so projects outlive a browser profile, while a clone of this repository still
   runs on `npm install && npm run dev` alone.
 - **Sign-in by e-mail link.** No password to choose, recover, or store. What is
   proven is access to the mailbox, which is what a password reset proves anyway.
-- **Row-level security, not client-side filtering.** No query in the client
-  filters by owner: the database does it. The key the browser carries is
-  readable by anyone who opens the developer tools, so a filter in the client
-  would be decoration. Setup in [docs/contas.md](docs/contas.md).
+- **Server-side rules, not client-side filtering.** Nothing in the client
+  checks who owns what. Everything belonging to a person lives under their own
+  uid, which makes the rule three lines instead of an ownership field to check
+  on every document. The keys the browser carries are readable by anyone who
+  opens the developer tools, so a check in the client would be decoration.
+  Setup in [docs/contas.md](docs/contas.md).
 - **Projects already on the machine are offered up, not stranded.** On first
   sign-in the app notices them and offers to copy them into the account, through
   the same validated path as a JSON import. Nothing is deleted locally.

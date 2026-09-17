@@ -1,18 +1,20 @@
 /// <reference types="vite/client" />
 
 /**
- * As duas variaveis que ligam o armazem remoto.
+ * As variaveis que ligam o armazem remoto.
  *
  * Sem elas a aplicacao corre em IndexedDB, nesta maquina, sem conta nenhuma -
  * que e o que acontece a quem clona o repositorio e faz `npm run dev`.
  *
- * A chave anonima nao e um segredo: vai no pacote que o browser transfere e
- * qualquer pessoa a pode ler. O que protege os dados sao as politicas de linha
- * em `supabase/esquema.sql`, e e por isso que elas existem.
+ * Nenhuma delas e um segredo: vao no pacote que o browser transfere e qualquer
+ * pessoa as pode ler. O que protege os dados sao as regras em
+ * `firestore.rules`, e e por isso que elas existem.
  */
 interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL?: string
-  readonly VITE_SUPABASE_ANON_KEY?: string
+  readonly VITE_FIREBASE_API_KEY?: string
+  readonly VITE_FIREBASE_AUTH_DOMAIN?: string
+  readonly VITE_FIREBASE_PROJECT_ID?: string
+  readonly VITE_FIREBASE_APP_ID?: string
 }
 
 interface ImportMeta {

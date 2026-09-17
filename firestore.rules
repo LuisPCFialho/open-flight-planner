@@ -1,0 +1,37 @@
+rules_version = '2';
+
+/*
+ * Quem pode ler e escrever o que.
+ *
+ * Esta e a unica barreira que conta. As chaves que a aplicacao usa vao no
+ * pacote que o browser transfere e qualquer pessoa as pode ler - e assim que o
+ * Firebase do lado do cliente funciona - portanto uma verificacao no codigo da
+ * aplicacao seria decoracao. Quem quisesse pedia sem ela.
+ *
+ * Tudo o que e de alguem vive debaixo de `utilizadores/{uid}`. E por isso que
+ * esta regra cabe em tres linhas: nao ha um campo `dono` para conferir em cada
+ * documento, nem uma consulta que se possa esquecer de o filtrar. O caminho e
+ * que diz de quem e a coisa.
+ *
+ * Publicar: no painel do Firebase, Firestore Database > Rules, colar e
+ * publicar. Ver docs/contas.md.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /utilizadores/{uid}/{documento=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    /*
+     * Tudo o resto fica fechado, incluindo o que ainda nao existe.
+     *
+     * Sem esta regra final, uma coleccao criada de futuro noutro caminho nao
+     * teria regra nenhuma - e no Firestore isso nao e "toda a gente pode", mas
+     * tambem nao e uma decisao que alguem tenha tomado. Escrita, e.
+     */
+    match /{documento=**} {
+      allow read, write: if false;
+    }
+  }
+}
