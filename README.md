@@ -7,7 +7,7 @@ no conversion step, no cloud account, no subscription.
 Everything runs in the browser. Your routes never leave the machine.
 
 > **Status: not yet flown.** The exporters are built against real KMZ files and
-> covered by 780 tests, but no route produced by this tool has been flown on an
+> covered by 799 tests, but no route produced by this tool has been flown on an
 > aircraft yet. Read [what to verify in the field](docs/verificar-no-campo.md)
 > before you trust it with a battery. If you fly one, please open an issue —
 > that single report is the most useful contribution this project can get.
@@ -100,7 +100,7 @@ from published dimensions. No third-party model is bundled.
 ![The aircraft model, four views](docs/imagens/modelo-3d-do-aparelho.png)
 
 ```
-npm test         780 unit and component tests
+npm test         799 unit and component tests
 npm run e2e      3 end-to-end tests against a production build
 npm run cobertura coverage report
 npm run lint     oxlint, hooks rules
