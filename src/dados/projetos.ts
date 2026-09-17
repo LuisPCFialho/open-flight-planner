@@ -18,8 +18,18 @@ export type ProjetoComRotas = { projeto: Projeto; rotas: Rota[] }
 
 export const VERSAO_FICHEIRO = 1
 
+/**
+ * A marca que identifica o ficheiro como nosso.
+ *
+ * A ferramenta mudou de nome, e os ficheiros exportados antes trazem a marca
+ * antiga. Escreve-se a nova e aceitam-se as duas a ler: recusar a antiga seria
+ * recusar os projetos que alguem exportou ontem, por causa de uma palavra.
+ */
+export const MARCA_DO_FICHEIRO = 'open-flight-planner'
+const MARCAS_ACEITES = [MARCA_DO_FICHEIRO, 'pye-flight-planner']
+
 export type FicheiroProjeto = {
-  formato: 'pye-flight-planner'
+  formato: string
   versao: number
   exportadoEm: number
   projeto: Projeto
@@ -69,7 +79,7 @@ export async function duplicarProjeto(projetoId: string): Promise<Projeto> {
 
 export function paraFicheiro(conteudo: ProjetoComRotas): FicheiroProjeto {
   return {
-    formato: 'pye-flight-planner',
+    formato: MARCA_DO_FICHEIRO,
     versao: VERSAO_FICHEIRO,
     exportadoEm: Date.now(),
     projeto: conteudo.projeto,
@@ -91,8 +101,8 @@ export function deFicheiro(bruto: unknown): ProjetoComRotas {
   }
   const dados = bruto as Partial<FicheiroProjeto>
 
-  if (dados.formato !== 'pye-flight-planner') {
-    throw new FicheiroInvalido('o ficheiro nao e um projeto do PYE Flight Planner')
+  if (typeof dados.formato !== 'string' || !MARCAS_ACEITES.includes(dados.formato)) {
+    throw new FicheiroInvalido('o ficheiro nao e um projeto do Open Flight Planner')
   }
   if (typeof dados.versao !== 'number' || dados.versao > VERSAO_FICHEIRO) {
     throw new FicheiroInvalido(

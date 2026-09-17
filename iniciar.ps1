@@ -1,4 +1,4 @@
-# Arranque do PYE Flight Planner a partir do atalho do ambiente de trabalho.
+# Arranque do Open Flight Planner a partir do atalho do ambiente de trabalho.
 #
 # Serve a versao construida na porta 5173, que tem de ser a mesma do servidor de
 # desenvolvimento: os projetos e as rotas vivem na IndexedDB, que e por origem, e
@@ -23,7 +23,7 @@ function Avisar($texto) {
   Add-Type -AssemblyName System.Windows.Forms
   [System.Windows.Forms.MessageBox]::Show(
     "$texto`n`nO registo fica em:`n$registo",
-    'PYE Flight Planner',
+    'Open Flight Planner',
     [System.Windows.Forms.MessageBoxButtons]::OK,
     [System.Windows.Forms.MessageBoxIcon]::Error
   ) | Out-Null

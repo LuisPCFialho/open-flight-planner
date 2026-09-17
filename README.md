@@ -1,4 +1,4 @@
-# PYE Flight Planner
+# Open Flight Planner
 
 Browser-based waypoint planner for DJI drones. Plans a survey, follows the
 terrain, and exports a `.kmz` that **DJI Fly and DJI Pilot 2 accept directly** —

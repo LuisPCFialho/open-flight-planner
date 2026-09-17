@@ -15,6 +15,16 @@ class BaseDeDados extends Dexie {
   rotas!: EntityTable<Rota, 'id'>
 
   constructor() {
+    /*
+     * O nome da base de dados fica como nasceu, apesar de a ferramenta ter
+     * mudado de nome.
+     *
+     * A IndexedDB e identificada por este nome: muda-lo abre uma base nova e
+     * vazia, e os projetos e as rotas que la estao passam a nao existir para
+     * quem abrir a aplicacao. Nao ha erro nenhum - ha trabalho desaparecido.
+     *
+     * Migrar dava-se, mas por um nome que ninguem ve nao vale o risco.
+     */
     super('pye-flight-planner')
     this.version(1).stores({
       projetos: 'id, nome, cliente, criadoEm',

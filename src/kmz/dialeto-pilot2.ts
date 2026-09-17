@@ -116,7 +116,7 @@ function alturaASL(
 
 function documentoTemplate(rota: Rota, drone: Drone, opcoes: OpcoesPilot2): No {
   return no('Document', [
-    valor('wpml:author', 'pye-flight-planner'),
+    valor('wpml:author', 'open-flight-planner'),
     valor('wpml:createTime', opcoes.createTime ?? rota.criadaEm),
     valor('wpml:updateTime', opcoes.updateTime ?? rota.alteradaEm),
     missionConfig(rota, drone),
