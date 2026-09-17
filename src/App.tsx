@@ -133,7 +133,15 @@ export function App() {
   const { rota, aplicar, carregar } = editor
   const seleccao = useSeleccao(rota)
 
-  const [modo3D, setModo3D] = useState(false)
+  /*
+   * O relevo entra ligado.
+   *
+   * O que se planeia aqui sao voos a altura constante acima do solo sobre
+   * encostas: em planta, uma rota que passa rente a um cabeco e uma rota que
+   * passa a cem metros dele desenham-se igual. O relevo e a unica vista em que
+   * essa diferenca se ve, e nao vale a pena esconde-la atras de um botao.
+   */
+  const [modo3D, setModo3D] = useState(true)
   const [rotaVisivel, setRotaVisivel] = useState(true)
   const [tamanhoCamara, setTamanhoCamara] = useState<TamanhoCamara>('normal')
   /**
