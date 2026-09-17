@@ -8,7 +8,7 @@ ordering below is the useful part, not the calendar.
 
 ---
 
-## Unreleased
+## 0.1.0 — first public release
 
 ### Added
 
