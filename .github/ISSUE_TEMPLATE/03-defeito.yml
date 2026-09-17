@@ -1,0 +1,44 @@
+name: Bug
+description: Something the planner does wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: esperado
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: aconteceu
+    attributes:
+      label: What happened instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: passos
+    attributes:
+      label: How to get there
+      placeholder: |
+        1. Import the perimeter ...
+        2. Generate the coverage with ...
+        3. Export and ...
+    validations:
+      required: true
+
+  - type: input
+    id: ambiente
+    attributes:
+      label: Browser and system
+      placeholder: Firefox 142, Windows 11
+    validations:
+      required: true
+
+  - type: textarea
+    id: ficheiro
+    attributes:
+      label: Files involved
+      description: >
+        The `.kmz` the planner produced, or the perimeter you imported. If a map
+        or terrain layer is involved, the browser console usually says why.

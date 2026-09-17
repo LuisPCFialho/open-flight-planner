@@ -1,0 +1,49 @@
+name: CI
+
+# Corre em tudo o que entra no master e em cada pull request. E o minimo para
+# que o emblema em cima do README queira dizer alguma coisa.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Um push por cima de outro cancela o anterior: o que interessa e o ultimo estado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: Lint, tipos, testes e construcao
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tipos
+        run: npm run tipos
+
+      # `test:unidade` e nao `test`: o ensaio de integracao vai a rede buscar
+      # cotas de terreno a um servico publico. Falharia aqui por causa da rede e
+      # nao do codigo, e um teste que falha por acaso ensina a ignorar falhas.
+      - name: Testes
+        run: npm run test:unidade
+
+      # Faz outra vez o lint e os tipos por dentro, e e de proposito: e este o
+      # comando que um contribuidor corre. Acaba no `verificar-dist`, que trava
+      # a construcao se algum ficheiro importado nao tiver ido para o `dist` -
+      # foi assim que o worker do MapLibre morreu em silencio uma vez.
+      - name: Construcao
+        run: npm run build

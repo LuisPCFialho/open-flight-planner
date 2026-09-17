@@ -58,6 +58,8 @@ A few conventions that are not obvious from the outside:
 - **Tests pin decisions, not implementations.** If a test fails after your
   change, read what it says before changing it — several of them describe
   defects that took a morning to find.
+- **The linter is oxlint, not ESLint**, and there is a reason —
+  [docs/lint.md](docs/lint.md).
 
 ## Reporting a bug
 

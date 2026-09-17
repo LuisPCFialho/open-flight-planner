@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: What helps this project most
+    url: https://github.com/LuisPCFialho/open-flight-planner/blob/master/CONTRIBUTING.md
+    about: A field report, and a droneEnumValue for an aircraft that is missing.
+  - name: What to verify in the field
+    url: https://github.com/LuisPCFialho/open-flight-planner/blob/master/docs/verificar-no-campo.md
+    about: A small test route and a table of what to observe, in order.

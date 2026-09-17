@@ -1,5 +1,8 @@
 # Open Flight Planner
 
+[![CI](https://github.com/LuisPCFialho/open-flight-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/LuisPCFialho/open-flight-planner/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-informational)](LICENSE)
+
 Browser-based waypoint planner for DJI drones. Plans a survey, follows the
 terrain, and exports a `.kmz` that **DJI Fly and DJI Pilot 2 accept directly** —
 no conversion step, no cloud account, no subscription.

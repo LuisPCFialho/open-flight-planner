@@ -1,0 +1,25 @@
+# Uma leva por mes, agrupada.
+#
+# Agrupada de proposito: quinze pull requests soltos por causa de versoes de
+# correccao sao ruido, e ruido faz com que se deixe de olhar - que e o contrario
+# do que isto serve. Junta-se tudo num, e le-se de uma vez.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      producao:
+        dependency-type: production
+      desenvolvimento:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      accoes:
+        patterns: ['*']

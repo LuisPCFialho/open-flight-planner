@@ -1,0 +1,68 @@
+name: Aircraft missing
+description: The enum values for an aircraft that is not listed yet.
+title: 'Aircraft: '
+labels: [aircraft]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These numbers tell the aircraft whether a file is meant for it. They are
+        published for the enterprise line; **for Mini and Air they are not**,
+        which is why only the Mini 5 Pro is listed.
+
+        How to read them:
+
+        1. Create any waypoint mission in the DJI app and export it.
+        2. The `.kmz` is a zip. Open `wpmz/waylines.wpml` in a text editor.
+        3. The values are near the top, inside `wpml:droneInfo`.
+
+        **Please do not guess.** A wrong number produces no error — it produces
+        a route that does not fly, which somebody discovers in a field with a
+        spent battery. Leave a field empty rather than filling it from memory.
+
+  - type: input
+    id: modelo
+    attributes:
+      label: Model, as DJI writes it
+      placeholder: DJI Air 3S
+    validations:
+      required: true
+
+  - type: input
+    id: drone
+    attributes:
+      label: wpml:droneEnumValue
+    validations:
+      required: true
+
+  - type: input
+    id: sub
+    attributes:
+      label: wpml:droneSubEnumValue
+      description: Leave empty if the tag is not in the file.
+
+  - type: input
+    id: payload
+    attributes:
+      label: wpml:payloadEnumValue
+      description: Leave empty if the tag is not in the file.
+
+  - type: dropdown
+    id: origem
+    attributes:
+      label: Where these came from
+      options:
+        - A file I exported from my own aircraft
+        - A file someone else exported and sent me
+        - DJI documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: especificacao
+    attributes:
+      label: Anything else you know for certain
+      description: >
+        Field of view, sensor aspect ratio, endurance, maximum speed, service
+        ceiling — but only what you read somewhere, not what sounds right.
+        Unconfirmed values are marked as such in the app rather than guessed.

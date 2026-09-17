@@ -1,0 +1,53 @@
+name: I flew a route
+description: A field report. This is worth more than anything else you could send.
+title: 'Flight report: '
+labels: [field-report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No route produced by this tool has been flown yet, so yours is new
+        information whatever happened. **Failures are the useful part** — if the
+        aircraft refused the file, that is exactly what needs to be known.
+
+        [docs/verificar-no-campo.md](https://github.com/LuisPCFialho/open-flight-planner/blob/master/docs/verificar-no-campo.md)
+        has a small test route and a table of what to observe, in order.
+
+  - type: input
+    id: aparelho
+    attributes:
+      label: Aircraft and app
+      placeholder: Mini 5 Pro, DJI Fly 1.16.4
+    validations:
+      required: true
+
+  - type: dropdown
+    id: aceitou
+    attributes:
+      label: Did the aircraft accept the file?
+      options:
+        - Accepted and flew it
+        - Accepted but flew it wrong
+        - Imported but refused to start
+        - Refused on import
+    validations:
+      required: true
+
+  - type: textarea
+    id: aconteceu
+    attributes:
+      label: What happened
+      description: >
+        Altitudes, heading, gimbal, the actions at each waypoint, what the
+        aircraft did at the end of the route. Anything that surprised you.
+    validations:
+      required: true
+
+  - type: textarea
+    id: ficheiro
+    attributes:
+      label: The route
+      description: >
+        Drag the `.kmz` in if you can. A route the aircraft refused is a gift.
+        Remove the file if the coordinates are commercially sensitive — the rest
+        of the report is still useful without it.

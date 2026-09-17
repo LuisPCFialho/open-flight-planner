@@ -1,0 +1,53 @@
+name: Ponta a ponta
+
+# A parte. Os ensaios de ponta a ponta carregam mosaicos de ortofoto e cotas de
+# terreno de servicos publicos: uma falha aqui tanto pode ser um defeito nosso
+# como um servidor de mosaicos com um mau dia. A correr em cada pull request,
+# pintavam o repositorio de vermelho por razoes que nao sao nossas.
+#
+# Por isso correm a pedido e uma vez por semana, contra o que esta publicado -
+# que e o que a configuracao do Playwright foi feita para fazer. Assim o que se
+# verifica e o deploy a serio, e nao uma copia local dele.
+on:
+  workflow_dispatch:
+    inputs:
+      endereco:
+        description: Endereco a ensaiar
+        required: false
+        default: https://pye-flight-planner.vercel.app
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  percurso-critico:
+    name: Percurso critico no sitio publicado
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Ensaios
+        env:
+          E2E_URL: ${{ inputs.endereco || 'https://pye-flight-planner.vercel.app' }}
+        run: npm run e2e
+
+      # O rasto e o video so ficam guardados quando alguma coisa falha, que e
+      # quando fazem falta.
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: rasto-playwright
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
