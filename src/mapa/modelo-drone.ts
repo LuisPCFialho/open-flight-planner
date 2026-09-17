@@ -94,12 +94,18 @@ function baseTransversal(eixo: Vec3): { u: Vec3; v: Vec3 } {
 /**
  * Contorno de uma seccao em forma de rectangulo arredondado.
  *
- * E uma superelipse: com expoente dois da uma elipse, com expoente alto da um
- * rectangulo. Quatro e o meio-termo que da a fuselagem desta familia, chata por
- * baixo e abaulada em cima, sem precisar de cantos explicitos na malha.
+ * E uma superelipse: com grau dois da uma elipse, e quanto maior o grau mais se
+ * aproxima de um rectangulo. Seis da uma seccao de lados quase direitos com os
+ * cantos boleados, que e o que uma fuselagem destas e - um prisma, nao um ovo.
+ * Com quatro saia um charuto, que foi o engano da versao anterior.
  */
-function superelipse(lados: number, meiaLargura: number, meiaAltura: number): Vec3[] {
-  const expoente = 2 / 4
+function superelipse(
+  lados: number,
+  meiaLargura: number,
+  meiaAltura: number,
+  grau = 6,
+): Vec3[] {
+  const expoente = 2 / grau
   const pontos: Vec3[] = []
   for (let i = 0; i < lados; i++) {
     const t = (i / lados) * Math.PI * 2
@@ -317,16 +323,15 @@ const SECCOES_CORPO: readonly {
   /** Onde passa o eixo da seccao. E o que faz o nariz descair para o gimbal. */
   eixo: number
 }[] = [
-  { y: -0.0725, x: 0.013, cima: 0.011, baixo: 0.008, eixo: 0.009 },
-  { y: -0.066, x: 0.031, cima: 0.021, baixo: 0.013, eixo: 0.008 },
-  { y: -0.05, x: 0.042, cima: 0.028, baixo: 0.016, eixo: 0.007 },
-  { y: -0.026, x: 0.045, cima: 0.031, baixo: 0.017, eixo: 0.006 },
-  { y: 0.002, x: 0.045, cima: 0.03, baixo: 0.017, eixo: 0.006 },
-  { y: 0.028, x: 0.042, cima: 0.027, baixo: 0.016, eixo: 0.005 },
-  { y: 0.048, x: 0.036, cima: 0.023, baixo: 0.014, eixo: 0.003 },
-  { y: 0.062, x: 0.027, cima: 0.018, baixo: 0.011, eixo: 0.0 },
-  { y: 0.07, x: 0.017, cima: 0.012, baixo: 0.007, eixo: -0.004 },
-  { y: 0.0725, x: 0.006, cima: 0.005, baixo: 0.003, eixo: -0.007 },
+  { y: -0.0725, x: 0.026, cima: 0.017, baixo: 0.012, eixo: 0.007 },
+  { y: -0.068, x: 0.035, cima: 0.022, baixo: 0.015, eixo: 0.007 },
+  { y: -0.058, x: 0.039, cima: 0.026, baixo: 0.016, eixo: 0.006 },
+  { y: -0.03, x: 0.04, cima: 0.028, baixo: 0.017, eixo: 0.006 },
+  { y: 0.005, x: 0.04, cima: 0.028, baixo: 0.017, eixo: 0.005 },
+  { y: 0.035, x: 0.039, cima: 0.027, baixo: 0.016, eixo: 0.004 },
+  { y: 0.055, x: 0.037, cima: 0.025, baixo: 0.015, eixo: 0.002 },
+  { y: 0.066, x: 0.033, cima: 0.022, baixo: 0.013, eixo: 0.0 },
+  { y: 0.0725, x: 0.026, cima: 0.017, baixo: 0.01, eixo: -0.002 },
 ]
 
 function corpo(c: Construtor): void {
@@ -536,33 +541,41 @@ function bracoEMotor(c: Construtor, mx: number, my: number, fase: number): void 
  * e simetrico e nao se percebe onde e a frente.
  */
 function gimbalECamara(c: Construtor): void {
-  // Braco que desce do nariz e recua, como o encaixe real.
-  c.tuboEntre([0, 0.05, -0.012], [0, 0.058, -0.026], 0.008, 0.0068, LADOS_BRACO, CORPO_ESCURO)
+  /*
+   * A camara vai a frente, nao pendurada por baixo.
+   *
+   * Estava a descair quarenta milimetros abaixo da barriga, como um candeeiro.
+   * O sitio dela e encostada a cara do nariz, um pouco abaixo do eixo, a
+   * avancar para a frente - e o aparelho assenta nas pernas e nao nela, que e o
+   * que lhe permite pousar.
+   */
+  const ALTURA = -0.013
+  const CARA = 0.0725
 
-  // Berco em U: dois bracos verticais e a travessa que os une por tras.
+  // Encaixe: sai da cara do nariz e segura o modulo pelos lados.
   for (const lado of [-1, 1]) {
     c.tuboEntre(
-      [lado * 0.017, 0.058, -0.024],
-      [lado * 0.017, 0.06, -0.041],
-      0.0036,
-      0.0034,
+      [lado * 0.016, CARA - 0.008, ALTURA + 0.002],
+      [lado * 0.016, CARA + 0.008, ALTURA],
+      0.005,
+      0.0044,
       LADOS_BRACO,
-      CINZENTO_ESCURO,
+      CORPO_ESCURO,
     )
   }
-  c.caixa([0, 0.0555, -0.039], [0.017, 0.004, 0.005], CINZENTO_ESCURO)
 
-  // Corpo da camara, mais alto do que largo, como o modulo real.
-  c.caixa([0, 0.0645, -0.0405], [0.0135, 0.014, 0.0135], PRETO)
+  // Modulo da camara, um bloco escuro a avancar do nariz.
+  c.caixa([0, CARA + 0.009, ALTURA], [0.0145, 0.011, 0.0135], PRETO)
+
   /*
    * Aro da objectiva em cinzento sobre o barrilete preto.
    *
    * E o unico contraste claro nesta zona toda, e e ele que marca onde a camara
    * aponta quando o aparelho sai com dez pixeis no ecra.
    */
-  c.tuboEntre([0, 0.0755, -0.0425], [0, 0.0815, -0.0425], 0.0135, 0.013, LADOS_LENTE, CINZENTO_ESCURO)
-  c.tuboEntre([0, 0.0765, -0.0405], [0, 0.082, -0.0405], 0.0105, 0.0098, LADOS_LENTE, PRETO)
-  c.tuboEntre([0, 0.082, -0.0405], [0, 0.0826, -0.0405], 0.0086, 0.0086, LADOS_LENTE, VIDRO)
+  c.tuboEntre([0, CARA + 0.018, ALTURA], [0, CARA + 0.023, ALTURA], 0.0125, 0.012, LADOS_LENTE, CINZENTO_ESCURO)
+  c.tuboEntre([0, CARA + 0.023, ALTURA], [0, CARA + 0.0265, ALTURA], 0.0098, 0.0092, LADOS_LENTE, PRETO)
+  c.tuboEntre([0, CARA + 0.0265, ALTURA], [0, CARA + 0.027, ALTURA], 0.008, 0.008, LADOS_LENTE, VIDRO)
 }
 
 /**

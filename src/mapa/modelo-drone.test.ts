@@ -138,8 +138,12 @@ describe('proporcoes do aparelho', () => {
     expect(Math.hypot(0.087, 0.087)).toBeCloseTo(Math.hypot(0.087, 0.087), 9)
   })
 
-  it('a camara e o ponto mais baixo, e fica a frente', () => {
-    // O gimbal pendura-se do nariz: tem de descer mais do que o trem de tras.
+  it('assenta nas pernas, e nao na camara', () => {
+    /*
+     * A camara esteve pendurada quarenta milimetros abaixo da barriga, como um
+     * candeeiro, e era o ponto mais baixo do aparelho. Nenhum aparelho pousa
+     * sobre a objectiva: o ponto mais baixo sao as pernas de tras.
+     */
     let maisBaixo = Infinity
     let yDoMaisBaixo = 0
     for (let i = 0; i < malha.posicoes.length; i += 3) {
@@ -148,8 +152,8 @@ describe('proporcoes do aparelho', () => {
       maisBaixo = z
       yDoMaisBaixo = malha.posicoes[i + 1] ?? 0
     }
-    expect(maisBaixo).toBeLessThan(-0.03)
-    expect(yDoMaisBaixo).toBeGreaterThan(0)
+    expect(maisBaixo).toBeLessThan(-0.028)
+    expect(yDoMaisBaixo).toBeLessThan(0)
   })
 
   it('o comprimento anunciado bate com o corpo', () => {
@@ -250,17 +254,22 @@ describe('forma da fuselagem', () => {
     expect(cima).toBeGreaterThan(Math.abs(baixo) * 1.8)
   })
 
-  it('a objectiva passa a frente do nariz', () => {
+  it('a camara vai a frente do nariz, e nao por baixo', () => {
     /*
      * E o que diz para onde ele esta a olhar quando se ve de cima, e de cima e
-     * como ele se ve quase sempre. Com a lente recolhida debaixo do nariz, um
-     * quadricoptero visto de cima e simetrico e nao se percebe onde e a frente.
+     * como ele se ve quase sempre. Recolhida debaixo do nariz, um quadricoptero
+     * visto de cima e simetrico e nao se percebe onde e a frente.
+     *
+     * O plano do meio so tem fuselagem e camara - os bracos, os motores e as
+     * pernas ficam todos para fora dele.
      */
-    const gimbal = opacos().filter((p) => p.z < -0.03)
-    expect(gimbal.length).toBeGreaterThan(0)
-
-    const maisAFrente = Math.max(...gimbal.map((p) => p.y))
+    const meio = opacos().filter((p) => Math.abs(p.x) < 0.02)
+    const maisAFrente = Math.max(...meio.map((p) => p.y))
     expect(maisAFrente).toBeGreaterThan(comprimentoDoDrone() / 2)
+
+    // E fica a altura do nariz, e nao pendurada: acima do pouso das pernas.
+    const daFrente = meio.filter((p) => p.y > comprimentoDoDrone() / 2)
+    expect(Math.min(...daFrente.map((p) => p.z))).toBeGreaterThan(-0.028)
   })
 
   it('assenta em quatro pes, dois a frente e dois atras', () => {
