@@ -62,6 +62,7 @@ import { BotaoAreas, BotaoTopografia } from './ui/BotoesImportar.tsx'
 import { BarraModos } from './ui/BarraModos.tsx'
 import { useCanal } from './ui/canal.ts'
 import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
+import { encolherPaineis, useLarguraDaJanela } from './ui/larguras.ts'
 import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
 import type { DroneNoMapa } from './mapa/camada-drones.ts'
 import { BarraEstatisticas } from './ui/BarraEstatisticas.tsx'
@@ -182,6 +183,17 @@ export function App() {
   const [sombreado, setSombreado] = useState(true)
   const [larguraEsquerda, setLarguraEsquerda] = useLarguraPersistida('painel-esquerdo', 240)
   const [larguraDireita, setLarguraDireita] = useLarguraPersistida('painel-direito', 300)
+
+  /*
+   * As larguras guardadas sao uma preferencia, e uma preferencia escolhida num
+   * ecra grande nao serve num pequeno. Numa janela estreita os paineis sao
+   * apertados para o mapa ficar com espaco util; alargar a janela devolve a
+   * largura escolhida, sem ninguem ter de arrastar outra vez.
+   */
+  const paineis = encolherPaineis(useLarguraDaJanela(), {
+    esquerda: larguraEsquerda,
+    direita: larguraDireita,
+  })
   const [erroMapa, setErroMapa] = useState<string | null>(null)
 
   // --- arranque: recupera a ultima rota ou cria uma nova ---------------------
@@ -736,7 +748,7 @@ export function App() {
       <main
         className="corpo"
         style={{
-          gridTemplateColumns: `${larguraEsquerda}px 5px minmax(0, 1fr) 5px ${larguraDireita}px`,
+          gridTemplateColumns: `${paineis.esquerda}px 5px minmax(0, 1fr) 5px ${paineis.direita}px`,
         }}
       >
         <ListaWaypoints
@@ -758,7 +770,7 @@ export function App() {
 
         <PuxadorPainel
           lado="esquerda"
-          largura={larguraEsquerda}
+          largura={paineis.esquerda}
           aoRedimensionar={setLarguraEsquerda}
           rotulo="Largura da lista de trajetórias"
         />
@@ -1030,7 +1042,7 @@ export function App() {
 
         <PuxadorPainel
           lado="direita"
-          largura={larguraDireita}
+          largura={paineis.direita}
           aoRedimensionar={setLarguraDireita}
           rotulo="Largura do painel de propriedades"
         />
