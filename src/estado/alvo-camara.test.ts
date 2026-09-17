@@ -266,15 +266,38 @@ describe('piramide do enquadramento', () => {
     cotaTerreno: 350,
     distancia: 100,
   })
-  const cheio = {
-    cantos: [canto(40.75, -8.41), canto(40.75, -8.4), canto(40.76, -8.4), canto(40.76, -8.41)],
-  }
+
+  /** Direccoes dos quatro raios de canto, aproximadas. So a ordem importa. */
+  const direccoes = [
+    { este: -0.3, norte: 0.6, cima: 0.35 },
+    { este: 0.3, norte: 0.6, cima: 0.35 },
+    { este: 0.3, norte: 0.5, cima: -0.7 },
+    { este: -0.3, norte: 0.5, cima: -0.7 },
+  ]
+
   const alvo = {
     posicao: { lat: 40.755, lon: -8.405 },
     alturaASL: 420,
-    guinada: 90,
-    gimbalPitch: -45,
+    guinada: 0,
+    gimbalPitch: -13,
     gimbalYaw: 0,
+  }
+
+  /** Os quatro cantos no chao: a foto nadiral, em que todos os raios acertam. */
+  const todosNoChao = {
+    centro: canto(40.755, -8.405),
+    direccoesDosCantos: direccoes,
+    cantos: [canto(40.75, -8.41), canto(40.75, -8.4), canto(40.76, -8.4), canto(40.76, -8.41)],
+  }
+
+  /**
+   * O caso real que estava a falhar: gimbal a treze graus, os dois raios de
+   * cima acima do horizonte, so os dois de baixo a tocar no terreno.
+   */
+  const soOsDeBaixo = {
+    centro: canto(40.756, -8.405),
+    direccoesDosCantos: direccoes,
+    cantos: [null, null, canto(40.76, -8.4), canto(40.76, -8.41)],
   }
 
   it('sem enquadramento nao ha piramide', () => {
@@ -282,58 +305,77 @@ describe('piramide do enquadramento', () => {
     expect(arestasDoEnquadramento(alvo, undefined)).toEqual([])
   })
 
-  it('com menos de tres cantos tambem nao', () => {
-    /* Acontece quando os raios saem do terreno carregado. */
-    expect(arestasDoEnquadramento(alvo, { cantos: [canto(40.75, -8.41)] })).toEqual([])
+  it('com os quatro cantos no chao sao quatro arestas mais a base fechada', () => {
+    expect(arestasDoEnquadramento(alvo, todosNoChao)).toHaveLength(4 + 4)
   })
 
-  it('um canto que o raio nao alcancou nao conta', () => {
-    const comFalha = { cantos: [...cheio.cantos.slice(0, 2), null] }
-    expect(arestasDoEnquadramento(alvo, comFalha)).toEqual([])
+  it('com o gimbal pouco inclinado a piramide aparece na mesma', () => {
+    /*
+     * Era este o defeito. Com o gimbal a doze ou treze graus - o que uma rota
+     * de inspeccao usa - e um campo de visao de oitenta e quatro, os dois raios
+     * de cima apontam mais de vinte graus acima do horizonte e nunca cortam o
+     * terreno. Exigir que os quatro tocassem no chao fazia a figura nao
+     * aparecer precisamente nas rotas que mais precisam dela.
+     */
+    expect(arestasDoEnquadramento(alvo, soOsDeBaixo)).toHaveLength(4 + 4)
   })
 
-  it('sao quatro arestas do aparelho mais a base fechada', () => {
-    // Sem a base fechada a figura le-se como um leque, e nao como piramide.
-    expect(arestasDoEnquadramento(alvo, cheio)).toHaveLength(4 + 4)
+  it('sem canto nenhum no chao continua a haver piramide', () => {
+    // Camara toda acima do horizonte: nao ha o que medir, mas ha para onde olha.
+    const nenhum = { ...soOsDeBaixo, cantos: [null, null, null, null] }
+    expect(arestasDoEnquadramento(alvo, nenhum)).toHaveLength(4 + 4)
   })
 
   it('as quatro primeiras partem todas do aparelho, a altura de voo', () => {
-    /*
-     * E este o ponto de tudo isto. Em GeoJSON os raios partiam do sitio do
-     * aparelho mas nao da altura dele, e o que se via era uma estrela desenhada
-     * no terreno em vez de um cone a descer.
-     */
-    const arestas = arestasDoEnquadramento(alvo, cheio)
-    for (const aresta of arestas.slice(0, 4)) {
+    for (const aresta of arestasDoEnquadramento(alvo, soOsDeBaixo).slice(0, 4)) {
       expect(aresta.de).toEqual({ lat: alvo.posicao.lat, lon: alvo.posicao.lon, alt: 420 })
     }
   })
 
-  it('as pontas de baixo assentam na cota do terreno', () => {
-    const arestas = arestasDoEnquadramento(alvo, cheio)
-    for (const aresta of arestas.slice(0, 4)) {
-      expect(aresta.para.alt).toBe(350)
-    }
+  it('um canto que toca no chao assenta na cota do terreno', () => {
+    const arestas = arestasDoEnquadramento(alvo, soOsDeBaixo)
+    expect(arestas[2]?.para.alt).toBe(350)
+    expect(arestas[3]?.para.alt).toBe(350)
+  })
+
+  it('um canto que nao toca no chao sobe, em vez de desaparecer', () => {
+    // O raio aponta acima do horizonte: a ponta fica acima do aparelho.
+    const arestas = arestasDoEnquadramento(alvo, soOsDeBaixo)
+    expect(arestas[0]?.para.alt).toBeGreaterThan(alvo.alturaASL)
+    expect(arestas[1]?.para.alt).toBeGreaterThan(alvo.alturaASL)
   })
 
   it('a base liga cantos seguidos e volta ao primeiro', () => {
-    const base = arestasDoEnquadramento(alvo, cheio).slice(4)
+    const base = arestasDoEnquadramento(alvo, todosNoChao).slice(4)
     expect(base).toHaveLength(4)
     expect(base[3]?.para).toEqual(base[0]?.de)
   })
 
-  it('a base fica toda no terreno, sem subir ao aparelho', () => {
-    const base = arestasDoEnquadramento(alvo, cheio).slice(4)
-    for (const aresta of base) {
-      expect(aresta.de.alt).toBe(350)
-      expect(aresta.para.alt).toBe(350)
-    }
+  it('a piramide cresce com a distancia ao que se esta a ver', () => {
+    /*
+     * A ponta de um raio que nao chega ao chao fica a uma vez e meia a
+     * distancia ao centro. Com um tamanho fixo, a figura ficava enorme de perto
+     * e minuscula de longe.
+     */
+    const perto = arestasDoEnquadramento(alvo, {
+      ...soOsDeBaixo,
+      centro: { ...canto(40.756, -8.405), distancia: 50 },
+    })
+    const longe = arestasDoEnquadramento(alvo, {
+      ...soOsDeBaixo,
+      centro: { ...canto(40.756, -8.405), distancia: 500 },
+    })
+
+    expect(longe[0]?.para.alt).toBeGreaterThan(perto[0]!.para.alt)
   })
 
-  it('o aparelho fica acima da base: e uma piramide invertida', () => {
-    const arestas = arestasDoEnquadramento(alvo, cheio)
-    for (const aresta of arestas.slice(0, 4)) {
-      expect(aresta.de.alt).toBeGreaterThan(aresta.para.alt)
+  it('sem centro visado a piramide usa uma distancia de recurso', () => {
+    const semCentro = { ...soOsDeBaixo, centro: null, cantos: [null, null, null, null] }
+    const arestas = arestasDoEnquadramento(alvo, semCentro)
+
+    expect(arestas).toHaveLength(8)
+    for (const aresta of arestas) {
+      expect(Number.isFinite(aresta.para.alt)).toBe(true)
     }
   })
 })

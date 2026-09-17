@@ -74,7 +74,15 @@ export function VistaCamara({
 }: Props) {
   const contentor = useRef<HTMLDivElement>(null)
   const mapa = useRef<MapaLibre | null>(null)
-  const pronto = useRef(false)
+  /*
+   * Estado, e nao `ref`, de proposito.
+   *
+   * Num `ref`, um efeito que dependa dos dados corre uma vez antes de o mapa
+   * carregar, desiste, e nunca mais volta a correr - porque os dados nao
+   * mudaram. Foi assim que os limites importados deixaram de aparecer aqui. Em
+   * estado, a chegada do mapa provoca render e os efeitos correm outra vez.
+   */
+  const [pronto, setPronto] = useState(false)
   const arrasto = useRef<{ x: number; y: number } | null>(null)
   const [aArrastar, setAArrastar] = useState(false)
 
@@ -96,11 +104,11 @@ export function VistaCamara({
 
     instancia.on('load', () => {
       instancia.setTerrain({ source: FONTE_TERRENO, exaggeration: 1 })
-      pronto.current = true
+      setPronto(true)
     })
 
     return () => {
-      pronto.current = false
+      setPronto(false)
       instancia.remove()
       mapa.current = null
     }
@@ -109,10 +117,10 @@ export function VistaCamara({
 
   useEffect(() => {
     const instancia = mapa.current
-    if (!instancia || !pronto.current) return
+    if (!instancia || !pronto) return
     const fonte = instancia.getSource(FONTE_AREAS_CAMARA) as GeoJSONSource | undefined
     fonte?.setData(areasGeoJSON(areas))
-  }, [areas])
+  }, [areas, pronto])
 
   const centro = enquadramento?.centro
   const alvoLat = centro?.ponto.lat
@@ -121,7 +129,7 @@ export function VistaCamara({
 
   useEffect(() => {
     const instancia = mapa.current
-    if (!instancia || !pronto.current) return
+    if (!instancia || !pronto) return
     if (alvoLat === undefined || alvoLon === undefined || alvoCota === undefined) return
 
     const opcoes = instancia.calculateCameraOptionsFromTo(
@@ -131,7 +139,7 @@ export function VistaCamara({
       alvoCota,
     )
     instancia.jumpTo(opcoes)
-  }, [posicao.lat, posicao.lon, alturaASL, alvoLat, alvoLon, alvoCota])
+  }, [posicao.lat, posicao.lon, alturaASL, alvoLat, alvoLon, alvoCota, pronto])
 
   const grausPorPixel = (elemento: HTMLElement): number =>
     fovHorizontal / Math.max(1, elemento.clientWidth)

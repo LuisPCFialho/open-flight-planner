@@ -37,6 +37,16 @@ export type Enquadramento = {
   centro: PontoVisado | null
   /** Cantos pela ordem: cima-esquerda, cima-direita, baixo-direita, baixo-esquerda. */
   cantos: (PontoVisado | null)[]
+  /**
+   * Direccao de cada raio de canto, em ENU e normalizada, pela mesma ordem.
+   *
+   * Vao a parte dos cantos porque um raio que nao corte o terreno continua a
+   * ter direccao. Com o gimbal pouco inclinado - doze ou treze graus, que e o
+   * que uma rota de inspeccao usa - os raios de cima passam mais de vinte graus
+   * acima do horizonte e nunca tocam no chao: nao ha canto, mas ha para onde se
+   * olha, e e disso que a piramide precisa.
+   */
+  direccoesDosCantos: Vector3[]
   /** Largura do terreno coberta na horizontal media, em metros. */
   larguraCoberta: number | null
   /** Profundidade coberta entre o bordo proximo e o distante, em metros. */
@@ -52,7 +62,7 @@ export function fovVerticalDe(fovHorizontal: number, proporcao: number): number 
   return (2 * Math.atan(Math.tan((fovHorizontal * GRAUS) / 2) / proporcao)) / GRAUS
 }
 
-type Vector3 = { este: number; norte: number; cima: number }
+export type Vector3 = { este: number; norte: number; cima: number }
 
 /**
  * Base da camara em ENU.
@@ -102,6 +112,28 @@ function normalizar(v: Vector3): Vector3 {
  * por bisseccao. Devolve `null` quando o raio sobe, ou quando nao encontra o
  * terreno dentro do alcance, que e o caso de uma camara apontada ao horizonte.
  */
+/**
+ * Onde um raio esta, a uma dada distancia da origem.
+ *
+ * Serve para desenhar a direccao de um raio que nunca corta o terreno. Nao e
+ * uma medicao - e um ponto arbitrario ao longo da linha de vista - e por isso
+ * nao entra em nada que se leia como numero.
+ */
+export function pontoAoLongoDoRaio(
+  origem: LatLon,
+  alturaASL: number,
+  direccao: Vector3,
+  distancia: number,
+): { ponto: LatLon; altura: number } {
+  const horizontal = Math.hypot(direccao.este, direccao.norte)
+  const rumo = (Math.atan2(direccao.este, direccao.norte) / GRAUS + 360) % 360
+
+  return {
+    ponto: horizontal < 1e-12 ? origem : deslocar(origem, rumo, horizontal * distancia),
+    altura: alturaASL + direccao.cima * distancia,
+  }
+}
+
 export function marcharRaio(
   origem: LatLon,
   alturaASL: number,
@@ -184,10 +216,18 @@ export function projectarEnquadramento(
 
   const centro = lancar(0, 0)
   // Cima-esquerda, cima-direita, baixo-direita, baixo-esquerda.
-  const cantos = [lancar(-1, 1), lancar(1, 1), lancar(1, -1), lancar(-1, -1)]
+  const escalas: readonly [number, number][] = [
+    [-1, 1],
+    [1, 1],
+    [1, -1],
+    [-1, -1],
+  ]
+  const cantos = escalas.map(([sx, sy]) => lancar(sx, sy))
+  const direccoesDosCantos = escalas.map(([sx, sy]) => raio(sx, sy))
 
   return {
     centro,
+    direccoesDosCantos,
     cantos,
     larguraCoberta: larguraMedia(cantos),
     profundidadeCoberta: profundidade(cantos),

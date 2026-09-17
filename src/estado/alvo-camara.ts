@@ -5,7 +5,7 @@ import type { EstadoReplay } from '../nucleo/replay.ts'
 import type { EstadoVoo } from '../nucleo/voo.ts'
 import type { Perfil } from '../nucleo/perfil.ts'
 import type { Alvo } from './useEnquadramento.ts'
-import type { Enquadramento } from '../nucleo/camara.ts'
+import { pontoAoLongoDoRaio, type Enquadramento } from '../nucleo/camara.ts'
 import type { Segmento3D } from '../mapa/camada-rota-3d.ts'
 import { chaveDaPosicao } from './useCotasTerreno.ts'
 import type { DroneNoMapa } from '../mapa/camada-drones.ts'
@@ -168,26 +168,50 @@ export function aeronaveDoVoo(estado: EstadoVoo, alturaASL: number): DroneNoMapa
  */
 export function arestasDoEnquadramento(
   alvo: Alvo,
-  enquadramento: Pick<Enquadramento, 'cantos'> | null | undefined,
+  enquadramento: Pick<Enquadramento, 'cantos' | 'centro' | 'direccoesDosCantos'> | null | undefined,
 ): Segmento3D[] {
   if (!enquadramento) return []
 
-  const cantos = enquadramento.cantos.filter((c) => c !== null)
-  if (cantos.length < 3) return []
+  const direccoes = enquadramento.direccoesDosCantos
+  if (direccoes.length < 4) return []
+
+  /*
+   * Ate onde se estende um raio que nao chega ao chao.
+   *
+   * Uma vez e meia a distancia ao centro do enquadramento: assim a piramide
+   * cresce com o que se esta a ver, em vez de ter um tamanho fixo que fica
+   * enorme de perto e minusculo de longe. Sem centro visado - camara toda acima
+   * do horizonte - usa-se uma distancia de recurso.
+   */
+  const alcance = enquadramento.centro ? enquadramento.centro.distancia * 1.5 : 400
 
   const aparelho = { lat: alvo.posicao.lat, lon: alvo.posicao.lon, alt: alvo.alturaASL }
-  const noChao = cantos.map((c) => ({
-    lat: c.ponto.lat,
-    lon: c.ponto.lon,
-    alt: c.cotaTerreno,
-  }))
 
-  const arestas: Segmento3D[] = noChao.map((canto) => ({ de: aparelho, para: canto }))
+  /*
+   * Cada canto vem do terreno quando o raio la chega, e da propria linha de
+   * vista quando nao chega.
+   *
+   * Exigir que os quatro tocassem no chao era o que fazia a piramide nao
+   * aparecer quase nunca: com o gimbal a doze graus e um campo de visao de
+   * oitenta e quatro, os dois raios de cima apontam mais de vinte graus acima
+   * do horizonte e nunca cortam o terreno. A figura ficava por desenhar
+   * precisamente nas rotas de inspeccao, que sao as que mais precisam dela.
+   */
+  const pontas = direccoes.map((direccao, i) => {
+    const canto = enquadramento.cantos[i]
+    if (canto) {
+      return { lat: canto.ponto.lat, lon: canto.ponto.lon, alt: canto.cotaTerreno }
+    }
+    const longe = pontoAoLongoDoRaio(alvo.posicao, alvo.alturaASL, direccao, alcance)
+    return { lat: longe.ponto.lat, lon: longe.ponto.lon, alt: longe.altura }
+  })
+
+  const arestas: Segmento3D[] = pontas.map((ponta) => ({ de: aparelho, para: ponta }))
 
   // A base fecha-se: e ela que faz a figura ler-se como piramide e nao como leque.
-  for (const [i, canto] of noChao.entries()) {
-    const seguinte = noChao[(i + 1) % noChao.length]
-    if (seguinte) arestas.push({ de: canto, para: seguinte })
+  for (const [i, ponta] of pontas.entries()) {
+    const seguinte = pontas[(i + 1) % pontas.length]
+    if (seguinte) arestas.push({ de: ponta, para: seguinte })
   }
 
   return arestas
