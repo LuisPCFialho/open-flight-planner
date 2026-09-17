@@ -96,7 +96,7 @@ test.describe('do limite da parcela ao ficheiro que voa', () => {
     page.on('response', (resposta) => {
       if (resposta.status() < 400) return
       // So os nossos: os mosaicos vem de fora e falham por razoes que nao sao nossas.
-      if (resposta.url().startsWith('http://localhost:')) {
+      if (new URL(resposta.url()).origin === new URL(page.url()).origin) {
         pedidosFalhados.push(`${resposta.status()} ${resposta.url()}`)
       }
     })

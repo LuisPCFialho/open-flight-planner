@@ -16,6 +16,15 @@ import { defineConfig, devices } from '@playwright/test'
 /** Porta propria, para nao chocar com o que estiver a correr a mao. */
 const PORTA = 4173
 
+/**
+ * Endereco a ensaiar.
+ *
+ * Sem `E2E_URL`, constroi-se e serve-se localmente. Com ele, os ensaios correm
+ * contra o que estiver publicado - e o que permite verificar um deploy do
+ * Vercel sem ter de confiar que ele saiu igual ao que saiu aqui.
+ */
+const PUBLICADO = process.env['E2E_URL']
+
 export default defineConfig({
   testDir: 'e2e',
   /* Um percurso que falha a meio raramente falha por acaso: vale mais ver logo. */
@@ -32,17 +41,22 @@ export default defineConfig({
   reporter: process.env['CI'] ? [['github'], ['list']] : [['list']],
 
   use: {
-    baseURL: `http://localhost:${PORTA}`,
+    baseURL: PUBLICADO ?? `http://localhost:${PORTA}`,
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
-  webServer: {
-    command: `npm run build && npx vite preview --port ${PORTA} --strictPort`,
-    url: `http://localhost:${PORTA}`,
-    reuseExistingServer: !process.env['CI'],
-    timeout: 180_000,
-  },
+  // Contra um endereco publicado nao ha nada que levantar aqui.
+  ...(PUBLICADO
+    ? {}
+    : {
+        webServer: {
+          command: `npm run build && npx vite preview --port ${PORTA} --strictPort`,
+          url: `http://localhost:${PORTA}`,
+          reuseExistingServer: !process.env['CI'],
+          timeout: 180_000,
+        },
+      }),
 })
