@@ -12,6 +12,19 @@ ordering below is the useful part, not the calendar.
 
 ### Added
 
+- **Direction of travel on every leg**, and **the take-off point drawn** with its
+  outbound and return legs dashed. The route used to start in mid-air, and on a
+  coverage route with parallel legs the order could only be read point by point
+  off the marker numbers.
+- **Markers thin out when they would overlap.** A coverage route puts photos
+  twenty metres apart: seen from above, a hundred and eight numbered circles fall
+  on top of each other and neither the numbers nor the path can be read — in the
+  tool's main use case. Below the threshold they shrink to dots and the number
+  goes; zooming in brings it back. The selected one never shrinks.
+- **Where you were survives a reload.** Reloading used to drop you back at the
+  project list, which in a project with several campaigns means choosing twice
+  every time.
+
 - **Optional accounts, one person's projects per account.** Storage now sits
   behind one interface with two implementations. IndexedDB stays the default and
   needs no configuration; Firestore with per-account isolation switches on when
@@ -61,6 +74,24 @@ ordering below is the useful part, not the calendar.
 - **Coverage measurement** and a linter that understands React hooks.
 
 ### Fixed
+
+- **The parcel boundary never drew in the camera view**, because its source and
+  layers were never created. The effect that writes the data existed and called
+  `setData` on a source that did not exist: `getSource` returned undefined, the
+  optional chain swallowed the call, and nothing reported that the drawing was
+  not happening.
+- **The amber footprint on the ground appeared some of the time.** It and the 3D
+  pyramid each had their own calculation, and the ground one required three
+  corners resting on terrain — with the gimbal at twelve or thirteen degrees the
+  upper rays pass above the horizon. Both now come from one calculation, and a
+  footprint whose corners did not all reach the ground is drawn faintly, because
+  it is where the camera looks rather than what the photo covers.
+- **The aircraft's heading could not be read.** A quadcopter seen from above is
+  nearly symmetric under quarter turns, and the only cue was the gimbal camera,
+  two pixels wide at map scale. Front propeller tips are now warm and rear ones
+  cold, which is what the aircraft themselves do with their arm LEDs.
+- **Warnings and file errors were missing their accents**, in an interface that
+  is meant to be in correct European Portuguese throughout.
 
 - **Rotating in virtual flight moved nothing on screen.** The map turned to keep
   the heading up while the 3D model turned with the heading in world
