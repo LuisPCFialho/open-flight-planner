@@ -20,6 +20,7 @@ import {
   enquadramentoGeoJSON,
   medicaoGeoJSON,
   segmentosGeoJSON,
+  trajectoCasaGeoJSON,
 } from './geojson.ts'
 import type { Enquadramento } from '../nucleo/camara.ts'
 
@@ -39,6 +40,10 @@ const CAMADA_MEDICAO_PONTOS = 'medicao-pontos'
 const FONTE_AREAS = 'areas-referencia'
 const CAMADA_AREAS_PREENCHIMENTO = 'areas-preenchimento'
 const CAMADA_AREAS_CONTORNO = 'areas-contorno'
+
+const FONTE_CASA = 'ponto-casa'
+const CAMADA_CASA_PERNAS = 'casa-pernas'
+const CAMADA_CASA_PONTO = 'casa-ponto'
 
 export type CursorTerreno = { lat: number; lon: number; cotaTerreno: number | null }
 
@@ -71,8 +76,8 @@ export type PropsMapa = {
   enquadramento: Enquadramento | null
   /** Arestas da piramide que a camara projecta, desenhadas a altura de voo. */
   arestasEnquadramento: readonly Segmento3D[]
-  /** Posicao da aeronave em voo virtual, para o mapa a seguir. */
-  seguir: { posicao: LatLon; guinada: number } | null
+  /** Posicao da aeronave em voo virtual ou no leitor, para o mapa a seguir. */
+  seguir: { posicao: LatLon } | null
   /**
    * Ponto para onde levar a vista.
    *
@@ -266,6 +271,45 @@ export function Mapa(props: PropsMapa) {
           'line-width': 3,
           'line-opacity': 1,
           'line-dasharray': [3, 2],
+        },
+      })
+
+      /*
+       * O ponto de descolagem e as pernas de saida e de regresso.
+       *
+       * Tracejado e apagado de proposito: e voo de transito, nao e o que se vai
+       * filmar. Entra antes da rota para ficar por baixo dela - se as duas se
+       * cruzarem, e a rota que tem de se ver.
+       */
+      instancia.addSource(FONTE_CASA, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      instancia.addLayer({
+        id: CAMADA_CASA_PERNAS,
+        type: 'line',
+        source: FONTE_CASA,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': '#dfe7f0',
+          'line-width': 1.6,
+          'line-opacity': 0.6,
+          'line-dasharray': [2, 2.5],
+        },
+      })
+      instancia.addLayer({
+        id: CAMADA_CASA_PONTO,
+        type: 'circle',
+        source: FONTE_CASA,
+        filter: ['==', ['geometry-type'], 'Point'],
+        // Um aro, e nao um disco: o interior deixa ver o sitio onde se levanta.
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#0b0e11',
+          'circle-opacity': 0.35,
+          'circle-stroke-color': '#dfe7f0',
+          'circle-stroke-width': 2.5,
         },
       })
 
@@ -607,6 +651,13 @@ export function Mapa(props: PropsMapa) {
   useEffect(() => {
     const instancia = mapa.current
     if (!instancia || !pronto) return
+    const fonte = instancia.getSource(FONTE_CASA) as GeoJSONSource | undefined
+    fonte?.setData(trajectoCasaGeoJSON(props.rota))
+  }, [props.rota, pronto])
+
+  useEffect(() => {
+    const instancia = mapa.current
+    if (!instancia || !pronto) return
     const fonte = instancia.getSource(FONTE_ENQUADRAMENTO) as GeoJSONSource | undefined
     fonte?.setData(enquadramentoGeoJSON(props.enquadramento, posicaoDaAeronave(props)))
     // O enquadramento sai da camara do ponto seleccionado ou da aeronave em voo.
@@ -632,16 +683,26 @@ export function Mapa(props: PropsMapa) {
     fonte?.setData(medicaoGeoJSON(props.medicao))
   }, [props.medicao, pronto])
 
-  // Em voo virtual o mapa acompanha a aeronave, como no Pilot 2.
+  /*
+   * Em voo virtual e no leitor o mapa acompanha a aeronave. Acompanha a
+   * posicao, e so a posicao.
+   *
+   * Rodava tambem, para o rumo ficar sempre para cima. So que o modelo 3D ja
+   * roda com a guinada, em coordenadas do mundo: mapa e aparelho rodavam o
+   * mesmo angulo em sentidos contrarios e o resultado no ecra era zero. Rodar a
+   * aeronave nao mexia nada - o que se via era o terreno a girar a volta de um
+   * aparelho aparentemente preso.
+   *
+   * Sem a rotacao, virar o nariz vira o modelo, que e o que se quer ver. A
+   * orientacao do mapa passa a ser de quem esta a ver, e a bussola continua la
+   * para voltar ao norte.
+   */
   useEffect(() => {
     const instancia = mapa.current
     const seguir = props.seguir
     if (!instancia || !pronto || !seguir) return
 
-    instancia.jumpTo({
-      center: [seguir.posicao.lon, seguir.posicao.lat],
-      bearing: seguir.guinada,
-    })
+    instancia.jumpTo({ center: [seguir.posicao.lon, seguir.posicao.lat] })
   }, [props.seguir, pronto])
 
   // Levar a vista a um waypoint, a pedido da lista ou do perfil.

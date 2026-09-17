@@ -46,6 +46,47 @@ export function segmentosGeoJSON(waypoints: Rota['waypoints']): FeatureCollectio
   return { type: 'FeatureCollection', features }
 }
 
+/**
+ * O ponto de descolagem e as pernas que a aeronave voa sem estar a filmar.
+ *
+ * Nao se desenhavam em lado nenhum. A rota aparecia a comecar no ar, e o sitio
+ * de onde o aparelho levanta - que e tambem onde o piloto fica - nao estava no
+ * plano. A saida ate ao primeiro waypoint e o regresso sao voo a serio: contam
+ * para a bateria e passam por cima de alguma coisa.
+ *
+ * O regresso so se desenha quando a rota o tem. Com `autoLand` a aeronave pousa
+ * onde acaba, e com `noAction` fica a pairar: desenhar uma perna de volta era
+ * mostrar um voo que nao vai acontecer.
+ */
+export function trajectoCasaGeoJSON(
+  rota: Pick<Rota, 'pontoDescolagem' | 'waypoints' | 'acaoFinal'>,
+): FeatureCollection {
+  const casa: LatLon = { lat: rota.pontoDescolagem.lat, lon: rota.pontoDescolagem.lon }
+  const features: Feature[] = [
+    {
+      type: 'Feature',
+      properties: { papel: 'casa' },
+      geometry: { type: 'Point', coordinates: coordenada(casa) },
+    },
+  ]
+
+  const primeiro = rota.waypoints[0]
+  if (!primeiro) return { type: 'FeatureCollection', features }
+  features.push(linha(casa, primeiro, { papel: 'saida' }))
+
+  // Com um waypoint so, a volta e a ida ao contrario e o tracejado ficava a
+  // dobrar sobre si proprio.
+  const ultimo = rota.waypoints.at(-1)
+  if (!ultimo || rota.waypoints.length < 2) return { type: 'FeatureCollection', features }
+
+  if (rota.acaoFinal === 'goHome') features.push(linha(ultimo, casa, { papel: 'regresso' }))
+  if (rota.acaoFinal === 'gotoFirstWaypoint') {
+    features.push(linha(ultimo, primeiro, { papel: 'regresso' }))
+  }
+
+  return { type: 'FeatureCollection', features }
+}
+
 /** Os limites das parcelas importadas, como poligonos fechados. */
 export function areasGeoJSON(areas: readonly Area[] | undefined): FeatureCollection {
   const features: Feature[] = []

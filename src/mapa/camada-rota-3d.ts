@@ -58,6 +58,86 @@ export type Segmento3D = {
 /** O ambar do poligono do enquadramento: as duas leituras sao da mesma coisa. */
 const COR_ENQUADRAMENTO: Cor = [0.94, 0.71, 0.16, 0.75]
 
+/**
+ * Um ponto em coordenadas Mercator. So o que a geometria precisa.
+ *
+ * `MercatorCoordinate` serve aqui sem conversao nenhuma - tem os mesmos tres
+ * campos - mas o tipo e proprio para as contas se poderem verificar sem mapa.
+ */
+export type PontoMercator = { x: number; y: number; z: number }
+
+/**
+ * Tamanho da seta de sentido, em metros e em fraccao do troco.
+ *
+ * Proporcional ao troco, para uma rota densa nao ficar com as setas maiores do
+ * que os proprios trocos, e limitada nos dois extremos: abaixo do minimo nao se
+ * distingue de um risco, acima do maximo passa a ser o que se ve em vez da rota.
+ */
+const SETA_FRACCAO = 0.22
+const SETA_MINIMA = 3
+const SETA_MAXIMA = 20
+/** Abaixo disto a seta tapava o troco inteiro e nao se lia nada. */
+const TROCO_MINIMO_COM_SETA = 6
+/** Quanto a seta abre para os lados, em fraccao do seu comprimento. */
+const ABERTURA_SETA = 0.42
+
+/**
+ * A seta que diz para que lado se voa o troco, a meio dele.
+ *
+ * Sem ela o plano nao tinha sentido de marcha: numa rota de cobertura com
+ * dezenas de pernas paralelas, a ordem lia-se ponto a ponto pelos numeros dos
+ * marcadores e mais nada. A seta assenta no plano que contem a direccao de voo
+ * e a horizontal, portanto num troco a subir inclina-se com ele.
+ *
+ * Devolve `null` quando nao ha seta que faca sentido: troco curto de mais, ou
+ * troco so de subida, que nao tem direccao no plano.
+ */
+export function setaDoTroco(
+  de: PontoMercator,
+  para: PontoMercator,
+  metro: number,
+): { ponta: PontoMercator; esquerda: PontoMercator; direita: PontoMercator } | null {
+  if (!(metro > 0)) return null
+
+  const vx = para.x - de.x
+  const vy = para.y - de.y
+  const vz = para.z - de.z
+  const comprimento = Math.hypot(vx, vy, vz)
+  const horizontal = Math.hypot(vx, vy)
+  if (comprimento === 0 || horizontal === 0) return null
+  if (comprimento < TROCO_MINIMO_COM_SETA * metro) return null
+
+  const lado = Math.min(
+    SETA_MAXIMA * metro,
+    Math.max(SETA_MINIMA * metro, comprimento * SETA_FRACCAO),
+  )
+
+  // Direccao de marcha, e a perpendicular horizontal a ela.
+  const ux = vx / comprimento
+  const uy = vy / comprimento
+  const uz = vz / comprimento
+  const nx = uy / (horizontal / comprimento)
+  const ny = -ux / (horizontal / comprimento)
+
+  const meio = { x: (de.x + para.x) / 2, y: (de.y + para.y) / 2, z: (de.z + para.z) / 2 }
+  const avanco = lado / 2
+  const abertura = lado * ABERTURA_SETA
+
+  return {
+    ponta: { x: meio.x + ux * avanco, y: meio.y + uy * avanco, z: meio.z + uz * avanco },
+    esquerda: {
+      x: meio.x - ux * avanco + nx * abertura,
+      y: meio.y - uy * avanco + ny * abertura,
+      z: meio.z - uz * avanco,
+    },
+    direita: {
+      x: meio.x - ux * avanco - nx * abertura,
+      y: meio.y - uy * avanco - ny * abertura,
+      z: meio.z - uz * avanco,
+    },
+  }
+}
+
 const COR_VERTICAL: Cor = [0.85, 0.88, 0.92, 0.55]
 /** A vertical leva a cor do ponto, mas mais apagada: e a linha, nao o aviso. */
 const OPACIDADE_VERTICAL = 0.6
@@ -258,11 +338,13 @@ export class CamadaRota3D implements CustomLayerInterface {
     const primeiro = voo[0]
     if (!primeiro) return
     this.#origem = [primeiro.x, primeiro.y, primeiro.z]
+    // Unidades Mercator por metro, a latitude da rota: e o que dimensiona as setas.
+    const metro = primeiro.meterInMercatorCoordinateUnits()
 
     const linhas: number[] = []
     const marcas: number[] = []
 
-    const empurrar = (destino: number[], m: MercatorCoordinate, cor: Cor): void => {
+    const empurrar = (destino: number[], m: PontoMercator, cor: Cor): void => {
       destino.push(m.x - this.#origem[0], m.y - this.#origem[1], m.z - this.#origem[2], ...cor)
     }
 
@@ -294,6 +376,14 @@ export class CamadaRota3D implements CustomLayerInterface {
       const cor = corDoTroco(acimaDoSolo(pontoDe), acimaDoSolo(pontoPara), this.#intervalo)
       empurrar(linhas, de, cor)
       empurrar(linhas, para, cor)
+
+      // A seta vai da cor do troco: o sentido e a folga acima do solo leem-se juntos.
+      const seta = setaDoTroco(de, para, metro)
+      if (!seta) continue
+      empurrar(linhas, seta.esquerda, cor)
+      empurrar(linhas, seta.ponta, cor)
+      empurrar(linhas, seta.direita, cor)
+      empurrar(linhas, seta.ponta, cor)
     }
 
     /*

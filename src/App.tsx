@@ -813,12 +813,9 @@ export function App() {
               enquadramento={enquadramento}
               seguir={
                 replay.activo && replay.estado
-                  ? {
-                      posicao: replay.estado.posicao,
-                      guinada: replay.estado.atitude.guinada,
-                    }
+                  ? { posicao: replay.estado.posicao }
                   : voo.activo
-                    ? { posicao: voo.estado.posicao, guinada: voo.estado.guinada }
+                    ? { posicao: voo.estado.posicao }
                     : null
               }
               centrarEm={centrarEm}

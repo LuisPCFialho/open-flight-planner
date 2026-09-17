@@ -3,7 +3,13 @@ import type { Feature, LineString, Polygon } from 'geojson'
 import type { Area, Rota } from '../nucleo/tipos.ts'
 import { deslocar } from '../nucleo/geodesia.ts'
 import { acrescentarWaypoint, rotaVazia, waypointNovo } from '../nucleo/operacoes-rota.ts'
-import { areasGeoJSON, enquadramentoGeoJSON, medicaoGeoJSON, segmentosGeoJSON } from './geojson.ts'
+import {
+  areasGeoJSON,
+  enquadramentoGeoJSON,
+  medicaoGeoJSON,
+  segmentosGeoJSON,
+  trajectoCasaGeoJSON,
+} from './geojson.ts'
 
 /**
  * O GeoJSON que o mapa desenha. O que se verifica aqui nao e o aspecto: e a
@@ -198,5 +204,52 @@ describe('enquadramento da camara', () => {
   it('o poligono do que a foto apanha fecha-se', () => {
     const anel = geometria<Polygon>(enquadramentoGeoJSON(cheio, null).features[0]).coordinates[0]
     expect(anel?.at(0)).toEqual(anel?.at(-1))
+  })
+})
+
+describe('ponto de descolagem e pernas de transito', () => {
+  const papeis = (r: Rota): string[] =>
+    trajectoCasaGeoJSON(r).features.map((f) => String(f.properties?.papel))
+
+  it('o sitio de onde se levanta aparece mesmo sem rota nenhuma', () => {
+    expect(papeis(rota(0))).toEqual(['casa'])
+  })
+
+  it('a saida vai do ponto de descolagem ao primeiro waypoint', () => {
+    const r = rota(3)
+    const saida = trajectoCasaGeoJSON(r).features.find((f) => f.properties?.papel === 'saida')
+    const linha = geometria<LineString>(saida)
+    expect(linha.coordinates[0]).toEqual([r.pontoDescolagem.lon, r.pontoDescolagem.lat])
+    expect(linha.coordinates[1]).toEqual([r.waypoints[0]?.lon, r.waypoints[0]?.lat])
+  })
+
+  it('com regresso a casa a ultima perna acaba no ponto de descolagem', () => {
+    const r: Rota = { ...rota(3), acaoFinal: 'goHome' }
+    const volta = trajectoCasaGeoJSON(r).features.find((f) => f.properties?.papel === 'regresso')
+    const linha = geometria<LineString>(volta)
+    expect(linha.coordinates[0]).toEqual([r.waypoints[2]?.lon, r.waypoints[2]?.lat])
+    expect(linha.coordinates[1]).toEqual([r.pontoDescolagem.lon, r.pontoDescolagem.lat])
+  })
+
+  it('com regresso ao primeiro ponto a volta acaba la, e nao em casa', () => {
+    const r: Rota = { ...rota(3), acaoFinal: 'gotoFirstWaypoint' }
+    const volta = trajectoCasaGeoJSON(r).features.find((f) => f.properties?.papel === 'regresso')
+    expect(geometria<LineString>(volta).coordinates[1]).toEqual([
+      r.waypoints[0]?.lon,
+      r.waypoints[0]?.lat,
+    ])
+  })
+
+  /*
+   * Com `autoLand` a aeronave pousa onde acaba e com `noAction` fica a pairar.
+   * Desenhar uma volta era mostrar um voo que nao vai acontecer.
+   */
+  it('quem nao volta nao leva perna de regresso', () => {
+    expect(papeis({ ...rota(3), acaoFinal: 'autoLand' })).toEqual(['casa', 'saida'])
+    expect(papeis({ ...rota(3), acaoFinal: 'noAction' })).toEqual(['casa', 'saida'])
+  })
+
+  it('com um waypoint so a volta seria a ida ao contrario, e nao se desenha', () => {
+    expect(papeis({ ...rota(1), acaoFinal: 'goHome' })).toEqual(['casa', 'saida'])
   })
 })
