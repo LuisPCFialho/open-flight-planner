@@ -10,6 +10,43 @@ ordering below is the useful part, not the calendar.
 
 ## Unreleased
 
+### Added
+
+- **Orbit a point, looking at it the whole way round.** Coverage serves what lies
+  flat — the terrain, the parcel, the field of panels. For what stands up (a
+  transformer station, a met mast, a pole, an inverter tower) a grid overhead
+  sees the roof and nothing else. There is no field for the camera angle, and
+  that is deliberate: with the aircraft `r` metres from the axis and `h` above
+  the target, the angle that points at it is `-atan(h/r)` and there is nothing to
+  decide. Leaving it by hand gives a full circle with the target drifting out of
+  frame halfway round, which is the one mistake an orbit can really make.
+
+  The heading is not written in degrees either — each waypoint is tied to the POI
+  in `towardPOI`. Same arithmetic, but the route stays correct after someone
+  drags the point on the map, which is exactly what you do next after looking at
+  an orbit.
+
+- **A safety net under the application.** An exception in any component unmounts
+  the whole tree, and what React leaves in its place is an empty `div`. To
+  whoever is using this, a page that suddenly goes blank is indistinguishable
+  from "I have lost everything" — and that is not what happened: the projects and
+  routes are in IndexedDB, untouched, and reloading brings them all back. The net
+  exists to say the two things nobody can work out alone in front of a blank
+  screen. It does not try to recover: a `setState` remounting the tree that just
+  blew up blows up again, and what you get is a flicker.
+
+### Changed
+
+- **Firebase is no longer downloaded by people who will never have an account.**
+  Three hundred-odd kilobytes that everyone transferred, including everyone who
+  clones the repository and — today — everyone who opens the published site. A
+  mode of operation selected by environment variables cannot cost the weight of
+  both modes to someone using one. First load on the preview server went from
+  about 650 kB to 476 kB transferred; the main chunk from 1213 kB (373 gzipped)
+  to 530 kB (167 gzipped). If the network cannot reach the chunk, the app falls
+  back to local mode rather than going blank, because local mode works perfectly
+  without it.
+
 ## 0.3.0
 
 Six features and a visual pass. The first three came out of the same question -

@@ -16,7 +16,7 @@ own; see [accounts](docs/contas.md).
 account. The routes you make there stay in that browser.
 
 > **Status: not yet flown.** The exporters are built against real KMZ files and
-> covered by 944 tests, but no route produced by this tool has been flown on an
+> covered by 973 tests, but no route produced by this tool has been flown on an
 > aircraft yet. Read [what to verify in the field](docs/verificar-no-campo.md)
 > before you trust it with a battery. If you fly one, please open an issue —
 > that single report is the most useful contribution this project can get.
@@ -48,6 +48,13 @@ specify altitude and overlap, the way a survey is actually specified; the
 spacing follows. Optionally a second pass at ninety degrees, for when what
 matters is the volume of things rather than the ground, and a camera tilt for
 what stands up rather than what lies flat.
+
+**Orbit a point.** Coverage serves what lies flat. For what stands up — a
+transformer station, a met mast, an inverter tower — a grid overhead sees the
+roof and nothing else. An orbit circles at a fixed radius with the camera locked
+on the point. The camera angle is not a field you fill in: with the aircraft `r`
+from the axis and `h` above the target, `-atan(h/r)` is the only angle that
+points at it.
 
 **Terrain following that means it.** Altitudes are AGL against a real elevation
 model, with a terrain profile showing clearance along the whole route. On a
