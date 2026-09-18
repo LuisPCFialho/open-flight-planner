@@ -20,7 +20,45 @@
   --fonte: 'Segoe UI', system-ui, -apple-system, sans-serif;
   --fonte-numerica: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
 
+  /*
+   * Sombras por altura, e nao uma so para tudo.
+   *
+   * Uma barra encostada e um painel que flutua sobre o mapa estao a alturas
+   * diferentes e tem de o parecer. Com a mesma sombra nos dois, a interface fica
+   * plana e deixa de se perceber o que esta por cima do que.
+   */
+  --sombra-baixa: 0 1px 2px rgb(0 0 0 / 0.3);
+  --sombra-media: 0 4px 12px rgb(0 0 0 / 0.4);
+  --sombra-alta: 0 12px 32px rgb(0 0 0 / 0.55);
+
+  /* O azul do destaque com transparencia, para fundos e anéis de foco. */
+  --destaque-fundo: rgb(74 163 255 / 0.14);
+  --destaque-borda: rgb(74 163 255 / 0.45);
+
+  /* Uma so duracao para tudo o que e resposta ao rato. */
+  --transicao: 120ms ease;
+
   color-scheme: dark;
+}
+
+/*
+ * Quem pediu menos movimento nao leva movimento nenhum.
+ *
+ * Isto nao e cosmetica: ha quem fique enjoado com transicoes, e o sistema
+ * operativo tem uma definicao para o dizer. Respeita-se.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transicao: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 * {
@@ -60,11 +98,25 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  transition:
+    background var(--transicao),
+    border-color var(--transicao),
+    color var(--transicao);
 }
 
 button:hover:not(:disabled) {
   border-color: var(--borda-forte);
   background: #212a35;
+}
+
+button:active:not(:disabled) {
+  /*
+   * Um pixel para baixo em vez de uma cor diferente.
+   *
+   * Numa barra com vinte botoes, mudar a cor no clique le-se como "este ficou
+   * ligado"; afundar le-se como "carreguei neste".
+   */
+  transform: translateY(1px);
 }
 
 button:disabled {
@@ -75,6 +127,69 @@ button:disabled {
 button.activo {
   border-color: var(--destaque);
   color: var(--destaque);
+  background: var(--destaque-fundo);
+}
+
+/*
+ * A accao que e o ponto da aplicacao.
+ *
+ * Numa barra onde vinte botoes tem todos o mesmo peso, `Exportar` - que e para
+ * onde todo o trabalho vai - le-se ao mesmo nivel que `DXF`. O contorno e o
+ * suficiente: nao ha aqui nenhum botao cheio de cor a gritar, porque o resto da
+ * interface e para se olhar durante horas.
+ */
+button.principal:not(:disabled) {
+  border-color: var(--destaque-borda);
+  background: var(--destaque-fundo);
+  color: var(--destaque);
+  font-weight: 600;
+}
+
+button.principal:not(:disabled):hover {
+  border-color: var(--destaque);
+  background: rgb(74 163 255 / 0.22);
+}
+
+/*
+ * O anel de foco, uma vez, para tudo.
+ *
+ * `:focus-visible` e nao `:focus`: quem navega com o rato nao leva anel nenhum
+ * ao clicar, e quem navega com o teclado sabe sempre onde esta.
+ */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+/* --- barras de deslocamento ------------------------------------------------ */
+
+/*
+ * A barra do sistema, em claro, sobre uma interface escura, corta a coluna ao
+ * meio com uma faixa branca. Fina e da cor das bordas desaparece ate fazer falta.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borda-forte) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--borda-forte);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #445770;
 }
 
 /* --- estrutura ------------------------------------------------------------ */
@@ -1379,51 +1494,113 @@ button,
   font-size: 15px;
 }
 
+/*
+ * Os projetos em cartoes, e nao numa tabela.
+ *
+ * Uma tabela de cinco colunas e uma linha, num ecra de mil e quatrocentos
+ * pixeis, e uma risca perdida no meio do preto - e este e o primeiro ecra que
+ * alguem ve da aplicacao. Cada projeto e uma obra e ocupa o espaco de uma.
+ *
+ * A largura e limitada de proposito: cartoes de trezentos e tal pixeis lem-se;
+ * esticados de ponta a ponta do monitor, o nome fica num canto e a data no
+ * outro.
+ */
 .lista-projetos {
   overflow: auto;
-  padding: 14px;
+  padding: 20px 14px 40px;
 }
 
-.lista-projetos table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+.cartoes-projeto {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
 }
 
-.lista-projetos th {
-  text-align: left;
+.cartao-projeto {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--fundo-painel);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  box-shadow: var(--sombra-baixa);
+  transition:
+    border-color var(--transicao),
+    box-shadow var(--transicao);
+}
+
+.cartao-projeto:hover {
+  border-color: var(--borda-forte);
+  box-shadow: var(--sombra-media);
+}
+
+/* Dentro do cartao, o foco do teclado nunca fica cortado pelo canto. */
+.cartao-projeto:focus-within {
+  border-color: var(--destaque-borda);
+}
+
+.cartao-titulo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cartao-rotas {
+  flex: none;
+  font-size: 11px;
+  color: var(--texto-suave);
+}
+
+.cartao-campos {
+  display: grid;
+  gap: 6px;
+}
+
+.cartao-campos label {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.cartao-campos label span {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--texto-suave);
-  font-weight: 600;
-  padding: 0 8px 6px;
-  border-bottom: 1px solid var(--borda);
 }
 
-.lista-projetos th.numerico,
-.lista-projetos td.numerico {
-  text-align: right;
+.cartao-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--borda);
 }
 
-.lista-projetos td {
-  padding: 3px 8px;
-  border-bottom: 1px solid #1a2129;
-}
-
-.lista-projetos tr:hover td {
-  background: #151c24;
+.cartao-data {
+  font-size: 11px;
+  color: var(--texto-suave);
 }
 
 .lista-projetos input {
   width: 100%;
-  background: transparent;
+  background: var(--fundo);
   color: var(--texto);
   border: 1px solid transparent;
   border-radius: var(--raio);
   padding: 4px 6px;
   font-family: inherit;
   font-size: 12px;
+  min-width: 0;
 }
 
 .lista-projetos input:hover {
@@ -1431,7 +1608,6 @@ button,
 }
 
 .lista-projetos input:focus {
-  outline: none;
   background: var(--fundo);
   border-color: var(--destaque);
 }
@@ -1439,15 +1615,65 @@ button,
 .lista-projetos .ligacao {
   background: none;
   border: none;
-  padding: 4px 6px;
-  color: var(--destaque);
-  font-size: 13px;
+  padding: 0;
+  color: var(--texto);
+  font-size: 15px;
+  font-weight: 600;
   text-align: left;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.lista-projetos .ligacao {
+  text-decoration: none;
 }
 
 .lista-projetos .ligacao:hover {
-  text-decoration: underline;
+  color: var(--destaque);
   background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.lista-projetos .nome-em-edicao {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/*
+ * O ecra vazio diz o que um projeto e.
+ *
+ * Quem abre isto pela primeira vez ve um ecra preto e um botao. Uma linha a
+ * dizer o que la vai dentro poupa a primeira pergunta toda.
+ */
+.vazio-projetos {
+  max-width: 460px;
+  margin: 60px auto;
+  text-align: center;
+}
+
+.vazio-projetos h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.vazio-projetos p {
+  margin: 0;
+}
+
+.subtitulo-produto {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--texto-suave);
+  font-size: 12px;
 }
 
 .accoes-linha {
@@ -2207,6 +2433,144 @@ button.ligacao {
  * Tudo o resto - mapa, listas, paineis - e trabalho de ecra e nao serve para
  * nada impresso. Sem isto o `Ctrl+P` dava vinte paginas de nada.
  */
+/* --- filtro da lista de waypoints ------------------------------------------ */
+
+.filtro-waypoints {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--borda);
+  background: var(--fundo);
+}
+
+.filtro-waypoints input {
+  font-family: var(--fonte-numerica);
+  font-size: 12px;
+  color: var(--texto);
+  background: var(--fundo-painel);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 3px 6px;
+  width: 100%;
+}
+
+.filtro-waypoints input::placeholder {
+  color: var(--texto-suave);
+  opacity: 0.7;
+}
+
+.filtro-waypoints .alternador button {
+  font-size: 10px;
+  padding: 3px 2px;
+}
+
+/*
+ * Quantos ficaram de fora, encostado ao fundo da coluna.
+ *
+ * Um filtro esquecido ligado faz uma rota de trezentos pontos parecer ter
+ * trinta, e a conta que se faz por cima dela sai toda errada.
+ */
+.filtro-resumo {
+  margin: 0;
+  padding: 5px 8px;
+  border-top: 1px solid var(--borda);
+  background: var(--fundo);
+  color: var(--texto-suave);
+  font-size: 11px;
+  text-align: right;
+}
+
+/* --- peso na barra de cima ------------------------------------------------- */
+
+/*
+ * A barra fica por cima do que vem abaixo, e tem de o parecer.
+ *
+ * So com a linha de baixo, a barra e o mapa liam-se como a mesma superficie, e
+ * os botoes pareciam desenhados sobre o terreno.
+ */
+.barra-superior {
+  box-shadow: var(--sombra-baixa);
+  position: relative;
+  z-index: 8;
+}
+
+.separador-barra {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 2px;
+  background: var(--borda);
+}
+
+/*
+ * Os quatro numeros que decidem o voo, num painel proprio.
+ *
+ * Soltos entre os botoes, liam-se como mais uns rotulos. Sao leitura e nao
+ * comando, e o fundo diz isso sem precisar de mais nada.
+ */
+.estatisticas {
+  padding: 3px 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--fundo);
+}
+
+/*
+ * A cabeca de cada painel, um degrau acima do que ela encima.
+ */
+.painel-cabecalho {
+  background: linear-gradient(var(--fundo-elevado), var(--fundo-painel));
+}
+
+.painel-flutuante {
+  box-shadow: var(--sombra-alta);
+}
+
+/* --- a lista de waypoints, mais legivel ------------------------------------ */
+
+/*
+ * Trezentas linhas iguais sao uma parede.
+ *
+ * Tudo estava ao mesmo peso: o numero, a altura, a altura acima do solo e
+ * quatro icones. A leitura que se faz nesta coluna e quase sempre a mesma -
+ * procurar um numero, e depois ver a altura - e e a esses dois que se da peso.
+ */
+.linha-waypoint .numero {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.linha-waypoint .altura {
+  color: var(--texto);
+}
+
+.linha-waypoint .agl {
+  opacity: 0.75;
+}
+
+/*
+ * Os icones de accao so aparecem a serio quando o rato la esta.
+ *
+ * Centrar e eliminar sao comandos de um ponto de cada vez, e estavam a piscar
+ * em todas as linhas ao mesmo tempo. Continuam sempre no sitio - nao aparecem
+ * do nada - e continuam alcancaveis pelo teclado.
+ */
+.accoes-rapidas button {
+  opacity: 0.45;
+  transition: opacity var(--transicao);
+}
+
+.linha-waypoint:hover .accoes-rapidas button,
+.linha-waypoint.seleccionado .accoes-rapidas button,
+.accoes-rapidas button:focus-visible {
+  opacity: 1;
+}
+
+.linha-waypoint.seleccionado {
+  /* O rail azul a esquerda ja la estava; falta-lhe a fundacao a acompanhar. */
+  box-shadow: inset 3px 0 0 var(--destaque);
+}
+
 /* --- vento ----------------------------------------------------------------- */
 
 .vento-linha {

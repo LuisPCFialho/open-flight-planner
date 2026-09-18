@@ -56,8 +56,10 @@ export function EcraProjetos({ aoAbrir }: Props) {
   return (
     <div className="ecra-projetos">
       <header className="barra-superior">
-        <h1>Projetos</h1>
-        <span />
+        <h1>Open Flight Planner</h1>
+        <span className="subtitulo-produto">
+          Rotas de waypoints para DJI Fly e Pilot 2, sem conversão pelo meio
+        </span>
         <div className="accoes-superiores">
           {sessao.estado === 'dentro' ? (
             <span className="conta">
@@ -102,63 +104,72 @@ export function EcraProjetos({ aoAbrir }: Props) {
             {armazem.remoto ? 'A ler os teus projetos...' : 'A abrir a base de dados local...'}
           </p>
         ) : linhas.length === 0 ? (
-          <p className="vazio">
-            Ainda não há projetos. Cria um, ou importa um JSON exportado noutro posto.
-          </p>
+          <div className="vazio vazio-projetos">
+            <h2>Ainda não há projetos</h2>
+            <p>
+              Um projeto é uma obra, e leva dentro as rotas todas que se voarem lá. Cria um, ou
+              traz um ficheiro JSON exportado noutro posto.
+            </p>
+          </div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Cliente</th>
-                <th>Local</th>
-                <th className="numerico">Rotas</th>
-                <th>Criado</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map(({ projeto, rotas }) => (
-                <tr key={projeto.id}>
-                  <td>
-                    {aRenomear === projeto.id ? (
-                      <input
-                        autoFocus
-                        defaultValue={projeto.nome}
-                        onBlur={(e) => {
-                          void armazem.renomearProjeto(projeto.id, { nome: e.target.value.trim() || projeto.nome })
-                          setARenomear(null)
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') e.currentTarget.blur()
-                          if (e.key === 'Escape') setARenomear(null)
-                        }}
-                      />
-                    ) : (
-                      <button type="button" className="ligacao" onClick={() => aoAbrir(projeto.id)}>
-                        {projeto.nome}
-                      </button>
-                    )}
-                  </td>
-                  <td>
+          <ul className="cartoes-projeto">
+            {linhas.map(({ projeto, rotas }) => (
+              <li key={projeto.id} className="cartao-projeto">
+                <div className="cartao-titulo">
+                  {aRenomear === projeto.id ? (
+                    <input
+                      autoFocus
+                      className="nome-em-edicao"
+                      defaultValue={projeto.nome}
+                      onBlur={(e) => {
+                        void armazem.renomearProjeto(projeto.id, {
+                          nome: e.target.value.trim() || projeto.nome,
+                        })
+                        setARenomear(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') e.currentTarget.blur()
+                        if (e.key === 'Escape') setARenomear(null)
+                      }}
+                    />
+                  ) : (
+                    <button type="button" className="ligacao" onClick={() => aoAbrir(projeto.id)}>
+                      {projeto.nome}
+                    </button>
+                  )}
+                  <span className="cartao-rotas numerico" title="Rotas neste projeto">
+                    {rotas} {rotas === 1 ? 'rota' : 'rotas'}
+                  </span>
+                </div>
+
+                <div className="cartao-campos">
+                  <label>
+                    <span>Cliente</span>
                     <input
                       defaultValue={projeto.cliente}
-                      placeholder="cliente"
-                      onBlur={(e) => void armazem.renomearProjeto(projeto.id, { cliente: e.target.value })}
+                      placeholder="por preencher"
+                      onBlur={(e) =>
+                        void armazem.renomearProjeto(projeto.id, { cliente: e.target.value })
+                      }
                     />
-                  </td>
-                  <td>
+                  </label>
+                  <label>
+                    <span>Local</span>
                     <input
                       defaultValue={projeto.local}
-                      placeholder="local"
-                      onBlur={(e) => void armazem.renomearProjeto(projeto.id, { local: e.target.value })}
+                      placeholder="por preencher"
+                      onBlur={(e) =>
+                        void armazem.renomearProjeto(projeto.id, { local: e.target.value })
+                      }
                     />
-                  </td>
-                  <td className="numerico">{rotas}</td>
-                  <td className="numerico">
+                  </label>
+                </div>
+
+                <div className="cartao-rodape">
+                  <span className="cartao-data numerico">
                     {new Date(projeto.criadoEm).toLocaleDateString('pt-PT')}
-                  </td>
-                  <td className="accoes-linha">
+                  </span>
+                  <span className="accoes-linha">
                     <button type="button" onClick={() => setARenomear(projeto.id)} title="Renomear">
                       Renomear
                     </button>
@@ -185,11 +196,11 @@ export function EcraProjetos({ aoAbrir }: Props) {
                     >
                       <IconeEliminar />
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

@@ -1,5 +1,7 @@
+import { useMemo, useState } from 'react'
 import type { Rota, Waypoint } from '../nucleo/tipos.ts'
 import { IconeCentrar, IconeEliminar, IconeFoto, IconeGimbal } from './icones.tsx'
+import { CRITERIOS, filtrar, type Criterio } from './filtro-waypoints.ts'
 
 export type LinhaWaypoint = {
   waypoint: Waypoint
@@ -29,6 +31,12 @@ export function ListaWaypoints({
   aoCentrar,
   aoEliminar,
 }: Props) {
+  const [criterio, setCriterio] = useState<Criterio>('todos')
+  const [procura, setProcura] = useState('')
+
+  const visiveis = useMemo(() => filtrar(linhas, criterio, procura), [linhas, criterio, procura])
+  const filtrada = visiveis.length !== linhas.length
+
   return (
     <div className="painel painel-esquerdo">
       <header className="painel-cabecalho">
@@ -36,15 +44,49 @@ export function ListaWaypoints({
         <span className="etiqueta-modo">{rota.modoAltitude}</span>
       </header>
 
+      {/*
+        * O filtro so aparece quando a lista e grande de mais para se ler.
+        *
+        * Numa rota de dez pontos e ruido; numa cobertura de trezentos e a unica
+        * maneira de la encontrar alguma coisa.
+        */}
+      {linhas.length > 20 ? (
+        <div className="filtro-waypoints">
+          <input
+            type="search"
+            className="numerico"
+            value={procura}
+            placeholder="Nº"
+            aria-label="Procurar waypoint pelo número"
+            onChange={(evento) => setProcura(evento.target.value)}
+          />
+          <div className="alternador">
+            {CRITERIOS.map((c) => (
+              <button
+                key={c.valor}
+                type="button"
+                title={c.ajuda}
+                className={criterio === c.valor ? 'activo' : ''}
+                onClick={() => setCriterio(c.valor)}
+              >
+                {c.rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {linhas.length === 0 ? (
         <p className="vazio">
           Liga "Criar waypoints" na barra de cima e clica no mapa.
           <br />
           Alt e clique num troço insere um ponto intermédio.
         </p>
+      ) : visiveis.length === 0 ? (
+        <p className="vazio">Nenhum waypoint corresponde ao filtro.</p>
       ) : (
         <ol className="lista-waypoints">
-          {linhas.map(({ waypoint, acimaDoSolo, alerta, origemCota }) => (
+          {visiveis.map(({ waypoint, acimaDoSolo, alerta, origemCota }) => (
             <li
               key={waypoint.id}
               className={[
@@ -101,6 +143,19 @@ export function ListaWaypoints({
           ))}
         </ol>
       )}
+
+      {/*
+        * Quantos ficaram de fora.
+        *
+        * Sem isto, um filtro esquecido ligado e uma rota que parece ter trinta
+        * waypoints quando tem trezentos, e a conta que se faz por cima dela sai
+        * toda errada.
+        */}
+      {filtrada ? (
+        <p className="filtro-resumo numerico">
+          {visiveis.length} de {linhas.length}
+        </p>
+      ) : null}
     </div>
   )
 }

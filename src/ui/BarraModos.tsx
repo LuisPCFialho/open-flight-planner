@@ -49,6 +49,13 @@ export function BarraModos({
 }: Props) {
   return (
     <>
+      {/*
+        * A partir daqui nenhum botao toca na rota gravada: ligam e desligam
+        * modos. E uma fronteira que vale a pena ver, numa barra de vinte botoes
+        * todos com o mesmo aspecto.
+        */}
+      <span className="separador-barra" aria-hidden="true" />
+
       <button
         type="button"
         className={modoMapa === 'waypoint' ? 'activo' : ''}

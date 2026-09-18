@@ -75,7 +75,7 @@ export function BarraFicheiro({
       <div className="grupo-ficheiro">
         <button
           type="button"
-          className={bloqueio ? 'bloqueado' : ''}
+          className={bloqueio ? 'principal bloqueado' : 'principal'}
           title={bloqueio ?? `Exportar KMZ no dialeto ${drone.dialeto}`}
           disabled={rota.waypoints.length === 0 || bloqueio !== null}
           onClick={() => void exportar()}
