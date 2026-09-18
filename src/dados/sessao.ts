@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  isSignInWithEmailLink,
-  onAuthStateChanged,
-  sendSignInLinkToEmail,
-  signInWithEmailLink,
-  signOut,
-} from 'firebase/auth'
-import { autenticacao } from './firebase.ts'
+import { autenticacaoRemota, funcoesDeAutenticacao } from './armazem.ts'
 
 /**
  * Quem esta a usar a aplicacao.
@@ -90,15 +83,16 @@ let jaTentouAEntrada = false
 
 export function useSessao(): Sessao {
   const [estado, setEstado] = useState<EstadoSessao>(
-    autenticacao ? { estado: 'a-carregar' } : { estado: 'local' },
+    autenticacaoRemota ? { estado: 'a-carregar' } : { estado: 'local' },
   )
   const [porConcluir, setPorConcluir] = useState(false)
 
   useEffect(() => {
-    const auth = autenticacao
-    if (!auth) return
+    const auth = autenticacaoRemota
+    const funcoes = funcoesDeAutenticacao
+    if (!auth || !funcoes) return
 
-    const naLigacao = isSignInWithEmailLink(auth, window.location.href)
+    const naLigacao = funcoes.isSignInWithEmailLink(auth, window.location.href)
     const guardado = lerEmailGuardado()
 
     if (naLigacao && !guardado) {
@@ -114,7 +108,7 @@ export function useSessao(): Sessao {
 
     if (naLigacao && guardado && !jaTentouAEntrada) {
       jaTentouAEntrada = true
-      signInWithEmailLink(auth, guardado, window.location.href)
+      funcoes.signInWithEmailLink(auth, guardado, window.location.href)
         .then(() => {
           esquecerEmail()
           limparEndereco()
@@ -126,7 +120,7 @@ export function useSessao(): Sessao {
         })
     }
 
-    const largar = onAuthStateChanged(auth, (utilizador) => {
+    const largar = funcoes.onAuthStateChanged(auth, (utilizador) => {
       setEstado(
         utilizador?.email ? { estado: 'dentro', email: utilizador.email } : { estado: 'fora' },
       )
@@ -136,11 +130,12 @@ export function useSessao(): Sessao {
   }, [])
 
   const entrar = useCallback(async (email: string): Promise<string | null> => {
-    const auth = autenticacao
-    if (!auth) return 'não há armazém remoto configurado'
+    const auth = autenticacaoRemota
+    const funcoes = funcoesDeAutenticacao
+    if (!auth || !funcoes) return 'não há armazém remoto configurado'
 
     try {
-      await sendSignInLinkToEmail(auth, email, {
+      await funcoes.sendSignInLinkToEmail(auth, email, {
         /*
          * A ligacao volta para onde se saiu.
          *
@@ -159,11 +154,12 @@ export function useSessao(): Sessao {
   }, [])
 
   const concluir = useCallback(async (email: string): Promise<string | null> => {
-    const auth = autenticacao
-    if (!auth) return 'não há armazém remoto configurado'
+    const auth = autenticacaoRemota
+    const funcoes = funcoesDeAutenticacao
+    if (!auth || !funcoes) return 'não há armazém remoto configurado'
 
     try {
-      await signInWithEmailLink(auth, email, window.location.href)
+      await funcoes.signInWithEmailLink(auth, email, window.location.href)
       esquecerEmail()
       limparEndereco()
       setPorConcluir(false)
@@ -174,7 +170,7 @@ export function useSessao(): Sessao {
   }, [])
 
   const sair = useCallback(async (): Promise<void> => {
-    if (autenticacao) await signOut(autenticacao)
+    if (autenticacaoRemota) await funcoesDeAutenticacao?.signOut(autenticacaoRemota)
   }, [])
 
   return { ...estado, entrar, concluir: porConcluir ? concluir : null, sair }
