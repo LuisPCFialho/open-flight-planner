@@ -17,9 +17,38 @@ import { fileURLToPath } from 'node:url'
 const PARCELA = fileURLToPath(new URL('./fixtures/parcela.kml', import.meta.url))
 const ZONA = fileURLToPath(new URL('./fixtures/zona-interdita.kml', import.meta.url))
 
+/**
+ * Salta os ensaios quando o sitio pede entrada.
+ *
+ * Estes ensaios correm uma vez por semana contra o sitio publicado. No dia em
+ * que as contas forem ligadas - as variaveis `VITE_FIREBASE_*` postas no Vercel -
+ * o que esta em `/` deixa de ser a lista de projetos e passa a ser o ecra de
+ * entrada, e todos eles passariam a falhar com um tempo esgotado a procura de um
+ * botao que nao esta la.
+ *
+ * Um tempo esgotado nao diz nada a quem o le na segunda-feira de manha. Isto diz.
+ *
+ * Saltar e nao falhar: um trabalho agendado que fica vermelho todas as semanas
+ * por uma razao conhecida e um trabalho que se aprende a ignorar - e a seguir
+ * ignora-se tambem a semana em que ficou vermelho a serio. O que falta nesse dia
+ * e ensinar estes ensaios a entrar, e ate la e melhor dizer-se que nao correram
+ * do que fingir que correram.
+ */
+async function saltarSePedeEntrada(page: Page): Promise<void> {
+  const entrada = page.locator('.ecra-entrada')
+  if ((await entrada.count()) === 0) return
+
+  test.skip(
+    true,
+    'O sitio publicado tem contas ligadas e mostra o ecra de entrada. Estes ensaios ' +
+      'ainda nao sabem entrar - ver docs/contas.md.',
+  )
+}
+
 /** Entra num projeto novo e espera que o mapa instale as camadas. */
 async function abrirProjetoNovo(page: Page): Promise<void> {
   await page.goto('/')
+  await saltarSePedeEntrada(page)
 
   await page.getByRole('button', { name: 'Novo projeto' }).click()
   await page.getByRole('button', { name: /Projeto sem nome/ }).first().click()
