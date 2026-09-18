@@ -23,6 +23,7 @@ import {
 import { acrescentarPOI, poiNovo, removerPOI } from './nucleo/operacoes-poi.ts'
 import { repetirDeslocado, repetirEmSentidoContrario } from './nucleo/repeticao.ts'
 import { acrescentarCobertura } from './nucleo/cobertura.ts'
+import { acrescentarOrbita, gerarOrbita } from './nucleo/orbita.ts'
 import { dividirPorAutonomia } from './nucleo/baterias.ts'
 import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
 import { useEditorRota } from './estado/useEditorRota.ts'
@@ -81,6 +82,7 @@ import { EcraProjetos } from './ui/EcraProjetos.tsx'
 import { PainelSol } from './ui/PainelSol.tsx'
 import { ResumoDoPlano } from './ui/ResumoDoPlano.tsx'
 import { PainelAtalhos } from './ui/PainelAtalhos.tsx'
+import { PainelOrbita } from './ui/PainelOrbita.tsx'
 import { SelectorRota } from './ui/SelectorRota.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
@@ -186,6 +188,7 @@ export function App() {
   const canalOrientacao = useCanal<Orientacao>({ rumo: 0, inclinacao: 0 })
   const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
   const [coberturaAberta, setCoberturaAberta] = useState(false)
+  const [orbitaAberta, setOrbitaAberta] = useState(false)
   const [resumoAberto, setResumoAberto] = useState(false)
   const [atalhosAbertos, setAtalhosAbertos] = useState(false)
   /**
@@ -612,6 +615,7 @@ export function App() {
         setModoMapa('navegar')
         setConfiguracoesAbertas(false)
         setAtalhosAbertos(false)
+        setOrbitaAberta(false)
         seleccao.limpar()
       },
       mover: seleccao.mover,
@@ -801,6 +805,17 @@ export function App() {
             </button>
           ) : null}
 
+          {rota.pois.length > 0 ? (
+            <button
+              type="button"
+              className={orbitaAberta ? 'activo' : ''}
+              title="Voltar a um ponto de interesse, a olhar sempre para ele"
+              onClick={() => setOrbitaAberta((aberto) => !aberto)}
+            >
+              Orbitar
+            </button>
+          ) : null}
+
           {areasDeReferencia(rota.areas).length > 0 ? (
             <button
               type="button"
@@ -984,6 +999,23 @@ export function App() {
                   setCoberturaAberta(false)
                 }}
                 aoFechar={() => setCoberturaAberta(false)}
+              />
+            ) : null}
+
+            {orbitaAberta && rota.pois.length > 0 && drone ? (
+              <PainelOrbita
+                pois={rota.pois}
+                drone={drone}
+                waypointsExistentes={rota.waypoints.length}
+                aoGerar={(opcoesOrbita) => {
+                  aplicar((atual) =>
+                    acrescentarOrbita(atual, gerarOrbita(opcoesOrbita), opcoesOrbita),
+                  )
+                  if (opcoesOrbita.comFoto) setRegistoFotografico(true)
+                  seleccao.limpar()
+                  setOrbitaAberta(false)
+                }}
+                aoFechar={() => setOrbitaAberta(false)}
               />
             ) : null}
 
