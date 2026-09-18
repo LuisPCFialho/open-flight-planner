@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { resolucaoNoTerreno } from '../nucleo/resolucao.ts'
+import { alturaParaResolucao, resolucaoNoTerreno } from '../nucleo/resolucao.ts'
 import type { Area, Drone, ModoAltitude } from '../nucleo/tipos.ts'
 import {
   gerarCobertura,
@@ -101,6 +101,7 @@ export function PainelCobertura({
     [area, opcoes],
   )
 
+  const fov = drone.camara.fovHorizontalGraus ?? 80
   const resolucao = cobertura ? resolucaoNoTerreno(drone.camara, cobertura.larguraDaFaixa) : null
 
   const waypointsNovos = cobertura?.passagens.reduce((soma, p) => soma + p.length, 0) ?? 0
@@ -154,6 +155,27 @@ export function PainelCobertura({
             incrementos={[10, 1]}
             aoAlterar={setAltura}
           />
+          {/*
+            * A pergunta ao contrario, e e a que se faz primeiro: o caderno de
+            * encargos diz os centimetros por pixel e o que falta saber e a que
+            * altura se voa. So aparece para os aparelhos cuja ficha traz
+            * megapixeis - sem eles a conta nao se faz.
+            */}
+          {resolucao !== null ? (
+            <CampoNumerico
+              rotulo="Resolução pretendida"
+              valor={resolucao}
+              unidade=" cm/px"
+              casas={1}
+              min={0.2}
+              max={20}
+              incrementos={[1, 0.1]}
+              aoAlterar={(pedida) => {
+                const nova = alturaParaResolucao(drone.camara, pedida, fov)
+                if (nova !== null) setAltura(Math.round(Math.min(120, Math.max(5, nova))))
+              }}
+            />
+          ) : null}
           <CampoNumerico
             rotulo="Rumo das passagens"
             valor={rumoEfectivo}
