@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { Drone, POI } from '../nucleo/tipos.ts'
-import { gerarOrbita, PASSO_MINIMO, type OpcoesOrbita } from '../nucleo/orbita.ts'
+import {
+  apontaMesmoAoCentro,
+  gerarOrbita,
+  PASSO_MINIMO,
+  type OpcoesOrbita,
+} from '../nucleo/orbita.ts'
 import { formatarDistancia } from '../nucleo/medicao.ts'
 import { resolucaoNoTerreno } from '../nucleo/resolucao.ts'
 import { CampoNumerico, CampoSelecao } from './campos.tsx'
@@ -194,6 +199,19 @@ export function PainelOrbita({
               <dt>Percurso</dt>
               <dd>{formatarDistancia(orbita.distancia)}</dd>
             </dl>
+
+            {/*
+              * Quando o estabilizador nao chega la, a promessa deste painel -
+              * a camara sempre no alvo - deixa de se cumprir, e isso tem de se
+              * ver antes de gerar e nao depois de voar.
+              */}
+            {!apontaMesmoAoCentro(raio, acimaDoPonto) ? (
+              <p className="erro">
+                A esta distância e a esta altura, apontar ao ponto exigia mais do que os 45&deg;
+                para cima que o estabilizador faz. A câmara fica no limite e o ponto sai por
+                cima do enquadramento: afasta-te dele, ou sobe.
+              </p>
+            ) : null}
 
             {total > WAYPOINTS_DEMAIS ? (
               <p className="erro">

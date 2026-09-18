@@ -2,6 +2,7 @@ import type { LatLon, POI, Rota, Waypoint } from './tipos.ts'
 import { deslocar } from './geodesia.ts'
 import { novoId } from './ids.ts'
 import { renumerar, waypointNovo } from './operacoes-rota.ts'
+import { PITCH_MAXIMO, PITCH_MINIMO } from './voo.ts'
 
 /**
  * Voltar a um ponto, a olhar sempre para ele.
@@ -66,13 +67,35 @@ export type Orbita = {
 /**
  * Inclinacao que aponta ao centro, em graus.
  *
- * Negativa para baixo, que e a convencao do resto do projecto. Com a aeronave a
- * altura do proprio ponto da zero - a camara a olhar a direito - e nunca passa
- * dos noventa.
+ * Negativa para baixo, que e a convencao do resto do projecto.
+ *
+ * Fica presa aos mesmos limites que o resto da aplicacao usa para o
+ * estabilizador - de 90 para baixo a 45 para cima - e nao por arrumacao: uma
+ * rota que peca 80 graus para cima nao e uma rota que enquadra mal, e uma rota
+ * que o aparelho nao aceita. Quando o limite aperta, quem o diz e
+ * `apontaMesmoAoCentro`, porque nesse caso a promessa deste modulo - a camara
+ * sempre no alvo - deixa de se cumprir e isso tem de se ver.
  */
 export function inclinacaoParaOCentro(raio: number, acimaDoPonto: number): number {
-  if (!(raio > 0)) return acimaDoPonto >= 0 ? -90 : 90
-  return (-Math.atan2(acimaDoPonto, raio) * 180) / Math.PI
+  const exacta = !(raio > 0)
+    ? acimaDoPonto >= 0
+      ? -90
+      : 90
+    : (-Math.atan2(acimaDoPonto, raio) * 180) / Math.PI
+  return Math.min(PITCH_MAXIMO, Math.max(PITCH_MINIMO, exacta))
+}
+
+/**
+ * Se a inclinacao escolhida aponta mesmo ao centro, ou se bateu no limite.
+ *
+ * Bate quando se voa muito abaixo do alvo e perto dele - o caso de olhar para o
+ * cimo de uma torre de baixo. O estabilizador nao sobe dos 45 graus, e a partir
+ * dai o alvo sai por cima do enquadramento.
+ */
+export function apontaMesmoAoCentro(raio: number, acimaDoPonto: number): boolean {
+  if (!(raio > 0)) return false
+  const exacta = (-Math.atan2(acimaDoPonto, raio) * 180) / Math.PI
+  return exacta >= PITCH_MINIMO && exacta <= PITCH_MAXIMO
 }
 
 export function gerarOrbita(opcoes: OpcoesOrbita): Orbita {

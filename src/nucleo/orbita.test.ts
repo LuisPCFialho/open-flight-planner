@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { acrescentarOrbita, gerarOrbita, inclinacaoParaOCentro, type OpcoesOrbita } from './orbita.ts'
+import {
+  acrescentarOrbita,
+  apontaMesmoAoCentro,
+  gerarOrbita,
+  inclinacaoParaOCentro,
+  type OpcoesOrbita,
+} from './orbita.ts'
+import { PITCH_MAXIMO, PITCH_MINIMO } from './voo.ts'
 import { distancia, rumo } from './geodesia.ts'
 import { rotaVazia } from './operacoes-rota.ts'
 import type { POI, Rota } from './tipos.ts'
@@ -183,5 +190,48 @@ describe('acrescentarOrbita', () => {
     const o = opcoes({ raio: 0 })
     const antes = rotaDeEnsaio()
     expect(acrescentarOrbita(antes, gerarOrbita(o), o)).toBe(antes)
+  })
+})
+
+describe('os limites do estabilizador', () => {
+  /*
+   * Uma rota que peca oitenta graus para cima nao e uma rota que enquadra mal:
+   * e uma rota que o aparelho nao aceita. O resto da aplicacao trabalha entre
+   * -90 e +45, e a orbita tem de trabalhar nos mesmos.
+   */
+  it('nunca sai do intervalo que o resto da aplicacao usa', () => {
+    for (const raio of [1, 5, 40, 500]) {
+      for (const acima of [-100, -40, -1, 0, 1, 40, 120]) {
+        const pitch = inclinacaoParaOCentro(raio, acima)
+        expect(pitch).toBeGreaterThanOrEqual(PITCH_MINIMO)
+        expect(pitch).toBeLessThanOrEqual(PITCH_MAXIMO)
+      }
+    }
+  })
+
+  it('olhar para cima de muito perto bate no limite', () => {
+    /* 40 abaixo do alvo e a 10 dele daria +76 graus, que nao existe. */
+    expect(apontaMesmoAoCentro(10, -40)).toBe(false)
+    expect(inclinacaoParaOCentro(10, -40)).toBe(PITCH_MAXIMO)
+  })
+
+  it('a 45 graus para cima ainda aponta ao centro', () => {
+    expect(apontaMesmoAoCentro(30, -30)).toBe(true)
+    expect(inclinacaoParaOCentro(30, -30)).toBeCloseTo(45, 9)
+  })
+
+  it('a olhar para baixo nunca bate: 90 e o proprio limite', () => {
+    expect(apontaMesmoAoCentro(1, 1000)).toBe(true)
+    expect(inclinacaoParaOCentro(1, 1000)).toBeGreaterThan(PITCH_MINIMO)
+  })
+
+  it('sem raio nao ha centro para onde apontar', () => {
+    expect(apontaMesmoAoCentro(0, 30)).toBe(false)
+  })
+
+  it('a orbita gerada leva o angulo ja preso aos limites', () => {
+    const o = opcoes({ raio: 10, acimaDoPonto: -40 })
+    const rota = acrescentarOrbita(rotaDeEnsaio(), gerarOrbita(o), o)
+    for (const w of rota.waypoints) expect(w.gimbalPitch).toBe(PITCH_MAXIMO)
   })
 })
