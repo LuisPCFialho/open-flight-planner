@@ -8,6 +8,7 @@ import {
   aeronaveDoReplay,
   aeronaveNoPerfil,
   alvoDaCamara,
+  ALCANCE_DOS_RAIOS,
   arestasDoEnquadramento,
   setaDoRumo,
   type Comando,
@@ -268,12 +269,16 @@ describe('piramide do enquadramento', () => {
     distancia: 100,
   })
 
-  /** Direccoes dos quatro raios de canto, aproximadas. So a ordem importa. */
+  /*
+   * Direccoes dos quatro raios de canto, unitarias como as que
+   * `projectarEnquadramento` produz. Sem serem unitarias, o comprimento das
+   * arestas sairia escalado e o ensaio media outra coisa.
+   */
   const direccoes = [
-    { este: -0.3, norte: 0.6, cima: 0.35 },
-    { este: 0.3, norte: 0.6, cima: 0.35 },
-    { este: 0.3, norte: 0.5, cima: -0.7 },
-    { este: -0.3, norte: 0.5, cima: -0.7 },
+    { este: -0.396491, norte: 0.792982, cima: 0.462573 },
+    { este: 0.396491, norte: 0.792982, cima: 0.462573 },
+    { este: 0.329293, norte: 0.548821, cima: -0.768350 },
+    { este: -0.329293, norte: 0.548821, cima: -0.768350 },
   ]
 
   const alvo = {
@@ -333,10 +338,29 @@ describe('piramide do enquadramento', () => {
     }
   })
 
-  it('um canto que toca no chao assenta na cota do terreno', () => {
+  /*
+   * O cone da camara nao assenta no terreno, e e de proposito. Assente, a
+   * figura crescia com o que estava a ser visto: com o gimbal quase na
+   * horizontal os cantos de baixo caem a centenas de metros e a piramide
+   * disparava para fora do mapa. Quem continua a dizer o que a foto cobre e a
+   * mancha no chao, que essa e calculada contra o terreno a serio.
+   */
+  it('todas as arestas tem o mesmo comprimento, toquem ou nao no chao', () => {
     const arestas = arestasDoEnquadramento(alvo, soOsDeBaixo)
-    expect(arestas[2]?.para.alt).toBe(350)
-    expect(arestas[3]?.para.alt).toBe(350)
+    const comprimentos = arestas.slice(0, 4).map((aresta) => {
+      const plano = distancia(alvo.posicao, { lat: aresta.para.lat, lon: aresta.para.lon })
+      return Math.hypot(plano, aresta.para.alt - alvo.alturaASL)
+    })
+
+    for (const comprimento of comprimentos) {
+      expect(comprimento).toBeCloseTo(ALCANCE_DOS_RAIOS, 0)
+    }
+  })
+
+  it('nao usa a cota do terreno: dois cantos no chao nao a herdam', () => {
+    const arestas = arestasDoEnquadramento(alvo, soOsDeBaixo)
+    expect(arestas[2]?.para.alt).not.toBe(350)
+    expect(arestas[3]?.para.alt).not.toBe(350)
   })
 
   it('um canto que nao toca no chao sobe, em vez de desaparecer', () => {

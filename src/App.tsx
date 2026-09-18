@@ -850,7 +850,6 @@ export function App() {
               modo3D={modo3D}
               modoMapa={modoMapa}
               pontasEnquadramento={pontasEnquadramento}
-              centroEnquadramento={enquadramento?.centro?.ponto ?? null}
               seguir={
                 replay.activo && replay.estado
                   ? { posicao: replay.estado.posicao }

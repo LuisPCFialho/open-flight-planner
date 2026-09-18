@@ -81,8 +81,6 @@ export type PropsMapa = {
    * piramide e nao aparecia a mancha no chao.
    */
   pontasEnquadramento: readonly PontaDoEnquadramento[]
-  /** O ponto visado ao centro, para se desenhar o raio que la vai. */
-  centroEnquadramento: LatLon | null
   /** Arestas da piramide que a camara projecta, desenhadas a altura de voo. */
   arestasEnquadramento: readonly Segmento3D[]
   /** Posicao da aeronave em voo virtual ou no leitor, para o mapa a seguir. */
@@ -676,23 +674,8 @@ export function Mapa(props: PropsMapa) {
     const instancia = mapa.current
     if (!instancia || !pronto) return
     const fonte = instancia.getSource(FONTE_ENQUADRAMENTO) as GeoJSONSource | undefined
-    fonte?.setData(
-      enquadramentoGeoJSON(
-        props.pontasEnquadramento,
-        props.centroEnquadramento,
-        posicaoDaAeronave(props),
-      ),
-    )
-    // O enquadramento sai da camara do ponto seleccionado ou da aeronave em voo.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    props.pontasEnquadramento,
-    props.centroEnquadramento,
-    props.seguir,
-    props.seleccionados,
-    waypoints,
-    pronto,
-  ])
+    fonte?.setData(enquadramentoGeoJSON(props.pontasEnquadramento))
+  }, [props.pontasEnquadramento, pronto])
 
   useEffect(() => {
     const instancia = mapa.current
@@ -809,9 +792,3 @@ export function Mapa(props: PropsMapa) {
   return <div className="mapa" data-pronto={pronto ? 'sim' : 'nao'} ref={contentor} />
 }
 
-/** De onde partem os raios do enquadramento: a aeronave, ou o ponto escolhido. */
-function posicaoDaAeronave(props: PropsMapa): LatLon | null {
-  if (props.seguir) return props.seguir.posicao
-  const waypoint = props.rota.waypoints.find((w) => props.seleccionados.has(w.id))
-  return waypoint ? { lat: waypoint.lat, lon: waypoint.lon } : null
-}

@@ -149,7 +149,6 @@ describe('enquadramento da camara', () => {
     alt: 356,
     noTerreno,
   })
-  const CENTRO = { lat: 40.705, lon: -8.395 }
   const cheio = [
     ponta(40.7, -8.4),
     ponta(40.7, -8.39),
@@ -158,19 +157,29 @@ describe('enquadramento da camara', () => {
   ]
 
   it('sem pontas nao ha nada', () => {
-    expect(enquadramentoGeoJSON([], CENTRO, CANTO).features).toHaveLength(0)
+    expect(enquadramentoGeoJSON([]).features).toHaveLength(0)
   })
 
   it('com menos de tres pontas tambem nao: um segmento nao e uma mancha', () => {
-    const curto = [ponta(40.7, -8.4), ponta(40.7, -8.39)]
-    expect(enquadramentoGeoJSON(curto, CENTRO, CANTO).features).toHaveLength(0)
+    expect(enquadramentoGeoJSON([ponta(40.7, -8.4), ponta(40.7, -8.39)]).features).toHaveLength(0)
+  })
+
+  /*
+   * So o poligono. Havia tambem raios da aeronave a cada canto, e existiam por
+   * uma razao que deixou de valer: antes de haver piramide em 3D, eram eles que
+   * diziam de onde a camara olhava. Rastejavam pelo terreno e esticavam-se com
+   * a distancia visada, ate atravessarem o mapa de lado a lado.
+   */
+  it('e so o poligono, sem raios a atravessar o mapa', () => {
+    const features = enquadramentoGeoJSON(cheio).features
+    expect(features).toHaveLength(1)
+    expect(features[0]?.geometry.type).toBe('Polygon')
   })
 
   /*
    * O caso que fazia a mancha desaparecer. Com o gimbal a doze ou treze graus -
    * o que uma rota de inspeccao usa - os dois raios de cima passam acima do
-   * horizonte e nunca cortam o chao. Antes isso apagava o poligono e deixava a
-   * piramide: a mesma coisa via-se umas vezes sim, outras nao.
+   * horizonte e nunca cortam o chao.
    */
   it('pontas projectadas desenham na mesma, marcadas como incompletas', () => {
     const comCeu = [
@@ -179,48 +188,15 @@ describe('enquadramento da camara', () => {
       ponta(40.71, -8.39),
       ponta(40.71, -8.4),
     ]
-    const features = enquadramentoGeoJSON(comCeu, CENTRO, null).features
-    expect(features).toHaveLength(1)
-    expect(features[0]?.properties?.completo).toBe(false)
+    expect(enquadramentoGeoJSON(comCeu).features[0]?.properties?.completo).toBe(false)
   })
 
   it('com os quatro cantos no terreno, o poligono conta-se como completo', () => {
-    const features = enquadramentoGeoJSON(cheio, CENTRO, null).features
-    expect(features[0]?.properties?.completo).toBe(true)
-  })
-
-  it('sem aeronave desenha-se so o poligono', () => {
-    // E o que sobra quando nada esta seleccionado e nao ha voo a decorrer.
-    const features = enquadramentoGeoJSON(cheio, CENTRO, null).features
-    expect(features).toHaveLength(1)
-    expect(features[0]?.geometry.type).toBe('Polygon')
-  })
-
-  it('com aeronave vem tambem um raio por canto e um para o centro', () => {
-    /*
-     * Os raios sao o que deixa perceber de onde a camara esta a olhar: so com o
-     * poligono nao se distingue uma vista de cima de uma vista rasante.
-     */
-    const features = enquadramentoGeoJSON(cheio, CENTRO, CANTO).features
-    expect(features).toHaveLength(1 + 4 + 1)
-    expect(features.filter((f) => f.geometry.type === 'LineString')).toHaveLength(5)
-  })
-
-  it('sem centro nao ha raio ao centro', () => {
-    expect(enquadramentoGeoJSON(cheio, null, CANTO).features).toHaveLength(1 + 4)
-  })
-
-  it('cada raio parte da aeronave', () => {
-    const features = enquadramentoGeoJSON(cheio, CENTRO, CANTO).features
-    for (const f of features.filter((x) => x.geometry.type === 'LineString')) {
-      expect(geometria<LineString>(f).coordinates[0]).toEqual([CANTO.lon, CANTO.lat])
-    }
+    expect(enquadramentoGeoJSON(cheio).features[0]?.properties?.completo).toBe(true)
   })
 
   it('o poligono do que a foto apanha fecha-se', () => {
-    const anel = geometria<Polygon>(
-      enquadramentoGeoJSON(cheio, CENTRO, null).features[0],
-    ).coordinates[0]
+    const anel = geometria<Polygon>(enquadramentoGeoJSON(cheio).features[0]).coordinates[0]
     expect(anel?.at(0)).toEqual(anel?.at(-1))
   })
 })

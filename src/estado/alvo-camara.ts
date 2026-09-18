@@ -225,19 +225,32 @@ export function pontasDoEnquadramento(
 }
 
 /**
- * As arestas da piramide que a camara projecta no terreno.
+ * As arestas da piramide que sai da camara.
  *
- * Quatro do aparelho ate aos cantos que ele apanha, mais a base que os une.
- * Desenhada assim, ela diz duas coisas que o poligono no chao nao diz: de que
- * altura se esta a olhar, e com que inclinacao - um poligono igual pode vir de
- * um voo rasante ou de um voo alto a olhar para baixo.
+ * Quatro do aparelho, uma por canto do enquadramento, mais a base que as une.
+ * Diz para onde a camara aponta e com que inclinacao - um poligono igual no
+ * chao pode vir de um voo rasante ou de um voo alto a olhar para baixo.
+ *
+ * **Nao assenta no terreno, e e de proposito.** Cada aresta tem o mesmo
+ * comprimento, sempre. Assente no terreno, a figura crescia com o que estava a
+ * ser visto: com o gimbal quase na horizontal os cantos de baixo caem a
+ * centenas de metros e a piramide disparava para fora do mapa, tapando a rota.
+ *
+ * O que continua a dizer o que a foto cobre e a mancha no chao, essa calculada
+ * contra o terreno a serio. Esta figura e o cone da camara, e um cone de
+ * tamanho fixo le-se sempre da mesma maneira.
  */
 export function arestasDoEnquadramento(
   alvo: Alvo,
   enquadramento: Pick<Enquadramento, 'cantos' | 'centro' | 'direccoesDosCantos'> | null | undefined,
 ): Segmento3D[] {
-  const pontas = pontasDoEnquadramento(alvo, enquadramento)
-  if (pontas.length < 4) return []
+  const direccoes = enquadramento?.direccoesDosCantos ?? []
+  if (direccoes.length < 4) return []
+
+  const pontas = direccoes.map((direccao) => {
+    const longe = pontoAoLongoDoRaio(alvo.posicao, alvo.alturaASL, direccao, ALCANCE_DOS_RAIOS)
+    return { lat: longe.ponto.lat, lon: longe.ponto.lon, alt: longe.altura }
+  })
 
   const aparelho = { lat: alvo.posicao.lat, lon: alvo.posicao.lon, alt: alvo.alturaASL }
   const arestas: Segmento3D[] = pontas.map((ponta) => ({ de: aparelho, para: ponta }))

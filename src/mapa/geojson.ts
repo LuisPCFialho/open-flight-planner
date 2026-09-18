@@ -145,14 +145,11 @@ export function medicaoGeoJSON(pontos: readonly LatLon[]): FeatureCollection {
 /**
  * O que a camara apanha, no chao.
  *
- * O poligono dos quatro cantos mais os raios que vao da aeronave a cada um e ao
- * centro. Os raios sao o que deixa perceber de onde a camara esta a olhar - so
- * com o poligono nao se distingue uma vista de cima de uma vista rasante.
- *
- * As pontas vem ja calculadas, das mesmas de que sai a piramide em 3D. Aqui
- * havia conta propria, que exigia tres cantos assentes no terreno: com o gimbal
- * pouco inclinado aparecia a piramide e nao aparecia a mancha, e quem estava a
- * ver so via a mesma coisa umas vezes sim e outras nao.
+ * So o poligono dos quatro cantos. Havia tambem raios da aeronave a cada canto
+ * e ao centro, e existiam por uma razao que deixou de valer: antes de haver
+ * piramide em 3D, eram eles que diziam de onde a camara estava a olhar. Agora
+ * dizem-no pior - rastejam pelo terreno, esticam-se com a distancia visada, e
+ * com o gimbal quase na horizontal atravessavam o mapa de lado a lado.
  *
  * `completo` diz se os quatro cantos chegaram mesmo ao chao. Quando nao
  * chegaram, o poligono nao e o que a foto cobre - e para onde ela olha, com a
@@ -161,8 +158,6 @@ export function medicaoGeoJSON(pontos: readonly LatLon[]): FeatureCollection {
  */
 export function enquadramentoGeoJSON(
   pontas: readonly PontaDoEnquadramento[],
-  centro: LatLon | null | undefined,
-  aeronave: LatLon | null,
 ): FeatureCollection {
   if (pontas.length < 3) return VAZIO
 
@@ -170,20 +165,14 @@ export function enquadramentoGeoJSON(
   const primeiro = anel[0]
   if (primeiro) anel.push(primeiro)
 
-  const completo = pontas.every((p) => p.noTerreno)
-
-  const features: Feature[] = [
-    {
-      type: 'Feature',
-      properties: { completo },
-      geometry: { type: 'Polygon', coordinates: [anel] },
-    },
-  ]
-
-  if (aeronave) {
-    for (const ponta of pontas) features.push(linha(aeronave, ponta))
-    if (centro) features.push(linha(aeronave, centro))
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { completo: pontas.every((p) => p.noTerreno) },
+        geometry: { type: 'Polygon', coordinates: [anel] },
+      },
+    ],
   }
-
-  return { type: 'FeatureCollection', features }
 }
