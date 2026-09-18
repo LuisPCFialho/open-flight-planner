@@ -340,6 +340,20 @@ export function App() {
     },
   })
 
+  /*
+   * O arrasto vertical so mexe na inclinacao do gimbal.
+   *
+   * O horizontal ja nao lhe toca: passou a rodar a aeronave, que e o que quem
+   * pilota espera. A rotacao do gimbal em relacao ao nariz continua a existir e
+   * faz-se com as setas.
+   */
+  const inclinarGimbal = useCallback(
+    (deltaPitch: number) => {
+      voo.apontar(deltaPitch, 0)
+    },
+    [voo],
+  )
+
   const replay = useReplay(rota)
 
   /** Quem manda na camara, por ordem: o leitor, o voo virtual, a seleccao. */
@@ -940,7 +954,7 @@ export function App() {
                 fovHorizontal={drone.camara.fovHorizontalGraus ?? 80}
                 tamanho={tamanhoCamara}
                 aoMudarTamanho={setTamanhoCamara}
-                {...(voo.activo ? { aoApontar: voo.apontar } : {})}
+                {...(voo.activo ? { aoRodar: voo.rodar, aoInclinar: inclinarGimbal } : {})}
               />
             ) : null}
 

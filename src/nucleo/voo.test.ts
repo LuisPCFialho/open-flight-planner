@@ -6,6 +6,7 @@ import {
   FACTOR_FINO,
   ROTACAO,
   ROTACAO_GIMBAL,
+  rodarAeronave,
   VELOCIDADE,
   type EstadoVoo,
 } from './voo.ts'
@@ -142,5 +143,41 @@ describe('apontar o gimbal por incrementos', () => {
     expect(apontado.posicao).toEqual(INICIAL.posicao)
     expect(apontado.guinada).toBe(INICIAL.guinada)
     expect(apontado.altura).toBe(INICIAL.altura)
+  })
+})
+
+describe('rodar a aeronave com o rato', () => {
+  /*
+   * Arrastar na vista de camara rodava o gimbal, e o gimbal esta limitado a um
+   * quarto de volta para cada lado: a partir dai arrastar nao fazia nada e o
+   * aparelho no mapa nunca se via virar. Quem pilotava concluia que o modelo
+   * nao rodava - rodava, mas so com o Q e o E.
+   */
+  const parado: EstadoVoo = {
+    posicao: { lat: 40.75, lon: -8.41 },
+    altura: 60,
+    guinada: 0,
+    gimbalPitch: -30,
+    gimbalYaw: 0,
+  }
+
+  it('soma o angulo ao rumo', () => {
+    expect(rodarAeronave(parado, 35).guinada).toBeCloseTo(35, 6)
+  })
+
+  it('nao tem limite: a aeronave da voltas completas', () => {
+    expect(rodarAeronave({ ...parado, guinada: 350 }, 20).guinada).toBeCloseTo(10, 6)
+    expect(rodarAeronave({ ...parado, guinada: 10 }, -20).guinada).toBeCloseTo(350, 6)
+  })
+
+  it('nao toca no gimbal: a rotacao em relacao ao nariz e outra coisa', () => {
+    const rodado = rodarAeronave({ ...parado, gimbalYaw: -80 }, 45)
+    expect(rodado.gimbalYaw).toBe(-80)
+    expect(rodado.gimbalPitch).toBe(-30)
+  })
+
+  it('nao mexe a aeronave de sitio', () => {
+    expect(rodarAeronave(parado, 90).posicao).toEqual(parado.posicao)
+    expect(rodarAeronave(parado, 90).altura).toBe(60)
   })
 })

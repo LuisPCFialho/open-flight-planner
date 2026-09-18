@@ -64,8 +64,17 @@ type Props = {
   fovHorizontal: number
   tamanho: TamanhoCamara
   aoMudarTamanho: (tamanho: TamanhoCamara) => void
-  /** Aponta o gimbal, em graus. Ausente fora do voo, e entao nao se arrasta. */
-  aoApontar?: (deltaPitch: number, deltaYaw: number) => void
+  /**
+   * Arrastar na vista: para cima e para baixo inclina o gimbal, para os lados
+   * roda a aeronave. Ausentes fora do voo, e entao nao se arrasta.
+   *
+   * Era tudo gimbal, e o horizontal batia no limite de um quarto de volta: a
+   * partir dai arrastar nao fazia nada, e o aparelho no mapa nunca se via
+   * virar. Quem estava a pilotar concluia que o modelo nao rodava - rodava, mas
+   * so com o Q e o E.
+   */
+  aoInclinar?: (deltaPitch: number) => void
+  aoRodar?: (deltaGraus: number) => void
 }
 
 export function VistaCamara({
@@ -77,7 +86,8 @@ export function VistaCamara({
   fovHorizontal,
   tamanho,
   aoMudarTamanho,
-  aoApontar,
+  aoInclinar,
+  aoRodar,
 }: Props) {
   const contentor = useRef<HTMLDivElement>(null)
   const mapa = useRef<MapaLibre | null>(null)
@@ -210,26 +220,28 @@ export function VistaCamara({
 
   return (
     <div
-      className={`vista-camara ${tamanho}${aoApontar ? ' apontavel' : ''}${aArrastar ? ' a-arrastar' : ''}`}
-      title={aoApontar ? 'Arrastar aponta o gimbal' : undefined}
+      className={`vista-camara ${tamanho}${aoRodar ? ' apontavel' : ''}${aArrastar ? ' a-arrastar' : ''}`}
+      title={aoRodar ? 'Arrastar: para os lados roda a aeronave, para cima e baixo inclina o gimbal' : undefined}
       onPointerDown={(evento) => {
-        if (!aoApontar) return
+        if (!aoRodar) return
         evento.currentTarget.setPointerCapture(evento.pointerId)
         arrasto.current = { x: evento.clientX, y: evento.clientY }
         setAArrastar(true)
       }}
       onPointerMove={(evento) => {
         const anterior = arrasto.current
-        if (!aoApontar || !anterior) return
+        if (!aoRodar || !anterior) return
 
         const escala = grausPorPixel(evento.currentTarget)
         const dx = evento.clientX - anterior.x
         const dy = evento.clientY - anterior.y
         arrasto.current = { x: evento.clientX, y: evento.clientY }
 
-        // Arrastar para a direita vira a camara para a direita; para baixo,
-        // inclina para baixo. E o gimbal que se conduz, nao a imagem que se puxa.
-        aoApontar(-dy * escala, dx * escala)
+        // Arrastar para a direita vira o nariz para a direita; para baixo,
+        // inclina o gimbal para baixo. E a aeronave que se conduz, nao a
+        // imagem que se puxa.
+        aoRodar(dx * escala)
+        aoInclinar?.(-dy * escala)
       }}
       onPointerUp={(evento) => {
         if (arrasto.current) evento.currentTarget.releasePointerCapture(evento.pointerId)

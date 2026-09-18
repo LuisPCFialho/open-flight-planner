@@ -126,6 +126,16 @@ export function velocidadeAjustada(actual: number, delta: number): number {
   return limitar(actual + delta, VELOCIDADE_MINIMA, VELOCIDADE_MAXIMA)
 }
 
+/**
+ * Roda a aeronave por incrementos. Serve o arrasto do rato na vista de camara.
+ *
+ * Nao tem limites, ao contrario do gimbal: uma aeronave da voltas completas, e
+ * o rumo normaliza-se entre zero e trezentos e sessenta.
+ */
+export function rodarAeronave(estado: EstadoVoo, deltaGraus: number): EstadoVoo {
+  return { ...estado, guinada: normalizarGraus(estado.guinada + deltaGraus) }
+}
+
 /** Aponta o gimbal por incrementos, com os mesmos limites. Serve o rato. */
 export function apontarGimbal(
   estado: EstadoVoo,

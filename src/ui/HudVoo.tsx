@@ -98,9 +98,10 @@ export function HudVoo({
           Gravar waypoint
         </button>
         <span className="hud-ajuda">
-          Setas apontam o gimbal e R recentra-o. Arrastar na vista da câmara aponta
-          directamente. Mais e menos mudam a velocidade, Alt abranda tudo para o
-          ajuste fino. Shift+Space grava, Shift+F junta foto, Esc sai.
+          Arrastar na vista da câmara roda a aeronave e inclina o gimbal. As setas
+          rodam o gimbal em relação ao nariz e R recentra-o. Mais e menos mudam a
+          velocidade, Alt abranda tudo para o ajuste fino. Shift+Space grava,
+          Shift+F junta foto, Esc sai.
         </span>
         <button type="button" onClick={aoParar}>
           Sair do voo

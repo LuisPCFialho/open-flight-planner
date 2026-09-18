@@ -3,6 +3,7 @@ import type { LatLon } from '../nucleo/tipos.ts'
 import {
   apontarGimbal,
   avancarVoo,
+  rodarAeronave,
   PASSO_VELOCIDADE,
   VELOCIDADE,
   velocidadeAjustada,
@@ -40,8 +41,10 @@ export type ComandosVoo = {
   colocar: (posicao: LatLon) => void
   /** Grava o waypoint na posicao e atitude actuais. */
   gravar: () => void
-  /** Aponta a camara, em graus. Serve o arrastar do rato na vista da camara. */
+  /** Inclina o gimbal, em graus. Serve o arrastar vertical na vista da camara. */
   apontar: (deltaPitch: number, deltaYaw: number) => void
+  /** Roda a aeronave, em graus. Serve o arrastar horizontal na vista da camara. */
+  rodar: (deltaGraus: number) => void
   /** Metros por segundo a que a aeronave se desloca no voo virtual. */
   velocidade: number
   alterarVelocidade: (nova: number) => void
@@ -108,6 +111,10 @@ export function useVooVirtual(opcoes: {
 
   const apontar = useCallback((deltaPitch: number, deltaYaw: number) => {
     setEstado((anterior) => apontarGimbal(anterior, deltaPitch, deltaYaw))
+  }, [])
+
+  const rodar = useCallback((deltaGraus: number) => {
+    setEstado((anterior) => rodarAeronave(anterior, deltaGraus))
   }, [])
 
   // --- teclado --------------------------------------------------------------
@@ -203,5 +210,16 @@ export function useVooVirtual(opcoes: {
     return () => cancelAnimationFrame(pedido)
   }, [activo])
 
-  return { activo, estado, arrancar, parar, colocar, gravar, apontar, velocidade, alterarVelocidade }
+  return {
+    activo,
+    estado,
+    arrancar,
+    parar,
+    colocar,
+    gravar,
+    apontar,
+    rodar,
+    velocidade,
+    alterarVelocidade,
+  }
 }
