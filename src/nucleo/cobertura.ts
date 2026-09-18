@@ -42,6 +42,17 @@ export type OpcoesCobertura = {
    * se exporta com uma accao de foto em cada ponto, e enche depressa.
    */
   umPontoPorFoto: boolean
+  /**
+   * Passar a parcela duas vezes, a segunda a noventa graus da primeira.
+   *
+   * Uma grelha so tem um problema conhecido: as fachadas viradas para o lado
+   * das passagens ficam bem vistas e as perpendiculares ficam raspadas. Em
+   * fotogrametria isso da paredes derretidas no modelo, e num parque solar da
+   * uma face de cada mesa sempre vista de esguelha.
+   *
+   * Custa o dobro do tempo e o dobro das fotos, e por isso nao vem ligado.
+   */
+  cruzada?: boolean
 }
 
 export type Cobertura = {
@@ -133,37 +144,19 @@ function repartir(de: Ponto, para: Ponto, passo: number): Ponto[] {
 }
 
 /**
- * Gera as passagens que cobrem o contorno.
+ * As passagens que cobrem o contorno num rumo, no plano local em metros.
  *
- * As passagens alternam de sentido - o serpentear que qualquer levantamento faz -
- * porque voltar ao principio de cada uma seria andar duas vezes o mesmo caminho.
+ * Sai daqui separado de `gerarCobertura` por causa da grelha cruzada, que e a
+ * mesma coisa feita duas vezes em rumos perpendiculares.
  */
-export function gerarCobertura(
+function passagensNoRumo(
   contorno: readonly LatLon[],
+  centro: LatLon,
   opcoes: OpcoesCobertura,
-): Cobertura {
-  const vazio: Cobertura = {
-    passagens: [],
-    espacamento: 0,
-    intervaloEntreFotos: 0,
-    larguraDaFaixa: 0,
-    comprimentoDaFaixa: 0,
-    numeroDeFotos: 0,
-    distancia: 0,
-  }
-
-  const centro = centroDoContorno(contorno)
-  if (!centro || contorno.length < 3) return vazio
-
-  const larguraDaFaixa = larguraCoberta(opcoes.alturaAcimaDoSolo, opcoes.fovHorizontalGraus)
-  const comprimentoDaFaixa = larguraCoberta(
-    opcoes.alturaAcimaDoSolo,
-    fovVerticalDe(opcoes.fovHorizontalGraus, opcoes.proporcao),
-  )
-  const espacamento = avancoPara(larguraDaFaixa, opcoes.sobreposicaoLateral)
-  const intervaloEntreFotos = avancoPara(comprimentoDaFaixa, opcoes.sobreposicaoFrontal)
-  if (!(espacamento > 0)) return vazio
-
+  rumoGraus: number,
+  espacamento: number,
+  intervaloEntreFotos: number,
+): LatLon[][] {
   /*
    * Trabalha-se em metros num plano local e com as passagens na horizontal.
    *
@@ -178,7 +171,7 @@ export function gerarCobertura(
    * do norte e cresce para leste, e o eixo x aponta a leste: sem o desconto, um
    * rumo de zero - que e norte - dava passagens a voar para leste.
    */
-  const anguloDeTrabalho = (opcoes.rumoGraus - 90) * GRAUS
+  const anguloDeTrabalho = (rumoGraus - 90) * GRAUS
   const plano = contorno.map((p) => rodar(deslocamentoLocal(centro, p), anguloDeTrabalho))
 
   let yMin = Infinity
@@ -214,6 +207,71 @@ export function gerarCobertura(
 
       passagens.push(emMetros.map((p) => paraLatLon(centro, rodar(p, -anguloDeTrabalho))))
     }
+  }
+
+  return passagens
+}
+
+/**
+ * Gera as passagens que cobrem o contorno.
+ *
+ * As passagens alternam de sentido - o serpentear que qualquer levantamento faz -
+ * porque voltar ao principio de cada uma seria andar duas vezes o mesmo caminho.
+ */
+export function gerarCobertura(
+  contorno: readonly LatLon[],
+  opcoes: OpcoesCobertura,
+): Cobertura {
+  const vazio: Cobertura = {
+    passagens: [],
+    espacamento: 0,
+    intervaloEntreFotos: 0,
+    larguraDaFaixa: 0,
+    comprimentoDaFaixa: 0,
+    numeroDeFotos: 0,
+    distancia: 0,
+  }
+
+  const centro = centroDoContorno(contorno)
+  if (!centro || contorno.length < 3) return vazio
+
+  const larguraDaFaixa = larguraCoberta(opcoes.alturaAcimaDoSolo, opcoes.fovHorizontalGraus)
+  const comprimentoDaFaixa = larguraCoberta(
+    opcoes.alturaAcimaDoSolo,
+    fovVerticalDe(opcoes.fovHorizontalGraus, opcoes.proporcao),
+  )
+  const espacamento = avancoPara(larguraDaFaixa, opcoes.sobreposicaoLateral)
+  const intervaloEntreFotos = avancoPara(comprimentoDaFaixa, opcoes.sobreposicaoFrontal)
+  if (!(espacamento > 0)) return vazio
+
+  const passagens = passagensNoRumo(
+    contorno,
+    centro,
+    opcoes,
+    opcoes.rumoGraus,
+    espacamento,
+    intervaloEntreFotos,
+  )
+
+  /*
+   * A segunda grelha, a noventa graus da primeira.
+   *
+   * Vai depois e nao intercalada: sao duas passagens pela parcela, e a aeronave
+   * so comeca a segunda quando acabar a primeira. Intercalar dava saltos de um
+   * lado ao outro entre cada linha, e o percurso entre passagens ja e a parte
+   * que menos rende.
+   */
+  if (opcoes.cruzada === true) {
+    passagens.push(
+      ...passagensNoRumo(
+        contorno,
+        centro,
+        opcoes,
+        opcoes.rumoGraus + 90,
+        espacamento,
+        intervaloEntreFotos,
+      ),
+    )
   }
 
   return {

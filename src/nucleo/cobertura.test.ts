@@ -397,3 +397,71 @@ describe('acrescentar a cobertura a rota', () => {
     expect(acrescentarCobertura(rota, nada, { alturaAcimaDoSolo: 60, comFoto: false })).toBe(rota)
   })
 })
+
+describe('grelha cruzada', () => {
+  const contorno = rectangulo(400, 300)
+
+  it('desligada, nao muda nada do que ja havia', () => {
+    const so = gerarCobertura(contorno, opcoes({ rumoGraus: 0 }))
+    const explicito = gerarCobertura(contorno, opcoes({ rumoGraus: 0, cruzada: false }))
+    expect(explicito.passagens).toEqual(so.passagens)
+  })
+
+  it('a segunda grelha vai a noventa graus da primeira', () => {
+    const simples = gerarCobertura(contorno, opcoes({ rumoGraus: 0 }))
+    const cruzada = gerarCobertura(contorno, opcoes({ rumoGraus: 0, cruzada: true }))
+    const aos90 = gerarCobertura(contorno, opcoes({ rumoGraus: 90 }))
+
+    expect(cruzada.passagens).toHaveLength(simples.passagens.length + aos90.passagens.length)
+    /* A primeira metade e a grelha simples, ponto por ponto. */
+    expect(cruzada.passagens.slice(0, simples.passagens.length)).toEqual(simples.passagens)
+    expect(cruzada.passagens.slice(simples.passagens.length)).toEqual(aos90.passagens)
+  })
+
+  it('o espacamento e o mesmo nas duas: sai da camara e da altura', () => {
+    const simples = gerarCobertura(contorno, opcoes({ rumoGraus: 0 }))
+    const cruzada = gerarCobertura(contorno, opcoes({ rumoGraus: 0, cruzada: true }))
+    expect(cruzada.espacamento).toBeCloseTo(simples.espacamento, 9)
+    expect(cruzada.intervaloEntreFotos).toBeCloseTo(simples.intervaloEntreFotos, 9)
+  })
+
+  /*
+   * O que custa, dito por numeros: uma grelha cruzada e duas passagens pela
+   * parcela. Num rectangulo as duas nao dao exactamente o mesmo - as passagens
+   * ao travez sao mais curtas e ha mais delas - mas o percurso total e sempre
+   * maior do que o de uma so, e e isso que quem decide precisa de saber.
+   */
+  it('custa mais percurso e mais fotos do que uma grelha so', () => {
+    const simples = gerarCobertura(contorno, opcoes({ rumoGraus: 0, umPontoPorFoto: true }))
+    const cruzada = gerarCobertura(
+      contorno,
+      opcoes({ rumoGraus: 0, umPontoPorFoto: true, cruzada: true }),
+    )
+    expect(cruzada.distancia).toBeGreaterThan(simples.distancia)
+    expect(cruzada.numeroDeFotos).toBeGreaterThan(simples.numeroDeFotos)
+  })
+
+  it('num quadrado as duas grelhas tem o mesmo numero de passagens', () => {
+    const quadrado = rectangulo(300, 300)
+    const simples = gerarCobertura(quadrado, opcoes({ rumoGraus: 0 }))
+    const cruzada = gerarCobertura(quadrado, opcoes({ rumoGraus: 0, cruzada: true }))
+    expect(cruzada.passagens).toHaveLength(simples.passagens.length * 2)
+  })
+
+  it('as passagens cruzadas ficam mesmo perpendiculares as primeiras', () => {
+    const cruzada = gerarCobertura(contorno, opcoes({ rumoGraus: 30, cruzada: true }))
+    const simples = gerarCobertura(contorno, opcoes({ rumoGraus: 30 }))
+
+    const rumoDa = (passagem: readonly LatLon[]): number => {
+      const a = passagem[0]!
+      const b = passagem.at(-1)!
+      return rumo(a, b)
+    }
+
+    const primeira = rumoDa(cruzada.passagens[0]!)
+    const segunda = rumoDa(cruzada.passagens[simples.passagens.length]!)
+    /* Modulo 180, porque uma passagem serpenteada tanto vai como vem. */
+    const diferenca = Math.abs(((primeira - segunda) % 180) + 180) % 180
+    expect(Math.min(diferenca, 180 - diferenca)).toBeCloseTo(90, 0)
+  })
+})

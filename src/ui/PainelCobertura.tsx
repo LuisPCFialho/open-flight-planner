@@ -75,6 +75,11 @@ export function PainelCobertura({
   const [umPontoPorFoto, setUmPontoPorFoto] = useState(true)
   /** `null` enquanto ninguém lhe tocar: acompanha a forma da parcela. */
   const [rumo, setRumo] = useState<number | null>(null)
+  /*
+   * Desligada, e com razao: custa o dobro do tempo e o dobro das fotos. So
+   * compensa quando o que se quer e o volume das coisas e nao o chao.
+   */
+  const [cruzada, setCruzada] = useState(false)
 
   const rumoSugerido = useMemo(
     () => (area ? rumoDoLadoMaisLongo(area.contorno) : 0),
@@ -92,8 +97,9 @@ export function PainelCobertura({
       rumoGraus: rumoEfectivo,
       margem,
       umPontoPorFoto,
+      cruzada,
     }),
-    [altura, drone, lateral, frontal, rumoEfectivo, margem, umPontoPorFoto],
+    [altura, drone, lateral, frontal, rumoEfectivo, margem, umPontoPorFoto, cruzada],
   )
 
   const cobertura = useMemo(
@@ -229,6 +235,19 @@ export function PainelCobertura({
             {umPontoPorFoto
               ? 'Cada foto é um waypoint com a sua ação. É o que faz o ficheiro exportado tirar fotos, e o que enche a rota depressa.'
               : 'A rota fica com dois waypoints por passagem e o ficheiro exportado não leva ação de foto nenhuma: o intervalo de disparo tem de ser posto à mão no aparelho.'}
+          </p>
+          <label className="interruptor">
+            <input
+              type="checkbox"
+              checked={cruzada}
+              onChange={(evento) => setCruzada(evento.target.checked)}
+            />
+            <span>Passar segunda vez, a 90&deg;</span>
+          </label>
+          <p className="nota">
+            {cruzada
+              ? 'A parcela é coberta duas vezes, a segunda perpendicular à primeira. É o que se faz quando o que interessa é o volume das coisas e não o chão: uma grelha só vê de esguelha as faces perpendiculares às passagens, e no modelo elas saem derretidas. Custa o dobro do tempo e o dobro das fotos.'
+              : 'Uma passagem só. Chega para levantamento de terreno e para registo de obra.'}
           </p>
         </section>
 
