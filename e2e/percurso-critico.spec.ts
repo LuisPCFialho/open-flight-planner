@@ -112,6 +112,56 @@ test.describe('do limite da parcela ao ficheiro que voa', () => {
     expect(pedidosFalhados).toEqual([])
   })
 
+  test('um ponto de interesse, uma orbita a volta dele, e o ficheiro sai', async ({ page }) => {
+    /*
+     * A orbita tem os seus testes de unidade, e a ligacao entre eles nao tinha
+     * nenhum: criar o POI no mapa, ler o painel, gerar, e exportar de seguida
+     * passa por quatro modulos que os testes de unidade nunca veem juntos.
+     */
+    const errosDeConsola: string[] = []
+    page.on('console', (mensagem) => {
+      if (mensagem.type() === 'error') errosDeConsola.push(mensagem.text())
+    })
+
+    await abrirProjetoNovo(page)
+
+    // Sem POI nenhum o botao nem existe: e o que faz a orbita ter sentido.
+    await expect(page.getByRole('button', { name: 'Orbitar', exact: true })).toBeHidden()
+
+    // --- pousar um ponto de interesse no meio do mapa -----------------------
+    await page.getByRole('button', { name: 'POI', exact: true }).click()
+    await page.locator('.maplibregl-canvas').click({ position: { x: 300, y: 200 } })
+
+    const orbitar = page.getByRole('button', { name: 'Orbitar', exact: true })
+    await expect(orbitar).toBeVisible()
+    await orbitar.click()
+
+    // --- o painel diz o que vai fazer antes de o fazer ----------------------
+    const painel = page.getByRole('dialog', { name: 'Orbitar um ponto' })
+    await expect(painel).toBeVisible()
+
+    /*
+     * Com os valores de partida - 40 m de raio e 20 acima - a camara aponta a
+     * -26,6 graus. Nao ha campo para este numero, de proposito: e a conta
+     * `-atan(20/40)` e nao ha nada a decidir nela. Se algum dia aparecer aqui um
+     * campo, este ensaio diz porque nao devia.
+     */
+    await expect(painel).toContainText('-26.6')
+    await expect(painel).toContainText('12')
+
+    await painel.getByRole('button', { name: 'Acrescentar à rota' }).click()
+    await expect(painel).toBeHidden()
+
+    // --- doze waypoints, e um ficheiro no fim -------------------------------
+    expect(await page.locator('.marcador-waypoint').count()).toBe(12)
+
+    const descarga = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Exportar', exact: true }).click()
+    expect((await descarga).suggestedFilename()).toMatch(/\.kmz$/)
+
+    expect(errosDeConsola).toEqual([])
+  })
+
   test('uma zona interdita por baixo da cobertura trava a exportacao', async ({ page }) => {
     /*
      * A validacao das zonas interditas verifica o troco inteiro e nao so os
