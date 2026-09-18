@@ -2014,3 +2014,16 @@ button.ligacao {
   border-width: 1.5px;
   font-size: 11px;
 }
+
+/*
+ * Marca da construcao, no canto do mapa.
+ *
+ * Discreta de proposito: so faz falta quando alguem precisa de confirmar que o
+ * que tem no ecra e a versao que acabou de sair, e nao uma pagina guardada.
+ */
+.marca-construcao {
+  color: var(--texto-suave);
+  opacity: 0.55;
+  font-family: var(--fonte-numerica);
+  font-size: 10px;
+}

@@ -1004,6 +1004,10 @@ export function App() {
               {falha ? <span className="erro">{falha}</span> : null}
               <LeituraCursor canal={canalCursor} ondulacaoGeoide={rota.ondulacaoGeoide} />
               <span>WGS 84</span>
+              {/* Para se saber, de relance, se o que esta no ecra e a versao nova. */}
+              <span className="marca-construcao" title="Data e commit desta construção">
+                {__MARCA_DA_CONSTRUCAO__}
+              </span>
             </div>
           </div>
 

@@ -1,8 +1,31 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
+/**
+ * Marca da construcao, mostrada no canto do mapa.
+ *
+ * Existe por uma razao muito concreta: sem ela nao ha forma de alguem saber se
+ * o que tem no ecra e a versao nova ou uma pagina que o browser guardou. Custou
+ * uma manha a perceber que era isso, com correccoes a ser dadas por inuteis
+ * porque ninguem conseguia confirmar que estavam sequer carregadas.
+ *
+ * O `git` pode nao existir onde isto se constroi - um zip descarregado, um
+ * contentor sem historico - e nesse caso fica so a data.
+ */
+function marcaDaConstrucao(): string {
+  const quando = new Date().toISOString().slice(0, 16).replace('T', ' ')
+  try {
+    const sha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+    return `${quando} · ${sha}`
+  } catch {
+    return quando
+  }
+}
+
 export default defineConfig({
   plugins: [react()],
+  define: { __MARCA_DA_CONSTRUCAO__: JSON.stringify(marcaDaConstrucao()) },
   worker: { format: 'es' },
   /*
    * O MapLibre num pedaco so dele.

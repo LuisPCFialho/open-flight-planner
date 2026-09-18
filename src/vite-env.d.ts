@@ -20,3 +20,12 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/**
+ * Data e commit de quem construiu este pacote, posto pelo `vite.config.ts`.
+ *
+ * Aparece no canto do mapa para se poder confirmar, de relance, que o que esta
+ * no ecra e mesmo a versao que se acabou de construir - e nao uma pagina que o
+ * browser guardou.
+ */
+declare const __MARCA_DA_CONSTRUCAO__: string
