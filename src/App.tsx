@@ -952,6 +952,7 @@ export function App() {
                     acrescentarCobertura(atual, cobertura, {
                       alturaAcimaDoSolo: opcoesCobertura.alturaAcimaDoSolo,
                       comFoto: opcoesCobertura.umPontoPorFoto,
+                      gimbalPitch: opcoesCobertura.gimbalPitch ?? -90,
                     }),
                   )
                   // Uma cobertura com fotos e um registo fotografico: liga-se a

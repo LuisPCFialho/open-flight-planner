@@ -80,6 +80,11 @@ export function PainelCobertura({
    * compensa quando o que se quer e o volume das coisas e nao o chao.
    */
   const [cruzada, setCruzada] = useState(false)
+  /*
+   * A prumo por omissao, que e o que levanta terreno. Inclinada serve para ver
+   * o que esta de pe, e ai a sobreposicao calculada deixa de valer.
+   */
+  const [gimbalPitch, setGimbalPitch] = useState(-90)
 
   const rumoSugerido = useMemo(
     () => (area ? rumoDoLadoMaisLongo(area.contorno) : 0),
@@ -98,8 +103,19 @@ export function PainelCobertura({
       margem,
       umPontoPorFoto,
       cruzada,
+      gimbalPitch,
     }),
-    [altura, drone, lateral, frontal, rumoEfectivo, margem, umPontoPorFoto, cruzada],
+    [
+      altura,
+      drone,
+      lateral,
+      frontal,
+      rumoEfectivo,
+      margem,
+      umPontoPorFoto,
+      cruzada,
+      gimbalPitch,
+    ],
   )
 
   const cobertura = useMemo(
@@ -108,7 +124,16 @@ export function PainelCobertura({
   )
 
   const fov = drone.camara.fovHorizontalGraus ?? 80
-  const resolucao = cobertura ? resolucaoNoTerreno(drone.camara, cobertura.larguraDaFaixa) : null
+  /*
+   * Com a camara inclinada, a pegada deixa de ser o rectangulo centrado debaixo
+   * da aeronave de que `2h.tan(f/2)` fala: passa a um trapezio, com resolucao a
+   * degradar-se do primeiro plano para o fundo. Um unico numero de cm/px deixa
+   * de o descrever, e por isso deixa de se mostrar - a mesma regra de quando
+   * faltam os megapixeis na ficha.
+   */
+  const aPrumo = gimbalPitch <= -89
+  const resolucao =
+    cobertura && aPrumo ? resolucaoNoTerreno(drone.camara, cobertura.larguraDaFaixa) : null
 
   const waypointsNovos = cobertura?.passagens.reduce((soma, p) => soma + p.length, 0) ?? 0
   const total = waypointsExistentes + waypointsNovos
@@ -235,6 +260,20 @@ export function PainelCobertura({
             {umPontoPorFoto
               ? 'Cada foto é um waypoint com a sua ação. É o que faz o ficheiro exportado tirar fotos, e o que enche a rota depressa.'
               : 'A rota fica com dois waypoints por passagem e o ficheiro exportado não leva ação de foto nenhuma: o intervalo de disparo tem de ser posto à mão no aparelho.'}
+          </p>
+          <CampoNumerico
+            rotulo="Inclinação da câmara"
+            valor={gimbalPitch}
+            unidade="°"
+            min={-90}
+            max={-20}
+            incrementos={[15]}
+            aoAlterar={setGimbalPitch}
+          />
+          <p className={aPrumo ? 'nota' : 'erro'}>
+            {aPrumo
+              ? '-90° é a prumo, que é como se levanta terreno e como se inspeciona um painel.'
+              : 'Com a câmara inclinada a pegada de cada foto deixa de ser o retângulo debaixo da aeronave e passa a um trapézio esticado para a frente: o espaçamento aqui calculado já não garante a sobreposição pedida, e a resolução deixa de ser um número só. Serve para ver o que está de pé, não para levantar terreno.'}
           </p>
           <label className="interruptor">
             <input

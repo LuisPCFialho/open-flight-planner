@@ -465,3 +465,48 @@ describe('grelha cruzada', () => {
     expect(Math.min(diferenca, 180 - diferenca)).toBeCloseTo(90, 0)
   })
 })
+
+describe('inclinacao da camara na cobertura', () => {
+  const contorno = rectangulo(400, 300)
+
+  function rotaDeEnsaio(): Rota {
+    return rotaVazia({
+      nome: 'ensaio',
+      projetoId: 'p1',
+      droneId: 'mavic3t',
+      pontoDescolagem: { ...CENTRO, cotaTerreno: 100 },
+    })
+  }
+
+  it('a prumo por omissao, que e o que levanta terreno', () => {
+    const c = gerarCobertura(contorno, opcoes())
+    const rota = acrescentarCobertura(rotaDeEnsaio(), c, {
+      alturaAcimaDoSolo: 60,
+      comFoto: false,
+    })
+    for (const w of rota.waypoints) expect(w.gimbalPitch).toBe(-90)
+  })
+
+  it('inclinada, vai para todos os waypoints', () => {
+    const c = gerarCobertura(contorno, opcoes())
+    const rota = acrescentarCobertura(rotaDeEnsaio(), c, {
+      alturaAcimaDoSolo: 60,
+      comFoto: false,
+      gimbalPitch: -45,
+    })
+    for (const w of rota.waypoints) expect(w.gimbalPitch).toBe(-45)
+  })
+
+  /*
+   * A inclinacao nao entra em conta nenhuma da geracao, e tem de se poder
+   * confiar nisso: o espacamento sai de `2h.tan(f/2)`, que fala da camara a
+   * prumo. Quem a inclina fica sem garantia sobre a sobreposicao, e o painel
+   * di-lo - mas as passagens em si sao exactamente as mesmas.
+   */
+  it('nao muda as passagens que se geram', () => {
+    const aPrumo = gerarCobertura(contorno, opcoes({ gimbalPitch: -90 }))
+    const inclinada = gerarCobertura(contorno, opcoes({ gimbalPitch: -40 }))
+    expect(inclinada.passagens).toEqual(aPrumo.passagens)
+    expect(inclinada.espacamento).toBe(aPrumo.espacamento)
+  })
+})

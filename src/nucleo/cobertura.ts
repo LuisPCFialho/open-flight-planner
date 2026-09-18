@@ -53,6 +53,20 @@ export type OpcoesCobertura = {
    * Custa o dobro do tempo e o dobro das fotos, e por isso nao vem ligado.
    */
   cruzada?: boolean
+  /**
+   * Inclinacao da camara nos waypoints gerados, em graus. -90 e a prumo.
+   *
+   * Nao entra em conta nenhuma deste modulo, e de proposito: o espacamento sai
+   * de `2h.tan(f/2)`, que e a largura que uma camara a prumo cobre. Com a
+   * camara inclinada a pegada deixa de ser um rectangulo centrado debaixo da
+   * aeronave e passa a ser um trapezio esticado para a frente, e a sobreposicao
+   * pedida deixa de ser a que se obtem.
+   *
+   * Continua a servir - ver fachadas e estruturas exige camara inclinada - mas
+   * quem a inclina fica sem garantia nenhuma sobre a sobreposicao, e o painel
+   * diz-lho em vez de continuar a mostrar numeros que passaram a ser falsos.
+   */
+  gimbalPitch?: number
 }
 
 export type Cobertura = {
@@ -365,15 +379,18 @@ export function rumoDoLadoMaisLongo(contorno: readonly LatLon[]): number {
  * cima de uma rota que ja tinha trabalho feito nao devia perde-lo por engano, e
  * desfazer resolve o resto.
  *
- * Os waypoints ficam com a camara a prumo e o rumo fixo no sentido da passagem,
- * que e como um levantamento se voa. Sem isso a aeronave rodava a cada ponto
- * para seguir a linha, e as fotos saiam com a orientacao a mudar de passagem
- * para passagem.
+ * Os waypoints ficam com o rumo fixo no sentido da passagem, que e como um
+ * levantamento se voa. Sem isso a aeronave rodava a cada ponto para seguir a
+ * linha, e as fotos saiam com a orientacao a mudar de passagem para passagem.
+ *
+ * A camara vai a prumo por omissao, que e o que serve para levantar terreno.
+ * Inclinada serve para ver o que esta de pe - fachadas, estruturas, a face das
+ * mesas de um parque - e ai o que sai ja nao e um ortomosaico.
  */
 export function acrescentarCobertura(
   rota: Rota,
   cobertura: Cobertura,
-  opcoes: { alturaAcimaDoSolo: number; comFoto: boolean },
+  opcoes: { alturaAcimaDoSolo: number; comFoto: boolean; gimbalPitch?: number },
 ): Rota {
   const novos: Waypoint[] = []
 
@@ -393,7 +410,7 @@ export function acrescentarCobertura(
         id: novoId(),
         modoGuinada: 'fixed',
         guinada: rumoDaPassagem,
-        gimbalPitch: -90,
+        gimbalPitch: opcoes.gimbalPitch ?? -90,
         gimbalYaw: 0,
         // Passar suave: parar em cada ponto de uma cobertura duplicaria o tempo.
         tipoCurva: 'passarSuave',
