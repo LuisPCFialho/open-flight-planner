@@ -51,6 +51,7 @@ import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
 import { descarregarTexto, nomeSeguro } from './descarregar.ts'
 import { envolvente } from './nucleo/areas.ts'
+import { areasDeReferencia, zonasInterditas } from './nucleo/interdicoes.ts'
 import { armazem } from './dados/armazem.ts'
 import { droneComId } from './drones.ts'
 import { Mapa } from './mapa/Mapa.tsx'
@@ -59,7 +60,7 @@ import { Bussola, type Orientacao } from './ui/Bussola.tsx'
 import { ControlosVista } from './ui/ControlosVista.tsx'
 import { PainelCobertura } from './ui/PainelCobertura.tsx'
 import { Regua } from './ui/Regua.tsx'
-import { BotaoAreas, BotaoTopografia } from './ui/BotoesImportar.tsx'
+import { BotaoAreas, BotaoTopografia, type AreasImportadas } from './ui/BotoesImportar.tsx'
 import { BarraModos } from './ui/BarraModos.tsx'
 import { useCanal } from './ui/canal.ts'
 import { PuxadorPainel, useLarguraPersistida } from './ui/PuxadorPainel.tsx'
@@ -355,6 +356,32 @@ export function App() {
       voo.apontar(deltaPitch, 0)
     },
     [voo],
+  )
+
+  /*
+   * Importar substitui as areas do mesmo tipo e deixa as do outro em paz.
+   *
+   * Sao duas coisas diferentes guardadas na mesma lista: trazer o perimetro da
+   * obra nao pode apagar as zonas interditas que ja la estavam, nem o
+   * contrario.
+   */
+  const importarAreas = useCallback(
+    ({ areas, resumo, centro, caixa }: AreasImportadas) => {
+      const interditas = areas.some((a) => a.tipo === 'exclusao')
+      const guardar = interditas ? areasDeReferencia : zonasInterditas
+
+      editor.alterarRota({ areas: [...guardar(rota?.areas), ...areas] })
+      setFalha(null)
+      setAvisoTopografia(resumo)
+      if (centro) {
+        setCentrarEm({
+          posicao: centro,
+          pedido: Date.now(),
+          ...(caixa ? { envolvente: caixa } : {}),
+        })
+      }
+    },
+    [editor, rota?.areas],
   )
 
   const replay = useReplay(rota)
@@ -702,21 +729,12 @@ export function App() {
           >
             Projetos
           </button>
+          <BotaoAreas areas={rota.areas} aoFalhar={setFalha} aoImportar={importarAreas} />
           <BotaoAreas
+            tipo="exclusao"
             areas={rota.areas}
             aoFalhar={setFalha}
-            aoImportar={({ areas, resumo, centro, caixa }) => {
-              editor.alterarRota({ areas })
-              setFalha(null)
-              setAvisoTopografia(resumo)
-              if (centro) {
-                setCentrarEm({
-                  posicao: centro,
-                  pedido: Date.now(),
-                  ...(caixa ? { envolvente: caixa } : {}),
-                })
-              }
-            }}
+            aoImportar={importarAreas}
           />
 
           {divisao && divisao.trocos.length > 1 ? (
@@ -740,7 +758,7 @@ export function App() {
             </button>
           ) : null}
 
-          {rota.areas?.length ? (
+          {areasDeReferencia(rota.areas).length > 0 ? (
             <button
               type="button"
               className={coberturaAberta ? 'activo' : ''}
@@ -751,13 +769,23 @@ export function App() {
             </button>
           ) : null}
 
-          {rota.areas?.length ? (
+          {areasDeReferencia(rota.areas).length > 0 ? (
             <button
               type="button"
               title="Retirar as áreas de referência do mapa"
-              onClick={() => editor.alterarRota({ areas: [] })}
+              onClick={() => editor.alterarRota({ areas: zonasInterditas(rota.areas) })}
             >
               Sem área
+            </button>
+          ) : null}
+
+          {zonasInterditas(rota.areas).length > 0 ? (
+            <button
+              type="button"
+              title="Retirar as zonas interditas do mapa"
+              onClick={() => editor.alterarRota({ areas: areasDeReferencia(rota.areas) })}
+            >
+              Sem zona
             </button>
           ) : null}
 
@@ -882,9 +910,9 @@ export function App() {
 
             <ControlosVista sombreado={sombreado} aoMudarSombreado={setSombreado} />
 
-            {coberturaAberta && (rota.areas ?? []).length > 0 && drone ? (
+            {coberturaAberta && areasDeReferencia(rota.areas).length > 0 && drone ? (
               <PainelCobertura
-                areas={rota.areas ?? []}
+                areas={areasDeReferencia(rota.areas)}
                 drone={drone}
                 waypointsExistentes={rota.waypoints.length}
                 modoAltitude={rota.modoAltitude}

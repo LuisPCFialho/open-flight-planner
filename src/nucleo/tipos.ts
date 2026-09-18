@@ -90,6 +90,18 @@ export type Area = {
   nome: string
   /** Contorno em WGS84, sem repetir o primeiro ponto no fim. */
   contorno: LatLon[]
+  /**
+   * O que a area quer dizer.
+   *
+   * `referencia` e o limite do que ha para filmar, e e o que uma area e quando
+   * nao se diz o contrario - por isso o campo e opcional, e as rotas gravadas
+   * antes disto continuam a ler-se sem migracao nenhuma.
+   *
+   * `exclusao` e o contrario: um sitio por onde a rota nao pode passar. O posto
+   * de transformacao, a parcela do vizinho que nao autorizou, o corredor de uma
+   * linha de media tensao.
+   */
+  tipo?: 'referencia' | 'exclusao'
 }
 
 export type PontoDescolagem = {

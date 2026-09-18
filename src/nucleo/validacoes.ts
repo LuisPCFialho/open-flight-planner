@@ -5,6 +5,7 @@ import { accoesNaoSuportadas, NOME_DA_ACCAO } from './operacoes-accoes.ts'
 import { velocidadeDe } from './operacoes-rota.ts'
 import { interpolarAltura, percursoDosWaypoints } from './perfil.ts'
 import { waypointsComPOIPerdido } from './operacoes-poi.ts'
+import { incursoes, zonasInterditas } from './interdicoes.ts'
 
 /**
  * Validacoes que correm antes de exportar.
@@ -74,6 +75,7 @@ export function validarRota(rota: Rota, drone: Drone, contexto: ContextoValidaca
     ...validarFotos(rota, contexto),
     ...validarPOIs(rota),
     ...validarCotasEmFalta(rota, contexto),
+    ...validarZonasInterditas(rota),
   ]
 }
 
@@ -412,6 +414,41 @@ function validarCotasEmFalta(rota: Rota, contexto: ContextoValidacao): Validacao
       detalhe:
         'Sem essas cotas não é possível saber a que altura do solo a rota passa, nem converter alturas com segurança.',
       waypoints: emFalta.map((w) => w.index),
+    },
+  ]
+}
+
+// --- zonas interditas --------------------------------------------------------
+
+/**
+ * A rota a passar por onde nao pode.
+ *
+ * E erro e nao aviso: quem marcou a zona sabia porque a marcou, e sobrevoar o
+ * posto de transformacao do cliente ou a parcela do vizinho que nao autorizou
+ * nao e uma questao de grau.
+ *
+ * A verificacao apanha o troco inteiro e nao so os waypoints. Numa cobertura,
+ * as transicoes entre passagens sao os trocos mais compridos da rota, e sao
+ * precisamente os que atravessam uma zona de lado a lado sem que nenhuma ponta
+ * caia la dentro.
+ */
+function validarZonasInterditas(rota: Rota): Validacao[] {
+  const zonas = zonasInterditas(rota.areas)
+  if (zonas.length === 0) return []
+
+  const encontradas = incursoes(rota.waypoints, zonas)
+  if (encontradas.length === 0) return []
+
+  const nomes = [...new Set(encontradas.map((i) => i.nomeDaZona))]
+  const indices = [...new Set(encontradas.map((i) => i.indice))].sort((a, b) => a - b)
+
+  return [
+    {
+      id: 'zona-interdita',
+      severidade: 'erro',
+      titulo: `A rota entra em ${nomes.length === 1 ? 'zona interdita' : `${nomes.length} zonas interditas`}`,
+      detalhe: `${indices.length} ${indices.length === 1 ? 'troço passa' : 'troços passam'} por ${nomes.join(', ')}.`,
+      waypoints: indices,
     },
   ]
 }

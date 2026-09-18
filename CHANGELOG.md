@@ -12,6 +12,15 @@ ordering below is the useful part, not the calendar.
 
 ### Added
 
+- **No-fly zones.** Import polygons the route must not cross — the transformer
+  station, the neighbour's parcel, a power line corridor — and the route is
+  checked against them. Drawn in red beside the green of what is to be filmed,
+  and it blocks the export, because whoever marked the zone had a reason. The
+  check covers whole legs and not just waypoints: on a coverage route the
+  transitions between passes are the longest legs there are, and they are
+  precisely the ones that cross a zone end to end without either endpoint
+  falling inside it.
+
 - **Ground resolution, in cm per pixel.** This is the number a survey
   specification is written in, not the flight altitude: two cameras at eighty
   metres cover the same ground at very different resolutions. Shown next to the

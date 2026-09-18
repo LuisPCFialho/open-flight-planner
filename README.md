@@ -64,8 +64,12 @@ is what a survey specification is written in. A separate panel gives the hours
 when the sun is high enough for the site and the day — the criterion that
 decides whether a thermography flight is worth the trip.
 
+**No-fly zones.** Polygons the route must not cross, checked leg by leg. On a
+coverage route the transitions between passes are the longest legs, and they are
+the ones that cross a zone without either endpoint falling inside it.
+
 **Validation before export.** Ground clearance, service ceiling, endurance,
-speed limits, and actions the selected aircraft does not support.
+speed limits, no-fly zones, and actions the selected aircraft does not support.
 
 Also: DXF topography import (ETRS89 / PT-TM06), flight replay up to 50×, route
 repetition, measurement, KML export for Google Earth.

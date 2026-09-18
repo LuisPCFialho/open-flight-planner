@@ -27,27 +27,40 @@ export type AreasImportadas = {
   caixa: [[number, number], [number, number]] | null
 }
 
+/**
+ * Importa poligonos de um KMZ ou KML.
+ *
+ * Serve os dois tipos de area, que entram pelo mesmo caminho e so diferem no
+ * que querem dizer: o limite do que ha para filmar, ou um sitio por onde a rota
+ * nao pode passar. Quem decide e o botao por onde se importa, e nao o ficheiro.
+ */
 export function BotaoAreas({
   areas,
   aoImportar,
   aoFalhar,
+  tipo = 'referencia',
 }: {
   areas: readonly Area[] | undefined
   aoImportar: (importadas: AreasImportadas) => void
   aoFalhar: (mensagem: string) => void
+  tipo?: 'referencia' | 'exclusao'
 }) {
-  const total = areas?.reduce((soma, a) => soma + areaDoContorno(a.contorno), 0) ?? 0
+  const interdita = tipo === 'exclusao'
+  const minhas = (areas ?? []).filter((a) => (a.tipo === 'exclusao') === interdita)
+  const total = minhas.reduce((soma, a) => soma + areaDoContorno(a.contorno), 0)
 
   return (
     <label
-      className={`botao-ficheiro ${areas?.length ? 'activo' : ''}`}
+      className={`botao-ficheiro ${minhas.length ? 'activo' : ''}${interdita ? ' interdita' : ''}`}
       title={
-        areas?.length
-          ? `${areas.length} área(s) de referência, ${formatarArea(total)} no total. Importar de novo substitui.`
-          : 'Importar KMZ ou KML com polígonos, para ter no mapa o contorno da área a filmar'
+        minhas.length
+          ? `${minhas.length} ${interdita ? 'zona(s) interdita(s)' : 'área(s) de referência'}, ${formatarArea(total)} no total. Importar de novo substitui.`
+          : interdita
+            ? 'Importar KMZ ou KML com polígonos por onde a rota não pode passar - o posto de transformação, a parcela do vizinho, o corredor de uma linha'
+            : 'Importar KMZ ou KML com polígonos, para ter no mapa o contorno da área a filmar'
       }
     >
-      Área
+      {interdita ? 'Zona interdita' : 'Área'}
       <input
         type="file"
         accept=".kmz,.kml"
@@ -59,11 +72,12 @@ export function BotaoAreas({
 
           void importarAreas(ficheiro)
             .then(({ areas: lidas, avisos }) => {
+              const marcadas = lidas.map((a) => ({ ...a, tipo }))
               const soma = lidas.reduce((acc, a) => acc + areaDoContorno(a.contorno), 0)
               aoImportar({
-                areas: lidas,
+                areas: marcadas,
                 resumo: [
-                  `${ficheiro.name}: ${lidas.length} área(s), ${formatarArea(soma)}`,
+                  `${ficheiro.name}: ${lidas.length} ${interdita ? 'zona(s) interdita(s)' : 'área(s)'}, ${formatarArea(soma)}`,
                   ...avisos,
                 ].join('. '),
                 centro: centroDasAreas(lidas),

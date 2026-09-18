@@ -97,7 +97,8 @@ export function areasGeoJSON(areas: readonly Area[] | undefined): FeatureCollect
 
     features.push({
       type: 'Feature',
-      properties: { id: area.id, nome: area.nome },
+      // O tipo vai nas propriedades: e por ele que o mapa decide a cor.
+      properties: { id: area.id, nome: area.nome, interdita: area.tipo === 'exclusao' },
       geometry: { type: 'Polygon', coordinates: [anel.map(coordenada)] },
     })
   }

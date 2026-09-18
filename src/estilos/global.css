@@ -2127,3 +2127,9 @@ button.ligacao {
   line-height: 1.5;
   color: var(--texto-suave);
 }
+
+/* Zona interdita: o botao tambem, para nao se trocar um pelo outro. */
+.botao-ficheiro.interdita.activo {
+  border-color: var(--alerta);
+  color: var(--alerta);
+}

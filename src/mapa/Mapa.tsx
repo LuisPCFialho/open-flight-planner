@@ -261,11 +261,20 @@ export function Mapa(props: PropsMapa) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       })
+      /*
+       * Verde o que ha para filmar, vermelho por onde nao se pode passar.
+       *
+       * Sao a mesma fonte e a mesma geometria; o que muda e o que a area quer
+       * dizer, e isso tem de se ver sem ler legenda nenhuma.
+       */
       instancia.addLayer({
         id: CAMADA_AREAS_PREENCHIMENTO,
         type: 'fill',
         source: FONTE_AREAS,
-        paint: { 'fill-color': '#4fd973', 'fill-opacity': 0.14 },
+        paint: {
+          'fill-color': ['case', ['get', 'interdita'], '#f25a4c', '#4fd973'],
+          'fill-opacity': ['case', ['get', 'interdita'], 0.2, 0.14],
+        },
       })
       instancia.addLayer({
         id: CAMADA_AREAS_CONTORNO,
@@ -273,7 +282,7 @@ export function Mapa(props: PropsMapa) {
         source: FONTE_AREAS,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#4fd973',
+          'line-color': ['case', ['get', 'interdita'], '#f25a4c', '#4fd973'],
           // Sobre ortofoto de mato e vinha, dois pixeis de linha perdem-se.
           'line-width': 3,
           'line-opacity': 1,

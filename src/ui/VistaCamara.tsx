@@ -141,14 +141,21 @@ export function VistaCamara({
         id: 'areas-camara-preenchimento',
         type: 'fill',
         source: FONTE_AREAS_CAMARA,
-        paint: { 'fill-color': '#4fd973', 'fill-opacity': 0.14 },
+        paint: {
+          'fill-color': ['case', ['get', 'interdita'], '#f25a4c', '#4fd973'],
+          'fill-opacity': ['case', ['get', 'interdita'], 0.2, 0.14],
+        },
       })
       instancia.addLayer({
         id: 'areas-camara-contorno',
         type: 'line',
         source: FONTE_AREAS_CAMARA,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#4fd973', 'line-width': 3, 'line-dasharray': [3, 2] },
+        paint: {
+          'line-color': ['case', ['get', 'interdita'], '#f25a4c', '#4fd973'],
+          'line-width': 3,
+          'line-dasharray': [3, 2],
+        },
       })
 
       setPronto(true)

@@ -94,7 +94,17 @@ describe('areas de referencia', () => {
 
   it('o nome e o identificador viajam nas propriedades', () => {
     const f = areasGeoJSON([quadrado]).features[0]
-    expect(f?.properties).toEqual({ id: 'a1', nome: 'Parcela' })
+    expect(f?.properties).toEqual({ id: 'a1', nome: 'Parcela', interdita: false })
+  })
+
+  /*
+   * E pela propriedade que o mapa escolhe a cor: verde o que ha para filmar,
+   * vermelho por onde nao se pode passar. Uma area sem tipo e de referencia,
+   * que e o que as rotas gravadas antes disto sao.
+   */
+  it('uma zona interdita vai marcada como tal', () => {
+    const interdita: Area = { ...quadrado, id: 'a3', tipo: 'exclusao' }
+    expect(areasGeoJSON([interdita]).features[0]?.properties?.interdita).toBe(true)
   })
 
   it('uma area sem contorno nao entra', () => {
