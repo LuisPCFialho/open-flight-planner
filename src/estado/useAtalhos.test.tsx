@@ -16,6 +16,7 @@ function comandosFalsos() {
     eliminar: vi.fn(),
     escapar: vi.fn(),
     mover: vi.fn<(passo: 1 | -1) => void>(),
+    atalhos: vi.fn(),
   } satisfies ComandosDeAtalho
 }
 
@@ -148,5 +149,39 @@ describe('atalhos de teclado', () => {
 
     expect(segundos.escapar).toHaveBeenCalledTimes(1)
     expect(primeiros.escapar).not.toHaveBeenCalled()
+  })
+})
+
+describe('a folha de atalhos', () => {
+  it('a interrogacao abre-a', async () => {
+    const teclado = ligar()
+    await teclado.keyboard('?')
+    expect(comandos.atalhos).toHaveBeenCalledTimes(1)
+  })
+
+  /*
+   * O unico atalho que sobrevive ao voo virtual.
+   *
+   * Em voo o teclado e todo do voo - um Delete la no meio apagava um waypoint
+   * sem ninguem pedir - mas abrir uma folha de ajuda nao edita nada, e e
+   * precisamente em voo que ela faz mais falta: e la que estao as catorze
+   * teclas que ninguem decorou.
+   */
+  it('funciona mesmo com os atalhos suspensos pelo voo', async () => {
+    const teclado = ligar(true)
+    await teclado.keyboard('?')
+    expect(comandos.atalhos).toHaveBeenCalledTimes(1)
+    await teclado.keyboard('{Delete}')
+    expect(comandos.eliminar).not.toHaveBeenCalled()
+  })
+
+  it('escrever uma interrogacao num campo nao a abre', async () => {
+    const teclado = ligar()
+    const campo = document.createElement('input')
+    document.body.appendChild(campo)
+    campo.focus()
+    await teclado.keyboard('?')
+    expect(comandos.atalhos).not.toHaveBeenCalled()
+    campo.remove()
   })
 })

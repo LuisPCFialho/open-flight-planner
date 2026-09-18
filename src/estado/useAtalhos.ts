@@ -23,6 +23,8 @@ export type ComandosDeAtalho = {
   escapar: () => void
   /** Setas: anda na lista de waypoints. */
   mover: (passo: 1 | -1) => void
+  /** Interrogacao: abre e fecha a folha de atalhos. */
+  atalhos: () => void
 }
 
 /**
@@ -47,6 +49,26 @@ function estaAEscrever(alvo: EventTarget | null): boolean {
 export function useAtalhos(comandos: ComandosDeAtalho, suspenso: boolean): void {
   const actuais = useRef(comandos)
   actuais.current = comandos
+
+  /*
+   * A interrogacao tem ouvinte proprio, e nao e suspensa em voo virtual.
+   *
+   * Todos os outros atalhos sao suspensos porque em voo o teclado e do voo, e um
+   * Delete no meio dele apagava um waypoint sem ninguem pedir. Abrir a folha de
+   * atalhos nao edita nada - e precisamente em voo que ela faz mais falta, que e
+   * onde estao as catorze teclas que ninguem decorou.
+   */
+  useEffect(() => {
+    const aoTeclar = (evento: KeyboardEvent): void => {
+      if (estaAEscrever(evento.target)) return
+      if (evento.key !== '?') return
+      evento.preventDefault()
+      actuais.current.atalhos()
+    }
+
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
+  }, [])
 
   useEffect(() => {
     if (suspenso) return

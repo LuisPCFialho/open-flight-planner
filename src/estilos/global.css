@@ -2571,6 +2571,64 @@ button.ligacao {
   box-shadow: inset 3px 0 0 var(--destaque);
 }
 
+/* --- folha de atalhos ------------------------------------------------------ */
+
+/*
+ * Mais larga do que os outros paineis flutuantes.
+ *
+ * Cada linha e um par de teclas e uma frase, e a 300 pixeis as frases partiam-se
+ * em tres linhas cada - uma folha de consulta que obriga a ler devagar nao serve
+ * para nada.
+ */
+.painel-atalhos {
+  width: min(400px, calc(100% - 16px));
+}
+
+.lista-atalhos {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+}
+
+.atalho {
+  display: grid;
+  grid-template-columns: 116px 1fr;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.atalho dt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.atalho dd {
+  margin: 0;
+  color: var(--texto-suave);
+  line-height: 1.4;
+}
+
+kbd {
+  font-family: var(--fonte-numerica);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  color: var(--texto);
+  background: var(--fundo-elevado);
+  /*
+   * A borda de baixo mais forte do que as outras tres.
+   *
+   * E o que faz uma tecla parecer uma tecla e nao uma etiqueta, e neste painel
+   * a diferenca entre as duas coisas e o que se esta a explicar.
+   */
+  border: 1px solid var(--borda);
+  border-bottom: 2px solid var(--borda-forte);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
 /* --- vento ----------------------------------------------------------------- */
 
 .vento-linha {

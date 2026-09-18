@@ -80,6 +80,7 @@ import { PlayerReplay } from './ui/PlayerReplay.tsx'
 import { EcraProjetos } from './ui/EcraProjetos.tsx'
 import { PainelSol } from './ui/PainelSol.tsx'
 import { ResumoDoPlano } from './ui/ResumoDoPlano.tsx'
+import { PainelAtalhos } from './ui/PainelAtalhos.tsx'
 import { SelectorRota } from './ui/SelectorRota.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
@@ -186,6 +187,7 @@ export function App() {
   const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
   const [coberturaAberta, setCoberturaAberta] = useState(false)
   const [resumoAberto, setResumoAberto] = useState(false)
+  const [atalhosAbertos, setAtalhosAbertos] = useState(false)
   /**
    * A regua vive fora da rota e fora do historico.
    *
@@ -609,9 +611,11 @@ export function App() {
         // Escape volta sempre a navegar, seja qual for o modo em curso.
         setModoMapa('navegar')
         setConfiguracoesAbertas(false)
+        setAtalhosAbertos(false)
         seleccao.limpar()
       },
       mover: seleccao.mover,
+      atalhos: () => setAtalhosAbertos((aberto) => !aberto),
     },
     voo.activo,
   )
@@ -747,6 +751,15 @@ export function App() {
             onClick={() => setResumoAberto((aberto) => !aberto)}
           >
             Plano
+          </button>
+          <button
+            type="button"
+            className={atalhosAbertos ? 'activo' : ''}
+            title="Atalhos de teclado (?)"
+            aria-label="Atalhos de teclado"
+            onClick={() => setAtalhosAbertos((aberto) => !aberto)}
+          >
+            ?
           </button>
           <BotaoAreas areas={rota.areas} aoFalhar={setFalha} aoImportar={importarAreas} />
           <BotaoAreas
@@ -928,6 +941,10 @@ export function App() {
             <Bussola canal={canalOrientacao} aoApontarANorte={() => setPedidoDeNorte(Date.now())} />
 
             <ControlosVista sombreado={sombreado} aoMudarSombreado={setSombreado} />
+
+            {atalhosAbertos ? (
+              <PainelAtalhos aoFechar={() => setAtalhosAbertos(false)} />
+            ) : null}
 
             {resumoAberto ? (
               <ResumoDoPlano
