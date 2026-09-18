@@ -2645,6 +2645,78 @@ kbd {
   white-space: nowrap;
 }
 
+/* --- a rede por baixo da aplicacao ----------------------------------------- */
+
+.ecra-avaria {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 24px 16px;
+  overflow: auto;
+}
+
+.avaria-cartao {
+  max-width: 560px;
+  padding: 20px 22px;
+  background: var(--fundo-painel);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  box-shadow: var(--sombra-media);
+}
+
+.avaria-cartao h1 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.avaria-cartao p {
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.avaria-accoes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.avaria-accoes a {
+  color: var(--destaque);
+}
+
+.avaria-detalhe {
+  border-top: 1px solid var(--borda);
+  padding-top: 12px;
+}
+
+.avaria-detalhe summary {
+  cursor: pointer;
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+/*
+ * O rasto e para ser copiado para um issue, e por isso pode ser seleccionado e
+ * quebra nas linhas que tem em vez de esticar a caixa ate ao infinito.
+ */
+.avaria-detalhe pre {
+  margin: 10px 0 0;
+  padding: 10px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  color: var(--texto-suave);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* --- vento ----------------------------------------------------------------- */
 
 .vento-linha {
