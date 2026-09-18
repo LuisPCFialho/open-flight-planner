@@ -64,6 +64,13 @@ export function BotaoAreas({
       <input
         type="file"
         accept=".kmz,.kml"
+        /*
+         * O tipo vai no elemento para se poderem distinguir os dois campos de
+         * fora. Sao dois ficheiros com o mesmo `accept`, e sem isto um ensaio
+         * de ponta a ponta nao tem como dizer em qual esta a carregar - foi
+         * assim que o percurso critico partiu ao aparecer o segundo botao.
+         */
+        data-tipo={tipo}
         hidden
         onChange={(evento) => {
           const ficheiro = evento.target.files?.[0]

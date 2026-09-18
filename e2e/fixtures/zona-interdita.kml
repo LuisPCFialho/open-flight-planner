@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Zona interdita de ensaio: um quadrado no meio da parcela.
+
+  Fica deliberadamente dentro de `parcela.kml`, porque o que o percurso tem de
+  verificar e que a cobertura gerada passa por cima dela e que a aplicacao o diz
+  e recusa exportar. Uma zona ao lado nao provava nada.
+-->
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Posto de transformação</name>
+    <Placemark>
+      <name>Posto de transformação</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              -8.408800,40.747600,0
+              -8.407600,40.747600,0
+              -8.407600,40.748300,0
+              -8.408800,40.748300,0
+              -8.408800,40.747600,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

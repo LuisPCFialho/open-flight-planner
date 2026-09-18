@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
  */
 
 const PARCELA = fileURLToPath(new URL('./fixtures/parcela.kml', import.meta.url))
+const ZONA = fileURLToPath(new URL('./fixtures/zona-interdita.kml', import.meta.url))
 
 /** Entra num projeto novo e espera que o mapa instale as camadas. */
 async function abrirProjetoNovo(page: Page): Promise<void> {
@@ -41,7 +42,7 @@ test.describe('do limite da parcela ao ficheiro que voa', () => {
     await abrirProjetoNovo(page)
 
     // --- importar o limite --------------------------------------------------
-    await page.locator('input[type="file"][accept=".kmz,.kml"]').setInputFiles(PARCELA)
+    await page.locator('input[type="file"][data-tipo="referencia"]').setInputFiles(PARCELA)
 
     // O resumo da importacao diz quantas areas vieram e quanto medem.
     await expect(page.getByText(/parcela\.kml: 1 área\(s\)/)).toBeVisible()
@@ -109,6 +110,36 @@ test.describe('do limite da parcela ao ficheiro que voa', () => {
      * e o worker do MapLibre - com o mapa a parecer bom e o terreno plano.
      */
     expect(pedidosFalhados).toEqual([])
+  })
+
+  test('uma zona interdita por baixo da cobertura trava a exportacao', async ({ page }) => {
+    /*
+     * A validacao das zonas interditas verifica o troco inteiro e nao so os
+     * waypoints, e e por isso que tem de passar por aqui: numa cobertura, as
+     * transicoes entre passagens atravessam a zona de lado a lado sem que
+     * nenhuma ponta caia la dentro. Um teste de unidade da geometria nao prova
+     * que a rota gerada pela aplicacao chega a ser confrontada com ela.
+     */
+    await abrirProjetoNovo(page)
+
+    await page.locator('input[type="file"][data-tipo="referencia"]').setInputFiles(PARCELA)
+    await expect(page.getByText(/parcela\.kml: 1 área\(s\)/)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Cobrir', exact: true }).click()
+    const painel = page.getByRole('dialog', { name: 'Cobrir área com passagens' })
+    await painel.getByRole('button', { name: /waypoints/ }).click()
+    await expect(painel).toBeHidden()
+
+    // Exportar so fica travado por causa da zona: antes dela, esta livre.
+    const exportar = page.getByRole('button', { name: 'Exportar', exact: true })
+    await expect(exportar).toBeEnabled()
+
+    await page.locator('input[type="file"][data-tipo="exclusao"]').setInputFiles(ZONA)
+    await expect(page.getByText(/zona-interdita\.kml: 1 zona\(s\) interdita\(s\)/)).toBeVisible()
+
+    await expect(exportar).toBeDisabled()
+    await page.getByRole('tab', { name: /Validações/ }).click()
+    await expect(page.getByText(/A rota entra em zona interdita/)).toBeVisible()
   })
 
   test('sem waypoints nao ha nada para exportar', async ({ page }) => {
