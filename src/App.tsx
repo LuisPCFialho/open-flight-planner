@@ -79,6 +79,7 @@ import { HudVoo } from './ui/HudVoo.tsx'
 import { PlayerReplay } from './ui/PlayerReplay.tsx'
 import { EcraProjetos } from './ui/EcraProjetos.tsx'
 import { PainelSol } from './ui/PainelSol.tsx'
+import { ResumoDoPlano } from './ui/ResumoDoPlano.tsx'
 import { SelectorRota } from './ui/SelectorRota.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
@@ -184,6 +185,7 @@ export function App() {
   const canalOrientacao = useCanal<Orientacao>({ rumo: 0, inclinacao: 0 })
   const [pedidoDeNorte, setPedidoDeNorte] = useState(0)
   const [coberturaAberta, setCoberturaAberta] = useState(false)
+  const [resumoAberto, setResumoAberto] = useState(false)
   /**
    * A regua vive fora da rota e fora do historico.
    *
@@ -729,6 +731,14 @@ export function App() {
           >
             Projetos
           </button>
+          <button
+            type="button"
+            className={resumoAberto ? 'activo' : ''}
+            title="Os números do plano numa página, para levar para o terreno"
+            onClick={() => setResumoAberto((aberto) => !aberto)}
+          >
+            Plano
+          </button>
           <BotaoAreas areas={rota.areas} aoFalhar={setFalha} aoImportar={importarAreas} />
           <BotaoAreas
             tipo="exclusao"
@@ -909,6 +919,17 @@ export function App() {
             <Bussola canal={canalOrientacao} aoApontarANorte={() => setPedidoDeNorte(Date.now())} />
 
             <ControlosVista sombreado={sombreado} aoMudarSombreado={setSombreado} />
+
+            {resumoAberto ? (
+              <ResumoDoPlano
+                rota={rota}
+                drone={drone}
+                estatisticas={estatisticas}
+                validacoes={validacoes}
+                acimaDoSolo={alturasAGL}
+                aoFechar={() => setResumoAberto(false)}
+              />
+            ) : null}
 
             {coberturaAberta && areasDeReferencia(rota.areas).length > 0 && drone ? (
               <PainelCobertura

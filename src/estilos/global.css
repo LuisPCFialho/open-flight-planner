@@ -2133,3 +2133,117 @@ button.ligacao {
   border-color: var(--alerta);
   color: var(--alerta);
 }
+
+/* --- resumo do plano -------------------------------------------------------- */
+
+.resumo-do-plano {
+  max-width: 460px;
+}
+
+.resumo-conteudo {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.resumo-titulo {
+  margin: 0;
+  font-size: 15px;
+}
+
+.resumo-subtitulo {
+  margin: 2px 0 14px;
+  font-size: 11px;
+  color: var(--texto-suave);
+}
+
+.resumo-lista {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 14px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.resumo-lista dt {
+  color: var(--texto-suave);
+}
+
+.resumo-lista dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.resumo-nota {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--texto-suave);
+  line-height: 1.5;
+}
+
+.resumo-validacoes {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.resumo-validacoes .erro {
+  color: var(--alerta);
+}
+
+.resumo-aviso {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--alerta);
+  background: var(--fundo-elevado);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/*
+ * No papel so vai o resumo.
+ *
+ * Tudo o resto - mapa, listas, paineis - e trabalho de ecra e nao serve para
+ * nada impresso. Sem isto o `Ctrl+P` dava vinte paginas de nada.
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .resumo-do-plano,
+  .resumo-do-plano * {
+    visibility: visible;
+  }
+
+  .resumo-do-plano {
+    position: absolute;
+    inset: 0 auto auto 0;
+    max-width: none;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+    background: #fff;
+    color: #000;
+  }
+
+  .resumo-conteudo {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .resumo-do-plano .nao-imprimir {
+    display: none;
+  }
+
+  .resumo-lista dt,
+  .resumo-nota,
+  .resumo-subtitulo {
+    color: #444;
+  }
+
+  .resumo-aviso {
+    background: #f4f4f4;
+  }
+}

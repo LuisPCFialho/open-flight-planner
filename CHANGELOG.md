@@ -8,6 +8,18 @@ ordering below is the useful part, not the calendar.
 
 ---
 
+## Unreleased
+
+### Added
+
+- **A one-page plan summary, made to be printed.** Whoever goes to site does not
+  take the planner — they take a phone with the file and, with any sense, a sheet
+  of paper with what they agreed with themselves the night before. This is that
+  sheet: the numbers that decide whether the flight goes well, the take-off
+  coordinates, the solar window, and the validations still unresolved. It carries
+  the note that no route from this tool has been flown yet, because whoever takes
+  it to a field is testing the tool as much as flying the route.
+
 ## 0.2.0
 
 Seventeen commits of field-driven work: everything below came out of using the
