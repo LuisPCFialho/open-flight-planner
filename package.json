@@ -1,7 +1,7 @@
 {
   "name": "open-flight-planner",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Planeador de rotas de drone com saida KMZ para DJI Fly e DJI Pilot 2",
   "scripts": {

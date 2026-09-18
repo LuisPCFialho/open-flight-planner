@@ -10,6 +10,11 @@ ordering below is the useful part, not the calendar.
 
 ## Unreleased
 
+## 0.4.0
+
+One feature, two weight reductions, two defects, and the tests that should have
+been written alongside the last release.
+
 ### Added
 
 - **Orbit a point, looking at it the whole way round.** Coverage serves what lies
@@ -67,6 +72,21 @@ ordering below is the useful part, not the calendar.
   seventy-odd degrees up. The rest of the application works between 90 down and
   45 up, and an angle outside that is not a route that frames badly — it is a
   route the aircraft will not accept.
+
+### Tested
+
+- **The wind validation had only been checked by eye on screen**, and it is what
+  decides whether a route exports at all. Twelve metres per second head-on
+  against the fifteen a Mini 5 Pro does on a mission leaves three over the
+  ground — a warning, because the route still flies, just slower. Eighteen of
+  crosswind against the same fifteen is not a slow leg but a heading the aircraft
+  cannot hold, and that blocks. And the case that matters most is now pinned: with
+  airspeed to spare, however much wind there is, there is no complaint at all.
+
+- **What a corrupted project file does.** Half a dozen refusals were written and
+  none verified. A refusal that is not verified is one that can be lost in a
+  refactor without anyone noticing, until a crooked file gets in and the
+  application breaks three screens later, far from the cause.
 
 ## 0.3.0
 
