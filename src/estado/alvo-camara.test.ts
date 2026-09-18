@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Rota, Waypoint } from '../nucleo/tipos.ts'
-import { deslocar } from '../nucleo/geodesia.ts'
+import { deslocar, distancia } from '../nucleo/geodesia.ts'
 import { acrescentarWaypoint, rotaVazia, waypointNovo } from '../nucleo/operacoes-rota.ts'
 import { calcularPerfil } from '../nucleo/perfil.ts'
 import { chaveDaPosicao } from './useCotasTerreno.ts'
@@ -9,6 +9,7 @@ import {
   aeronaveNoPerfil,
   alvoDaCamara,
   arestasDoEnquadramento,
+  setaDoRumo,
   type Comando,
 } from './alvo-camara.ts'
 
@@ -351,12 +352,13 @@ describe('piramide do enquadramento', () => {
     expect(base[3]?.para).toEqual(base[0]?.de)
   })
 
-  it('a piramide cresce com a distancia ao que se esta a ver', () => {
-    /*
-     * A ponta de um raio que nao chega ao chao fica a uma vez e meia a
-     * distancia ao centro. Com um tamanho fixo, a figura ficava enorme de perto
-     * e minuscula de longe.
-     */
+  /*
+   * Era proporcional a distancia ao centro visado, e com o gimbal quase na
+   * horizontal essa distancia sao centenas de metros: a figura disparava para
+   * fora do mapa e tapava a rota inteira. O tamanho passa a ser fixo, e a
+   * mancha no chao e que continua a dizer o que a foto cobre.
+   */
+  it('a piramide tem sempre o mesmo tamanho, olhe-se de perto ou de longe', () => {
     const perto = arestasDoEnquadramento(alvo, {
       ...soOsDeBaixo,
       centro: { ...canto(40.756, -8.405), distancia: 50 },
@@ -366,7 +368,8 @@ describe('piramide do enquadramento', () => {
       centro: { ...canto(40.756, -8.405), distancia: 500 },
     })
 
-    expect(longe[0]?.para.alt).toBeGreaterThan(perto[0]!.para.alt)
+    expect(longe[0]?.para.alt).toBeCloseTo(perto[0]!.para.alt, 6)
+    expect(longe[0]?.para.lat).toBeCloseTo(perto[0]!.para.lat, 9)
   })
 
   it('sem centro visado a piramide usa uma distancia de recurso', () => {
@@ -377,5 +380,67 @@ describe('piramide do enquadramento', () => {
     for (const aresta of arestas) {
       expect(Number.isFinite(aresta.para.alt)).toBe(true)
     }
+  })
+})
+
+describe('seta do rumo', () => {
+  /*
+   * A marca que diz onde esta a frente. O modelo sozinho nao chega: um
+   * quadricoptero visto de cima e quase simetrico a quatro voltas, e a altura de
+   * voo a diferenca entre rumo 0 e rumo 90 sao uns pixeis.
+   */
+  const aeronave = {
+    posicao: { lat: 40.755, lon: -8.405 },
+    alturaASL: 420,
+    guinada: 0,
+    gimbalPitch: -13,
+    gimbalYaw: 0,
+  }
+  const emRumo = (guinada: number) => setaDoRumo({ ...aeronave, guinada })
+
+  it('sao tres segmentos: a haste e duas farpas', () => {
+    expect(emRumo(0)).toHaveLength(3)
+  })
+
+  it('parte sempre da aeronave', () => {
+    const [haste] = emRumo(0)
+    expect(haste?.de.lat).toBeCloseTo(aeronave.posicao.lat, 9)
+    expect(haste?.de.lon).toBeCloseTo(aeronave.posicao.lon, 9)
+  })
+
+  it('com rumo a norte aponta a norte', () => {
+    const [haste] = emRumo(0)
+    expect(haste!.para.lat).toBeGreaterThan(aeronave.posicao.lat)
+    expect(haste!.para.lon).toBeCloseTo(aeronave.posicao.lon, 6)
+  })
+
+  it('com rumo a leste aponta a leste', () => {
+    const [haste] = emRumo(90)
+    expect(haste!.para.lon).toBeGreaterThan(aeronave.posicao.lon)
+    expect(haste!.para.lat).toBeCloseTo(aeronave.posicao.lat, 6)
+  })
+
+  it('com rumo a sul aponta a sul: nao ha simetria que a confunda', () => {
+    const [haste] = emRumo(180)
+    expect(haste!.para.lat).toBeLessThan(aeronave.posicao.lat)
+  })
+
+  it('tem sempre o mesmo comprimento, seja qual for o rumo', () => {
+    const comprimento = (guinada: number): number => {
+      const [haste] = emRumo(guinada)
+      return distancia({ lat: haste!.de.lat, lon: haste!.de.lon }, haste!.para)
+    }
+    expect(comprimento(37)).toBeCloseTo(comprimento(213), 3)
+  })
+
+  it('fica toda a altura de voo: e uma marca no ar, nao no chao', () => {
+    for (const segmento of emRumo(45)) {
+      expect(segmento.de.alt).toBe(aeronave.alturaASL)
+      expect(segmento.para.alt).toBe(aeronave.alturaASL)
+    }
+  })
+
+  it('leva cor propria, para nao se confundir com a piramide da camara', () => {
+    expect(emRumo(0).every((s) => s.cor !== undefined)).toBe(true)
   })
 })

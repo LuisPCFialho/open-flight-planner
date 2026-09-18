@@ -43,6 +43,7 @@ import {
   alvoDaCamara,
   arestasDoEnquadramento,
   pontasDoEnquadramento,
+  setaDoRumo,
 } from './estado/alvo-camara.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
@@ -401,8 +402,19 @@ export function App() {
     [alvoCamara, enquadramento],
   )
 
+  /*
+   * A piramide da camara, mais a seta que diz onde esta a frente.
+   *
+   * Vao juntas para a mesma camada porque sao ambas linhas soltas a altura de
+   * voo, mas dizem coisas diferentes: a piramide para onde a camara olha, a
+   * seta para onde o nariz aponta. Com o gimbal rodado sao direccoes
+   * diferentes, que e quando isto faz falta.
+   */
   const arestasEnquadramento = useMemo(
-    () => (alvoCamara ? arestasDoEnquadramento(alvoCamara, enquadramento) : []),
+    () =>
+      alvoCamara
+        ? [...arestasDoEnquadramento(alvoCamara, enquadramento), ...setaDoRumo(alvoCamara)]
+        : [],
     [alvoCamara, enquadramento],
   )
 

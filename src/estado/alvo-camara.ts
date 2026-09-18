@@ -1,5 +1,5 @@
 import type { LatLon, Rota, Waypoint } from '../nucleo/tipos.ts'
-import { paraASL } from '../nucleo/geodesia.ts'
+import { deslocar, paraASL } from '../nucleo/geodesia.ts'
 import { guinadaEfectiva } from '../nucleo/camara-trajecto.ts'
 import type { EstadoReplay } from '../nucleo/replay.ts'
 import type { EstadoVoo } from '../nucleo/voo.ts'
@@ -7,6 +7,7 @@ import type { Perfil } from '../nucleo/perfil.ts'
 import type { Alvo } from './useEnquadramento.ts'
 import { pontoAoLongoDoRaio, type Enquadramento } from '../nucleo/camara.ts'
 import type { Segmento3D } from '../mapa/camada-rota-3d.ts'
+import type { Cor } from '../mapa/cores-rota.ts'
 import { chaveDaPosicao } from './useCotasTerreno.ts'
 import type { DroneNoMapa } from '../mapa/camada-drones.ts'
 
@@ -155,6 +156,20 @@ export function aeronaveDoVoo(estado: EstadoVoo, alturaASL: number): DroneNoMapa
   }
 }
 
+/**
+ * Comprimento dos raios da camara, em metros.
+ *
+ * Fixo de proposito. Proporcional a distancia visada, a figura ficava enorme
+ * quando o gimbal estava quase na horizontal e minuscula a olhar para baixo -
+ * duas leituras diferentes da mesma coisa, e nenhuma delas util.
+ */
+export const ALCANCE_DOS_RAIOS = 60
+
+/** Comprimento da seta que diz para onde aponta o nariz, em metros. */
+const COMPRIMENTO_DA_SETA = 26
+/** Quanto as farpas da ponta abrem, em graus para cada lado. */
+const ABERTURA_DA_SETA = 28
+
 /** Um canto do enquadramento, e se ele chegou mesmo ao terreno. */
 export type PontaDoEnquadramento = {
   lat: number
@@ -191,12 +206,13 @@ export function pontasDoEnquadramento(
   /*
    * Ate onde se estende um raio que nao chega ao chao.
    *
-   * Uma vez e meia a distancia ao centro do enquadramento: assim a figura
-   * cresce com o que se esta a ver, em vez de ter um tamanho fixo que fica
-   * enorme de perto e minusculo de longe. Sem centro visado - camara toda acima
-   * do horizonte - usa-se uma distancia de recurso.
+   * Era proporcional a distancia ao centro visado, e com o gimbal quase na
+   * horizontal essa distancia sao centenas de metros: a figura disparava para
+   * fora do mapa e tapava a rota. Passa a ser um comprimento fixo - a mancha no
+   * chao continua a dizer o que a foto cobre, e esta figura so tem de dizer
+   * para onde a camara aponta.
    */
-  const alcance = enquadramento.centro ? enquadramento.centro.distancia * 1.5 : 400
+  const alcance = ALCANCE_DOS_RAIOS
 
   return direccoes.map((direccao, i) => {
     const canto = enquadramento.cantos[i]
@@ -233,6 +249,52 @@ export function arestasDoEnquadramento(
   }
 
   return arestas
+}
+
+/** Branco-azulado, para nao se confundir com o ambar da camara nem com a rota. */
+const COR_RUMO: Cor = [0.88, 0.95, 1, 0.95]
+
+/**
+ * A seta que diz para onde aponta o nariz da aeronave.
+ *
+ * Existe porque o modelo, sozinho, nao chega: um quadricoptero visto de cima e
+ * quase simetrico a quatro voltas, e a que altura de voo se ve no mapa, a
+ * diferenca entre rumo 0 e rumo 90 sao uns pixeis de camara do gimbal. Quem
+ * pilotava nao via o aparelho rodar, e como o W leva a aeronave para onde o
+ * nariz aponta, o que se via era o aparelho a deslizar de lado sem razao.
+ *
+ * E uma marca de rumo e nao parte do modelo: nao estraga a fidelidade do
+ * aparelho, e le-se a qualquer escala porque tem comprimento proprio, fixo.
+ *
+ * Nao se confunde com a piramide da camara. Esta diz onde esta a frente, aquela
+ * diz para onde a camara olha - e com o gimbal rodado sao direccoes diferentes,
+ * que e precisamente quando isto faz falta.
+ */
+export function setaDoRumo(alvo: Alvo): Segmento3D[] {
+  const altura = alvo.alturaASL
+  const noAr = (ponto: LatLon): { lat: number; lon: number; alt: number } => ({
+    lat: ponto.lat,
+    lon: ponto.lon,
+    alt: altura,
+  })
+
+  const aparelho = noAr(alvo.posicao)
+  const ponta = noAr(deslocar(alvo.posicao, alvo.guinada, COMPRIMENTO_DA_SETA))
+
+  // As farpas nascem na ponta e voltam para tras, uma para cada lado.
+  const farpa = (lado: number): Segmento3D => ({
+    de: ponta,
+    para: noAr(
+      deslocar(
+        deslocar(alvo.posicao, alvo.guinada, COMPRIMENTO_DA_SETA * 0.62),
+        alvo.guinada + lado * 90,
+        COMPRIMENTO_DA_SETA * Math.tan((ABERTURA_DA_SETA * Math.PI) / 180) * 0.62,
+      ),
+    ),
+    cor: COR_RUMO,
+  })
+
+  return [{ de: aparelho, para: ponta, cor: COR_RUMO }, farpa(-1), farpa(1)]
 }
 
 /**

@@ -53,6 +53,8 @@ type OpcoesRender = {
 export type Segmento3D = {
   de: { lat: number; lon: number; alt: number }
   para: { lat: number; lon: number; alt: number }
+  /** Ausente, vai o ambar do enquadramento. A seta de rumo traz a sua. */
+  cor?: Cor
 }
 
 /** O ambar do poligono do enquadramento: as duas leituras sao da mesma coisa. */
@@ -404,11 +406,12 @@ export class CamadaRota3D implements CustomLayerInterface {
      * terreno: as duas leituras sao da mesma coisa e tem de se ler como uma.
      */
     for (const aresta of this.#arestas) {
+      const cor = aresta.cor ?? COR_ENQUADRAMENTO
       for (const ponta of [aresta.de, aresta.para]) {
         empurrar(
           linhas,
           MercatorCoordinate.fromLngLat([ponta.lon, ponta.lat], esticar(ponta.alt)),
-          COR_ENQUADRAMENTO,
+          cor,
         )
       }
     }
