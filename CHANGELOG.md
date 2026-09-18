@@ -47,6 +47,27 @@ ordering below is the useful part, not the calendar.
   back to local mode rather than going blank, because local mode works perfectly
   without it.
 
+- **`proj4` no longer ships to people who never import a DXF** — forty-three
+  gzipped kilobytes, on everyone's first load, for a coordinate conversion that
+  only serves PT-TM06 survey import. It arrived through a link you cannot see:
+  the composite terrain source, which the app always needs, lived in the same
+  file as the DXF one, and that one works in PT-TM06.
+
+### Fixed
+
+- **The "Flagged" filter on the waypoint list ignored almost every validation.**
+  It filtered on the row's own alert, which is only ground clearance outside the
+  limits. No-fly zones, wind, unsupported actions and points missing their photo
+  flag waypoints that carry no row alert, and none of them appeared. A filter
+  called "flagged" that ignores almost every validation lies by its name, and it
+  lies to whoever is in a hurry — which is exactly who uses it.
+
+- **An orbit could ask the gimbal for an angle it does not have.** Flying below
+  the target and close to it, the arithmetic that points at the centre asked for
+  seventy-odd degrees up. The rest of the application works between 90 down and
+  45 up, and an angle outside that is not a route that frames badly — it is a
+  route the aircraft will not accept.
+
 ## 0.3.0
 
 Six features and a visual pass. The first three came out of the same question -
