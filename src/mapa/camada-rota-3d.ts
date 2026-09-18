@@ -204,6 +204,22 @@ export class CamadaRota3D implements CustomLayerInterface {
   #numLinhas = 0
   #numPontos = 0
   #precisaRecarregar = false
+
+  /*
+   * As arestas vivem em buffer proprio, e nao no da rota.
+   *
+   * Partilhavam-no, e por isso mexer a aeronave reconstruia a rota inteira:
+   * verticais, trocos, setas de sentido e marcas no solo, sessenta vezes por
+   * segundo, com uma conversao para Mercator por waypoint de cada vez. Numa
+   * rota de cobertura isso e o que faz o voo virtual arrastar-se.
+   *
+   * Separados, mexer a aeronave toca em onze segmentos e mais nada.
+   */
+  #bufferArestas: WebGLBuffer | null = null
+  #vaoArestas: WebGLVertexArrayObject | null = null
+  #verticesArestas = new Float32Array(0)
+  #numLinhasArestas = 0
+  #precisaRecarregarArestas = false
   #renders = 0
   #reconstrucoes = 0
 
@@ -215,30 +231,41 @@ export class CamadaRota3D implements CustomLayerInterface {
     this.#programa = programa
     this.#localMatriz = gl.getUniformLocation(programa, 'uMatriz')
 
-    this.#buffer = gl.createBuffer()
-    this.#vao = gl.createVertexArray()
-    gl.bindVertexArray(this.#vao)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.#buffer)
+    const montar = (): [WebGLBuffer, WebGLVertexArrayObject] => {
+      const buffer = gl.createBuffer()
+      const vao = gl.createVertexArray()
+      gl.bindVertexArray(vao)
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
 
-    const posicao = gl.getAttribLocation(programa, 'aPosicao')
-    const cor = gl.getAttribLocation(programa, 'aCor')
-    const bytesPorVertice = 7 * 4
-    gl.enableVertexAttribArray(posicao)
-    gl.vertexAttribPointer(posicao, 3, gl.FLOAT, false, bytesPorVertice, 0)
-    gl.enableVertexAttribArray(cor)
-    gl.vertexAttribPointer(cor, 4, gl.FLOAT, false, bytesPorVertice, 3 * 4)
-    gl.bindVertexArray(null)
+      const posicao = gl.getAttribLocation(programa, 'aPosicao')
+      const cor = gl.getAttribLocation(programa, 'aCor')
+      const bytesPorVertice = 7 * 4
+      gl.enableVertexAttribArray(posicao)
+      gl.vertexAttribPointer(posicao, 3, gl.FLOAT, false, bytesPorVertice, 0)
+      gl.enableVertexAttribArray(cor)
+      gl.vertexAttribPointer(cor, 4, gl.FLOAT, false, bytesPorVertice, 3 * 4)
+      gl.bindVertexArray(null)
+      return [buffer, vao]
+    }
+
+    ;[this.#buffer, this.#vao] = montar()
+    ;[this.#bufferArestas, this.#vaoArestas] = montar()
 
     this.#precisaRecarregar = true
+    this.#precisaRecarregarArestas = true
   }
 
   onRemove(_mapa: MapaLibre, gl: WebGL2RenderingContext): void {
     if (this.#programa) gl.deleteProgram(this.#programa)
     if (this.#buffer) gl.deleteBuffer(this.#buffer)
     if (this.#vao) gl.deleteVertexArray(this.#vao)
+    if (this.#bufferArestas) gl.deleteBuffer(this.#bufferArestas)
+    if (this.#vaoArestas) gl.deleteVertexArray(this.#vaoArestas)
     this.#programa = null
     this.#buffer = null
     this.#vao = null
+    this.#bufferArestas = null
+    this.#vaoArestas = null
 
   }
 
@@ -264,8 +291,8 @@ export class CamadaRota3D implements CustomLayerInterface {
   /** Substitui as arestas soltas - a piramide do enquadramento. */
   definirArestas(arestas: readonly Segmento3D[]): void {
     this.#arestas = arestas
-    this.#construirVertices()
-    this.#precisaRecarregar = true
+    this.#construirArestas()
+    this.#precisaRecarregarArestas = true
     this.#mapa?.triggerRepaint()
   }
 
@@ -280,7 +307,10 @@ export class CamadaRota3D implements CustomLayerInterface {
     this.#intervalo = intervalo
     this.#exagero = exagero > 0 ? exagero : 1
     this.#construirVertices()
+    // A origem pode ter mudado com a rota, e as arestas sao relativas a ela.
+    this.#construirArestas()
     this.#precisaRecarregar = true
+    this.#precisaRecarregarArestas = true
     this.#mapa?.triggerRepaint()
   }
 
@@ -298,12 +328,18 @@ export class CamadaRota3D implements CustomLayerInterface {
    */
   render(gl: WebGL2RenderingContext, opcoes: OpcoesRender): void {
     this.#renders++
-    if (!this.#programa || !this.#vao || this.#vertices.length === 0) return
+    if (!this.#programa) return
+    if (this.#vertices.length === 0 && this.#verticesArestas.length === 0) return
 
     if (this.#precisaRecarregar) {
       gl.bindBuffer(gl.ARRAY_BUFFER, this.#buffer)
       gl.bufferData(gl.ARRAY_BUFFER, this.#vertices, gl.DYNAMIC_DRAW)
       this.#precisaRecarregar = false
+    }
+    if (this.#precisaRecarregarArestas) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.#bufferArestas)
+      gl.bufferData(gl.ARRAY_BUFFER, this.#verticesArestas, gl.DYNAMIC_DRAW)
+      this.#precisaRecarregarArestas = false
     }
 
     const principal = opcoes.defaultProjectionData?.mainMatrix
@@ -312,13 +348,69 @@ export class CamadaRota3D implements CustomLayerInterface {
 
     gl.useProgram(this.#programa)
     gl.uniformMatrix4fv(this.#localMatriz, false, matriz)
-    gl.bindVertexArray(this.#vao)
-    gl.drawArrays(gl.LINES, 0, this.#numLinhas)
-    gl.drawArrays(gl.POINTS, this.#numLinhas, this.#numPontos)
+
+    if (this.#vao && this.#numLinhas + this.#numPontos > 0) {
+      gl.bindVertexArray(this.#vao)
+      gl.drawArrays(gl.LINES, 0, this.#numLinhas)
+      gl.drawArrays(gl.POINTS, this.#numLinhas, this.#numPontos)
+    }
+    if (this.#vaoArestas && this.#numLinhasArestas > 0) {
+      gl.bindVertexArray(this.#vaoArestas)
+      gl.drawArrays(gl.LINES, 0, this.#numLinhasArestas)
+    }
     gl.bindVertexArray(null)
   }
 
   // --- interno ---------------------------------------------------------------
+
+  /**
+   * As arestas soltas: a piramide da camara e a seta de rumo.
+   *
+   * A piramide vai em ambar, a mesma cor do poligono que ela projecta no
+   * terreno - as duas leituras sao da mesma coisa e tem de se ler como uma. A
+   * seta de rumo traz cor propria, porque diz outra coisa.
+   *
+   * Com a rota vazia, a origem sai da primeira aresta: em voo virtual sobre uma
+   * rota sem waypoints era so isto que havia para desenhar, e sem origem nao se
+   * desenhava nada.
+   */
+  #construirArestas(): void {
+    if (this.#arestas.length === 0) {
+      this.#verticesArestas = new Float32Array(0)
+      this.#numLinhasArestas = 0
+      return
+    }
+
+    if (this.#pontos.length === 0) {
+      const primeira = this.#arestas[0]
+      if (!primeira) return
+      const ancora = MercatorCoordinate.fromLngLat(
+        [primeira.de.lon, primeira.de.lat],
+        primeira.de.alt * this.#exagero,
+      )
+      this.#origem = [ancora.x, ancora.y, ancora.z]
+    }
+
+    const linhas: number[] = []
+    for (const aresta of this.#arestas) {
+      const cor = aresta.cor ?? COR_ENQUADRAMENTO
+      for (const ponta of [aresta.de, aresta.para]) {
+        const m = MercatorCoordinate.fromLngLat(
+          [ponta.lon, ponta.lat],
+          ponta.alt * this.#exagero,
+        )
+        linhas.push(
+          m.x - this.#origem[0],
+          m.y - this.#origem[1],
+          m.z - this.#origem[2],
+          ...cor,
+        )
+      }
+    }
+
+    this.#numLinhasArestas = linhas.length / 7
+    this.#verticesArestas = new Float32Array(linhas)
+  }
 
   #construirVertices(): void {
     const pontos = this.#pontos
@@ -399,21 +491,6 @@ export class CamadaRota3D implements CustomLayerInterface {
       const baixo = solo[i]
       if (!baixo) continue
       empurrar(marcas, baixo, COR_VERTICAL)
-    }
-
-    /*
-     * A piramide vai em ambar, a mesma cor do poligono que ela projecta no
-     * terreno: as duas leituras sao da mesma coisa e tem de se ler como uma.
-     */
-    for (const aresta of this.#arestas) {
-      const cor = aresta.cor ?? COR_ENQUADRAMENTO
-      for (const ponta of [aresta.de, aresta.para]) {
-        empurrar(
-          linhas,
-          MercatorCoordinate.fromLngLat([ponta.lon, ponta.lat], esticar(ponta.alt)),
-          cor,
-        )
-      }
     }
 
     this.#numLinhas = linhas.length / 7

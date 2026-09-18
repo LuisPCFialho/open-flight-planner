@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { LngLat, Map as MapaLibre, type GeoJSONSource } from 'maplibre-gl'
 import type { Area, LatLon } from '../nucleo/tipos.ts'
-import type { Enquadramento } from '../nucleo/camara.ts'
+import {
+  abaixoDoHorizonte,
+  pontoAoLongoDoRaio,
+  type Enquadramento,
+} from '../nucleo/camara.ts'
 import { estiloBase, FONTE_TERRENO } from '../mapa/estilo.ts'
 import { areasGeoJSON } from '../mapa/geojson.ts'
 
 /** Fonte propria: esta janela tem o seu mapa, separado do principal. */
 const FONTE_AREAS_CAMARA = 'areas-na-camara'
+
+/** Ate onde se mira quando a camara nao encontra terreno. */
+const DISTANCIA_SEM_TERRENO = 400
 
 /**
  * O que a camara ve, em primeira pessoa.
@@ -153,9 +160,36 @@ export function VistaCamara({
   }, [areas, pronto])
 
   const centro = enquadramento?.centro
-  const alvoLat = centro?.ponto.lat
-  const alvoLon = centro?.ponto.lon
-  const alvoCota = centro?.cotaTerreno
+
+  /*
+   * Para onde a vista aponta.
+   *
+   * O ponto visado quando a camara chega ao terreno. Quando nao chega - gimbal
+   * apontado acima do horizonte - vale a propria linha de vista, baixada o
+   * minimo para a camara do mapa a conseguir seguir.
+   *
+   * Sem esta segunda hipotese a vista ficava parada no ultimo sitio que tinha
+   * visto: mexia a altitude e mais nada, e parecia encravada. Uma vista que
+   * responde e mais util do que uma vista exacta que congela, e o ecra continua
+   * a dizer por palavras que a camara esta acima do horizonte.
+   */
+  const mira = centro
+    ? { lat: centro.ponto.lat, lon: centro.ponto.lon, alt: centro.cotaTerreno }
+    : enquadramento
+      ? (() => {
+          const longe = pontoAoLongoDoRaio(
+            posicao,
+            alturaASL,
+            abaixoDoHorizonte(enquadramento.direccaoDoCentro),
+            DISTANCIA_SEM_TERRENO,
+          )
+          return { lat: longe.ponto.lat, lon: longe.ponto.lon, alt: longe.altura }
+        })()
+      : null
+
+  const alvoLat = mira?.lat
+  const alvoLon = mira?.lon
+  const alvoCota = mira?.alt
 
   useEffect(() => {
     const instancia = mapa.current

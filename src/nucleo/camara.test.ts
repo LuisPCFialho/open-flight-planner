@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { LatLon } from './tipos.ts'
 import { distancia, rumo } from './geodesia.ts'
 import {
+  abaixoDoHorizonte,
   baseDaCamara,
   fovVerticalDe,
   marcharRaio,
@@ -197,5 +198,46 @@ describe('enquadramento', () => {
       { alcance: 1500, passo: 5 },
     )
     expect(horizonte.cantos.some((c) => c === null)).toBe(true)
+  })
+})
+
+describe('baixar o raio abaixo do horizonte', () => {
+  /*
+   * A camara do mapa nao sabe olhar para cima. Com o gimbal apontado ao ceu nao
+   * ha ponto no terreno para onde mirar, e a vista de camara ficava parada no
+   * ultimo sitio que tinha visto - mexia a altitude e mais nada.
+   */
+  const norte = (cima: number) => {
+    const h = Math.sqrt(Math.max(0, 1 - cima * cima))
+    return { este: 0, norte: h, cima }
+  }
+
+  it('um raio que ja desce fica como esta', () => {
+    const desce = norte(-0.5)
+    expect(abaixoDoHorizonte(desce)).toBe(desce)
+  })
+
+  it('um raio que sobe passa a descer', () => {
+    expect(abaixoDoHorizonte(norte(0.4)).cima).toBeLessThan(0)
+  })
+
+  it('continua unitario depois de baixado', () => {
+    const baixado = abaixoDoHorizonte(norte(0.4))
+    expect(Math.hypot(baixado.este, baixado.norte, baixado.cima)).toBeCloseTo(1, 9)
+  })
+
+  it('mantem o azimute: baixa-se o raio, nao se roda a camara', () => {
+    const paraNordeste = { este: 0.6, norte: 0.6, cima: 0.53 }
+    const baixado = abaixoDoHorizonte(paraNordeste)
+    expect(Math.atan2(baixado.este, baixado.norte)).toBeCloseTo(
+      Math.atan2(paraNordeste.este, paraNordeste.norte),
+      9,
+    )
+  })
+
+  it('um raio a apontar ao zenite ganha uma direccao em vez de nenhuma', () => {
+    const baixado = abaixoDoHorizonte({ este: 0, norte: 0, cima: 1 })
+    expect(Math.hypot(baixado.este, baixado.norte)).toBeGreaterThan(0)
+    expect(baixado.cima).toBeLessThan(0)
   })
 })

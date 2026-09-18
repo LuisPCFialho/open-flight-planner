@@ -47,6 +47,14 @@ export type Enquadramento = {
    * olha, e e disso que a piramide precisa.
    */
   direccoesDosCantos: Vector3[]
+  /**
+   * Direccao do raio central, em ENU e normalizada.
+   *
+   * Existe mesmo quando o centro nao acerta em terreno nenhum - camara acima do
+   * horizonte - e e o que permite a vista de camara continuar a apontar para
+   * onde a camara aponta em vez de ficar parada no ultimo sitio que viu.
+   */
+  direccaoDoCentro: Vector3
   /** Largura do terreno coberta na horizontal media, em metros. */
   larguraCoberta: number | null
   /** Profundidade coberta entre o bordo proximo e o distante, em metros. */
@@ -215,6 +223,7 @@ export function projectarEnquadramento(
     marcharRaio(parametros.posicao, parametros.alturaASL, raio(sx, sy), terreno, opcoes)
 
   const centro = lancar(0, 0)
+  const direccaoDoCentro = raio(0, 0)
   // Cima-esquerda, cima-direita, baixo-direita, baixo-esquerda.
   const escalas: readonly [number, number][] = [
     [-1, 1],
@@ -227,6 +236,7 @@ export function projectarEnquadramento(
 
   return {
     centro,
+    direccaoDoCentro,
     direccoesDosCantos,
     cantos,
     larguraCoberta: larguraMedia(cantos),
@@ -249,4 +259,34 @@ function profundidade(cantos: readonly (PontoVisado | null)[]): number | null {
   const [cimaEsq, , , baixoEsq] = cantos
   if (!cimaEsq || !baixoEsq) return null
   return distancia(cimaEsq.ponto, baixoEsq.ponto)
+}
+
+/**
+ * A mesma direccao, garantidamente abaixo do horizonte.
+ *
+ * A camara do mapa nao sabe olhar para cima: a inclinacao maxima do MapLibre
+ * poe-na a rasar o horizonte e mais nada. Com o gimbal apontado ao ceu nao ha
+ * ponto no terreno para onde mirar, e a vista de camara ficava parada no ultimo
+ * sitio que tinha visto - mexia a altitude e mais nada, como se tivesse
+ * encravado.
+ *
+ * Baixando o raio o minimo necessario, a vista continua a rodar com o gimbal e
+ * a acompanhar a aeronave. O que ela mostra deixa de ser exacto em inclinacao,
+ * e o ecra di-lo por palavras - mas uma vista que responde e mais util do que
+ * uma vista exacta que congela.
+ */
+export function abaixoDoHorizonte(direccao: Vector3, minimoGraus = 6): Vector3 {
+  const minimo = -Math.sin(minimoGraus * GRAUS)
+  if (direccao.cima <= minimo) return direccao
+
+  const horizontal = Math.hypot(direccao.este, direccao.norte)
+  // Um raio exactamente vertical nao tem direccao no plano que se possa manter.
+  if (horizontal < 1e-12) return { este: 0, norte: 1, cima: minimo }
+
+  const escala = Math.sqrt(1 - minimo * minimo) / horizontal
+  return {
+    este: direccao.este * escala,
+    norte: direccao.norte * escala,
+    cima: minimo,
+  }
 }

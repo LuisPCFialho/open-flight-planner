@@ -34,6 +34,20 @@ export function azimuteDaCamara(alvo: Pick<Alvo, 'guinada' | 'gimbalYaw'>): numb
 
 const ALCANCE_MAXIMO = 3000
 
+/**
+ * Minimo de tempo entre duas projeccoes, em milesimos.
+ *
+ * A marcha dos raios amostra o terreno a cada passo, e com o gimbal quase na
+ * horizontal o alcance chega aos tres quilometros: sao centenas de amostras por
+ * raio, cinco raios, mais o precarregamento dos mosaicos que faltam. A correr a
+ * cada fotograma do voo virtual, e isso que faz a aplicacao arrastar-se.
+ *
+ * Sete vezes por segundo chega e sobra para uma figura que so tem de dizer para
+ * onde a camara aponta. O atraso e da ordem do fotograma e nao se ve; o que se
+ * via era tudo o resto a abrandar por causa dela.
+ */
+export const INTERVALO_MINIMO_MS = 140
+
 export function useEnquadramento(
   alvo: Alvo | null,
   drone: Drone,
@@ -42,6 +56,8 @@ export function useEnquadramento(
   const [enquadramento, setEnquadramento] = useState<Enquadramento | null>(null)
   const [aCarregar, setACarregar] = useState(false)
   const montado = useRef(true)
+  /** Quando correu a ultima projeccao, para lhe pôr um tecto de cadência. */
+  const ultimaProjeccao = useRef(0)
 
   useEffect(() => {
     montado.current = true
@@ -65,7 +81,31 @@ export function useEnquadramento(
     }
 
     let obsoleto = false
-    setACarregar(true)
+
+    /*
+     * Estrangulamento, e nao adiamento.
+     *
+     * Adiar ate as coisas assentarem nunca dispararia: em voo a assinatura muda
+     * a cada fotograma e o temporizador reiniciava-se sempre. O que se quer e um
+     * tecto a cadencia, com a ultima posicao sempre a chegar no fim.
+     */
+    const desdeAUltima = Date.now() - ultimaProjeccao.current
+    const espera = Math.max(0, INTERVALO_MINIMO_MS - desdeAUltima)
+
+    const temporizador = setTimeout(() => {
+      if (obsoleto || !montado.current) return
+      ultimaProjeccao.current = Date.now()
+      projectar()
+    }, espera)
+
+    return () => {
+      obsoleto = true
+      clearTimeout(temporizador)
+    }
+
+    function projectar(): void {
+      if (!alvo) return
+      setACarregar(true)
 
     // Alcance estimado: quanto mais horizontal o gimbal, mais longe vai o raio.
     const inclinacaoBordo = Math.max(1, Math.abs(alvo.gimbalPitch) - fov / 2)
@@ -101,9 +141,6 @@ export function useEnquadramento(
       .finally(() => {
         if (!obsoleto && montado.current) setACarregar(false)
       })
-
-    return () => {
-      obsoleto = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assinatura, fonte])
