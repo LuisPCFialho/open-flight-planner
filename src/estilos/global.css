@@ -1966,6 +1966,22 @@ button,
 .bussola-sul { fill: #7d8fa5; }
 .bussola-sul-sombra { fill: #52627a; }
 
+/*
+ * A seta do vento, num azul que nao se confunde com o ponteiro.
+ *
+ * O ponteiro do norte e vermelho e o do sul cinzento; uma terceira seta tinha de
+ * ser outra coisa, e o azul e o mesmo do destaque que a rosa do painel ja usa.
+ */
+.bussola-vento line {
+  stroke: var(--destaque);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.bussola-vento path {
+  fill: var(--destaque);
+}
+
 .bussola-letras text {
   fill: var(--texto-suave);
   font-family: var(--fonte);

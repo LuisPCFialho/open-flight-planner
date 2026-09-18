@@ -938,7 +938,11 @@ export function App() {
               aoErro={setErroMapa}
             />
 
-            <Bussola canal={canalOrientacao} aoApontarANorte={() => setPedidoDeNorte(Date.now())} />
+            <Bussola
+              canal={canalOrientacao}
+              aoApontarANorte={() => setPedidoDeNorte(Date.now())}
+              vento={rota.vento}
+            />
 
             <ControlosVista sombreado={sombreado} aoMudarSombreado={setSombreado} />
 
