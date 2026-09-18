@@ -111,6 +111,13 @@ export function calcularEstatisticas(
       rota,
       maximoNoAr,
     )
+    /*
+      * `null` e o troco que a aeronave nao segue - o vento de traves passa o que
+      * ela faz no ar. Nao ha duracao que se estime para isso, e o troco nao
+      * conta: o que sai e uma estimativa curta de mais para uma rota que nao se
+      * voa. Quem o diz pelo nome e `validarVento`, com um erro que bloqueia a
+      * exportacao, e por isso ninguem chega a agir sobre este numero.
+      */
     if (velocidade !== null && velocidade > 0) duracao += troco / velocidade
   }
 
