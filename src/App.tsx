@@ -957,6 +957,7 @@ export function App() {
                 estatisticas={estatisticas}
                 validacoes={validacoes}
                 acimaDoSolo={alturasAGL}
+                divisao={divisao}
                 aoFechar={() => setResumoAberto(false)}
               />
             ) : null}

@@ -1,6 +1,4 @@
 import type {
-  AccaoFinal,
-  AccaoPerdaSinal,
   Drone,
   ModoAltitude,
   ModoDescolagem,
@@ -11,18 +9,12 @@ import { DRONES } from '../drones.ts'
 import { CampoNumerico, CampoSelecao } from './campos.tsx'
 import { IconeDescolagem } from './icones.tsx'
 import { PainelVento } from './PainelVento.tsx'
+import { ACCOES_FINAIS, PERDA_SINAL } from './nomes.ts'
 
 const MODOS_ALTITUDE: readonly { valor: ModoAltitude; rotulo: string; ajuda: string }[] = [
   { valor: 'ASL', rotulo: 'ASL', ajuda: 'Acima do nível médio do mar' },
   { valor: 'ALT', rotulo: 'ALT', ajuda: 'Relativa à cota do ponto de descolagem' },
   { valor: 'AGL', rotulo: 'AGL', ajuda: 'Acima do solo em cada ponto' },
-]
-
-const ACCOES_FINAIS: readonly { valor: AccaoFinal; rotulo: string }[] = [
-  { valor: 'goHome', rotulo: 'Regressar ao ponto de descolagem' },
-  { valor: 'noAction', rotulo: 'Pairar no último waypoint' },
-  { valor: 'autoLand', rotulo: 'Aterrar no último waypoint' },
-  { valor: 'gotoFirstWaypoint', rotulo: 'Voltar ao primeiro waypoint' },
 ]
 
 const MODOS_CAMARA: readonly {
@@ -45,12 +37,6 @@ const MODOS_CAMARA: readonly {
     rotulo: 'Olhar o terreno',
     ajuda: 'A câmara aponta a prumo ao solo, para levantamento',
   },
-]
-
-const PERDA_SINAL: readonly { valor: AccaoPerdaSinal; rotulo: string }[] = [
-  { valor: 'goBack', rotulo: 'Regressar' },
-  { valor: 'landing', rotulo: 'Aterrar' },
-  { valor: 'hover', rotulo: 'Pairar' },
 ]
 
 type Props = {

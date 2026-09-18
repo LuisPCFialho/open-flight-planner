@@ -7,6 +7,8 @@ import { areaDoContorno, formatarArea } from '../nucleo/areas.ts'
 import { areasDeReferencia, zonasInterditas } from '../nucleo/interdicoes.ts'
 import { janelaSolar, ELEVACAO_MINIMA_PREDEFINIDA } from '../nucleo/sol.ts'
 import { quadrante, temVento } from '../nucleo/vento.ts'
+import type { Divisao } from '../nucleo/baterias.ts'
+import { ACCOES_FINAIS, nomeDe, PERDA_SINAL } from './nomes.ts'
 
 /**
  * O plano em uma pagina, para levar para o terreno.
@@ -34,6 +36,14 @@ type Props = {
    * e esses ficam de fora do intervalo em vez de o puxarem para zero.
    */
   acimaDoSolo: readonly (number | null)[]
+  /**
+   * Em quantos voos esta rota se divide, se e que se divide.
+   *
+   * O numero de baterias e das poucas coisas desta folha que se resolve antes de
+   * sair de casa e nao no campo, e por isso tem de la estar. Uma rota de dois
+   * voos com uma bateria na mochila e uma viagem perdida.
+   */
+  divisao: Divisao | null
   aoFechar: () => void
 }
 
@@ -57,6 +67,7 @@ export function ResumoDoPlano({
   estatisticas,
   validacoes,
   acimaDoSolo,
+  divisao,
   aoFechar,
 }: Props) {
   /*
@@ -124,6 +135,14 @@ export function ResumoDoPlano({
             <dd>{intervalo(acimaDoSolo)}</dd>
             <dt>Modo de altitude</dt>
             <dd>{rota.modoAltitude}</dd>
+            {divisao && divisao.trocos.length > 1 ? (
+              <>
+                <dt>Baterias</dt>
+                <dd>
+                  {divisao.trocos.length}, com {formatarDuracao(divisao.limite)} úteis cada
+                </dd>
+              </>
+            ) : null}
           </dl>
         </section>
 
@@ -139,9 +158,9 @@ export function ResumoDoPlano({
             <dt>Altura de regresso</dt>
             <dd>{rota.alturaRTH} m</dd>
             <dt>No fim da rota</dt>
-            <dd>{rota.acaoFinal}</dd>
+            <dd>{nomeDe(ACCOES_FINAIS, rota.acaoFinal)}</dd>
             <dt>Se perder o sinal</dt>
-            <dd>{rota.acaoPerdaSinal}</dd>
+            <dd>{nomeDe(PERDA_SINAL, rota.acaoPerdaSinal)}</dd>
           </dl>
         </section>
 
