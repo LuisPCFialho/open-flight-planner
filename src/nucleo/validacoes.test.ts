@@ -507,3 +507,99 @@ describe('tecto do aparelho', () => {
     expect(comId(validarRota(rota, comTecto(undefined), contexto), 'acima-do-tecto')).toBeUndefined()
   })
 })
+
+describe('o vento', () => {
+  /*
+   * Os waypoints de `cenario` vao todos para leste. Um vento de leste e de
+   * frente em toda a rota; um de norte e todo de travessia. E o par de casos que
+   * separa as duas coisas que o vento pode fazer: atrasar, e arrastar.
+   */
+  function rotaAoVento(vento: Rota['vento'], velocidade = 5) {
+    const { rota, contexto } = cenario({
+      numeroWaypoints: 5,
+      troco: 100,
+      altura: 60,
+      terreno: () => 200,
+      velocidade,
+    })
+    return { rota: { ...rota, vento }, contexto }
+  }
+
+  it('sem vento apontado nao diz nada', () => {
+    const { rota, contexto } = rotaAoVento(undefined)
+    const validacoes = validarRota(rota, droneComId('mini5pro'), contexto)
+    expect(comId(validacoes, 'vento-lento')).toBeUndefined()
+    expect(comId(validacoes, 'vento-deriva')).toBeUndefined()
+  })
+
+  /*
+   * O ponto de todo o modulo do vento: enquanto houver folga no ar, uma missao
+   * de waypoints e voada a velocidade que se pediu e o vento nao tira nada.
+   */
+  it('com folga no ar nao se queixa, por mais vento que haja', () => {
+    const { rota, contexto } = rotaAoVento({ velocidade: 9, rumo: 90 }, 5)
+    const validacoes = validarRota(rota, droneComId('mini5pro'), contexto)
+    expect(comId(validacoes, 'vento-lento')).toBeUndefined()
+    expect(comId(validacoes, 'vento-deriva')).toBeUndefined()
+  })
+
+  it('sem folga avisa, e diz o que a aeronave consegue mesmo fazer', () => {
+    /* Mini 5 Pro: 15 m/s em missao. 12 de frente deixam 3 no solo. */
+    const { rota, contexto } = rotaAoVento({ velocidade: 12, rumo: 90 }, 5)
+    const aviso = comId(validarRota(rota, droneComId('mini5pro'), contexto), 'vento-lento')
+
+    expect(aviso?.severidade).toBe('aviso')
+    expect(aviso?.detalhe).toContain('3.0 m/s em vez de 5.0')
+    expect(aviso?.waypoints).toHaveLength(4)
+  })
+
+  /*
+   * A travessia maior do que a velocidade no ar nao e um troco lento: e um rumo
+   * que a aeronave nao segura. Vai a deriva, e por isso bloqueia.
+   */
+  it('travessia maior do que a aeronave faz no ar bloqueia a exportacao', () => {
+    const { rota, contexto } = rotaAoVento({ velocidade: 18, rumo: 0 }, 5)
+    const validacoes = validarRota(rota, droneComId('mini5pro'), contexto)
+    const erro = comId(validacoes, 'vento-deriva')
+
+    expect(erro?.severidade).toBe('erro')
+    expect(erro?.detalhe).toContain('não é para voar')
+    expect(temErros(validacoes)).toBe(true)
+  })
+
+  it('o vento pela cauda nunca se queixa', () => {
+    const { rota, contexto } = rotaAoVento({ velocidade: 12, rumo: 270 }, 5)
+    const validacoes = validarRota(rota, droneComId('mini5pro'), contexto)
+    expect(comId(validacoes, 'vento-lento')).toBeUndefined()
+    expect(comId(validacoes, 'vento-deriva')).toBeUndefined()
+  })
+
+  /*
+   * Sem a velocidade maxima em missao no catalogo nao ha nada com que comparar o
+   * vento. Dizer isso e melhor do que calar - quem planeia fica a saber que o
+   * numero que escreveu nao esta a ser usado para nada.
+   */
+  it('sem velocidade maxima no catalogo, avisa que nao ha com que comparar', () => {
+    const { rota, contexto } = rotaAoVento({ velocidade: 12, rumo: 90 }, 5)
+    /*
+      * Tirado e nao posto a `undefined`: com `exactOptionalPropertyTypes` um
+      * campo opcional ou esta ou nao esta, e e assim que um aparelho do
+      * catalogo sem velocidade medida se apresenta.
+      */
+    const { velocidadeMaxWaypoint: _semUso, ...semMaximo } = droneComId('mini5pro')
+
+    const validacoes = validarRota(rota, semMaximo, contexto)
+    const aviso = comId(validacoes, 'vento-sem-maximo')
+
+    expect(aviso?.severidade).toBe('aviso')
+    expect(aviso?.detalhe).toContain('12 m/s de E')
+    expect(comId(validacoes, 'vento-lento')).toBeUndefined()
+  })
+
+  it('vento parado e o mesmo que vento nenhum', () => {
+    const { rota, contexto } = rotaAoVento({ velocidade: 0, rumo: 90 }, 5)
+    const validacoes = validarRota(rota, droneComId('mini5pro'), contexto)
+    expect(comId(validacoes, 'vento-lento')).toBeUndefined()
+    expect(comId(validacoes, 'vento-sem-maximo')).toBeUndefined()
+  })
+})
