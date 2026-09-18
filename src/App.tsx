@@ -264,8 +264,17 @@ export function App() {
     [rota?.alturaMinimaAcimaDoSolo],
   )
 
-  const estatisticas = useMemo(() => (rota ? calcularEstatisticas(rota) : null), [rota])
   const drone = useMemo(() => (rota ? droneComId(rota.droneId) : null), [rota])
+
+  /*
+   * A velocidade maxima do aparelho entra aqui por causa do vento: e contra ela
+   * que se decide se um troco consegue manter a velocidade pedida. Sem vento
+   * apontado nao muda nada, que e o caso normal.
+   */
+  const estatisticas = useMemo(
+    () => (rota ? calcularEstatisticas(rota, undefined, drone?.velocidadeMaxWaypoint) : null),
+    [rota, drone],
+  )
 
   /**
    * Em quantos voos esta rota se divide, e onde.

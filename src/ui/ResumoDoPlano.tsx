@@ -6,6 +6,7 @@ import { formatarDistancia, formatarDuracao } from '../nucleo/estatisticas.ts'
 import { areaDoContorno, formatarArea } from '../nucleo/areas.ts'
 import { areasDeReferencia, zonasInterditas } from '../nucleo/interdicoes.ts'
 import { janelaSolar, ELEVACAO_MINIMA_PREDEFINIDA } from '../nucleo/sol.ts'
+import { quadrante, temVento } from '../nucleo/vento.ts'
 
 /**
  * O plano em uma pagina, para levar para o terreno.
@@ -145,7 +146,7 @@ export function ResumoDoPlano({
         </section>
 
         <section className="grupo">
-          <h3>Sol, hoje</h3>
+          <h3>Sol e vento, hoje</h3>
           <dl className="resumo-lista numerico">
             <dt>Acima de {ELEVACAO_MINIMA_PREDEFINIDA}&deg;</dt>
             <dd>
@@ -158,8 +159,17 @@ export function ResumoDoPlano({
               {hora(janela.meioDiaSolar)}, {janela.elevacaoMaxima.toFixed(0)}&deg;
             </dd>
           </dl>
+          <dl className="resumo-lista numerico">
+            <dt>Vento apontado</dt>
+            <dd>
+              {temVento(rota.vento)
+                ? `${rota.vento.velocidade.toFixed(1)} m/s de ${quadrante(rota.vento.rumo)} (${rota.vento.rumo}°)`
+                : 'nenhum'}
+            </dd>
+          </dl>
           <p className="resumo-nota">
-            Céu limpo. Confirma a previsão e o vento antes de sair.
+            As horas do sol são cálculo; o vento é o que alguém escreveu na véspera. Confirma
+            os dois no boletim antes de sair.
           </p>
         </section>
 

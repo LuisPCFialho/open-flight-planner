@@ -179,3 +179,68 @@ describe('duracaoDoVooCompleto', () => {
     expect(Number.isFinite(duracaoDoVooCompleto(rotaEmLinha(4, 100, { velocidade: 0 })))).toBe(true)
   })
 })
+
+describe('o vento nas estatisticas', () => {
+  /*
+   * Os waypoints de `rotaEmLinha` vao todos a 45 graus - para nordeste - e por
+   * isso um vento de nordeste e de frente em toda a rota, e um de sudoeste e de
+   * cauda em toda ela. E o caso mais simples que ainda diz alguma coisa.
+   */
+  const rota = rotaEmLinha(5, 200, { velocidade: 10 })
+
+  it('sem vento apontado, nada muda', () => {
+    const semVento = calcularEstatisticas(rota, undefined, 15).duracao
+    expect(semVento).toBeCloseTo(calcularEstatisticas(rota).duracao, 9)
+  })
+
+  it('sem o maximo do aparelho, o vento nao entra na conta', () => {
+    const comVento = { ...rota, vento: { velocidade: 9, rumo: 45 } }
+    expect(calcularEstatisticas(comVento).duracao).toBeCloseTo(
+      calcularEstatisticas(rota).duracao,
+      9,
+    )
+  })
+
+  /*
+   * O ponto de todo o modulo: uma missao de waypoints e voada a velocidade no
+   * solo. Enquanto houver folga no ar, o vento nao atrasa a rota nem um segundo.
+   */
+  it('com folga no ar, o vento nao atrasa a rota', () => {
+    const comVento = { ...rota, vento: { velocidade: 4, rumo: 45 } }
+    expect(calcularEstatisticas(comVento, undefined, 15).duracao).toBeCloseTo(
+      calcularEstatisticas(rota, undefined, 15).duracao,
+      9,
+    )
+  })
+
+  it('sem folga no ar, a rota demora mais', () => {
+    const comVento = { ...rota, vento: { velocidade: 8, rumo: 45 } }
+    const parado = calcularEstatisticas(rota, undefined, 15).duracao
+    const contra = calcularEstatisticas(comVento, undefined, 15).duracao
+    /* 15 no ar menos 8 de frente da 7 no solo, em vez dos 10 que se pediram. */
+    expect(contra).toBeGreaterThan(parado)
+    const percurso = calcularEstatisticas(rota).distancia3D
+    expect(contra - parado).toBeCloseTo(percurso / 7 - percurso / 10, 6)
+  })
+
+  it('o vento de cauda nao acelera a rota acima do que se pediu', () => {
+    const comVento = { ...rota, vento: { velocidade: 8, rumo: 225 } }
+    expect(calcularEstatisticas(comVento, undefined, 15).duracao).toBeCloseTo(
+      calcularEstatisticas(rota, undefined, 15).duracao,
+      9,
+    )
+  })
+
+  it('a ida e o regresso tambem apanham o vento', () => {
+    /* Rota longe de casa, para a ida e a volta pesarem. */
+    const longe = rotaEmLinha(3, 100, { velocidade: 10 })
+    const afastada = {
+      ...longe,
+      waypoints: longe.waypoints.map((w) => ({ ...w, ...deslocar(w, 45, 3000) })),
+      acaoFinal: 'goHome' as const,
+    }
+    const parado = duracaoDoVooCompleto(afastada, 15)
+    const contra = duracaoDoVooCompleto({ ...afastada, vento: { velocidade: 8, rumo: 45 } }, 15)
+    expect(contra).toBeGreaterThan(parado)
+  })
+})

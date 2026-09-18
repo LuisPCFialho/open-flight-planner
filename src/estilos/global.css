@@ -2207,6 +2207,71 @@ button.ligacao {
  * Tudo o resto - mapa, listas, paineis - e trabalho de ecra e nao serve para
  * nada impresso. Sem isto o `Ctrl+P` dava vinte paginas de nada.
  */
+/* --- vento ----------------------------------------------------------------- */
+
+.vento-linha {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.vento-campos {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/*
+ * A rosa e um campo, nao um desenho: arrasta-se para escolher a direccao. O
+ * cursor diz isso antes de alguem tentar, e o `touch-action` impede que o
+ * arrasto no telemovel role a pagina em vez de rodar o vento.
+ */
+.rosa-dos-ventos {
+  flex: none;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.rosa-dos-ventos:active {
+  cursor: grabbing;
+}
+
+.rosa-fundo {
+  fill: var(--fundo);
+  stroke: var(--borda);
+}
+
+.rosa-marca {
+  stroke: var(--borda-forte);
+  stroke-width: 1;
+}
+
+.rosa-norte {
+  fill: var(--texto-suave);
+  font-size: 9px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.rosa-seta {
+  stroke: var(--destaque);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.rosa-ponta {
+  fill: var(--destaque);
+}
+
+@media print {
+  .grupo-vento {
+    display: none;
+  }
+}
+
 @media print {
   body * {
     visibility: hidden;

@@ -69,7 +69,10 @@ export function dividirPorAutonomia(
     let duracao = 0
 
     for (let i = 1; i <= porColocar.length; i++) {
-      const tentativa = duracaoDoVooCompleto({ ...rota, waypoints: renumerar(porColocar.slice(0, i)) })
+      const tentativa = duracaoDoVooCompleto(
+        { ...rota, waypoints: renumerar(porColocar.slice(0, i)) },
+        drone.velocidadeMaxWaypoint,
+      )
       if (tentativa > limite) break
       quantos = i
       duracao = tentativa

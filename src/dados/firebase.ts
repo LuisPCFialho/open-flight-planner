@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import { initializeFirestore, type Firestore } from 'firebase/firestore'
 
 /**
  * A ligacao ao armazem remoto, ou `null` quando ele nao esta configurado.
@@ -46,7 +46,21 @@ const app: FirebaseApp | null = completa
   : null
 
 export const autenticacao: Auth | null = app ? getAuth(app) : null
-export const firestore: Firestore | null = app ? getFirestore(app) : null
+/*
+ * `ignoreUndefinedProperties` esta ligado de proposito.
+ *
+ * O Firestore recusa por omissao um documento que leve `undefined` em qualquer
+ * campo, e rebenta na gravacao. Uma rota tem campos opcionais - o vento, por
+ * exemplo - e "esta rota nao tem vento apontado" escreve-se naturalmente como
+ * `vento: undefined`. Sem isto, tirar o vento a uma rota deixava de a conseguir
+ * gravar, e o erro so aparecia a quem tivesse contas ligadas.
+ *
+ * Com a opcao, o campo simplesmente nao vai para o documento, que e exactamente
+ * o que se quer dizer.
+ */
+export const firestore: Firestore | null = app
+  ? initializeFirestore(app, { ignoreUndefinedProperties: true })
+  : null
 
 /** Se ha armazem remoto configurado. Decide se ha ecra de entrada. */
 export const remotoConfigurado = app !== null

@@ -10,6 +10,7 @@ import type { ModoCamaraTrajecto } from '../nucleo/camara-trajecto.ts'
 import { DRONES } from '../drones.ts'
 import { CampoNumerico, CampoSelecao } from './campos.tsx'
 import { IconeDescolagem } from './icones.tsx'
+import { PainelVento } from './PainelVento.tsx'
 
 const MODOS_ALTITUDE: readonly { valor: ModoAltitude; rotulo: string; ajuda: string }[] = [
   { valor: 'ASL', rotulo: 'ASL', ajuda: 'Acima do nível médio do mar' },
@@ -208,6 +209,8 @@ export function ConfiguracoesRota({
             aoAlterar={(v) => aoAlterarRota({ alturaRTH: v })}
           />
         </section>
+
+        <PainelVento vento={rota.vento} aoAlterar={(vento) => aoAlterarRota({ vento })} />
 
         <section className="grupo">
           <h3>Limites acima do solo</h3>

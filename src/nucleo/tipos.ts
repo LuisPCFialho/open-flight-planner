@@ -104,6 +104,19 @@ export type Area = {
   tipo?: 'referencia' | 'exclusao'
 }
 
+/**
+ * O vento que se espera, como um boletim o escreve.
+ *
+ * `rumo` e a direccao **de onde** sopra: 0 e vento de norte. O que se faz com
+ * ele esta em `vento.ts`.
+ */
+export type Vento = {
+  /** Metros por segundo. */
+  velocidade: number
+  /** Graus, a direccao de onde o vento sopra. */
+  rumo: number
+}
+
 export type PontoDescolagem = {
   lat: number
   lon: number
@@ -151,6 +164,14 @@ export type Rota = {
    * rota. Rotas gravadas antes disto ficam em `manter`.
    */
   modoCamaraTrajecto: ModoCamaraTrajecto
+  /**
+   * Vento que se espera no dia, escrito a mao do boletim que se consultou.
+   *
+   * Nao ha previsao nenhuma a ser buscada: isto e o que quem planeia leu e
+   * decidiu usar. Rotas gravadas antes disto nao o tem, e sem ele nada do que a
+   * aplicacao calcula muda.
+   */
+  vento?: Vento | undefined
   criadaEm: number
   alteradaEm: number
 }

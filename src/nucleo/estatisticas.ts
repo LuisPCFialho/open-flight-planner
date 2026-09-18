@@ -1,6 +1,7 @@
-import type { Rota, Waypoint } from './tipos.ts'
-import { distancia, distancia3D } from './geodesia.ts'
+import type { LatLon, Rota, Waypoint } from './tipos.ts'
+import { distancia, distancia3D, rumo } from './geodesia.ts'
 import { velocidadeDe } from './operacoes-rota.ts'
+import { temVento, velocidadeMaximaNoSolo } from './vento.ts'
 
 /**
  * Aceleracao assumida nas paragens, em m/s2.
@@ -12,6 +13,30 @@ import { velocidadeDe } from './operacoes-rota.ts'
  * fica a menos de 2% do que o simulador mostra.
  */
 export const ACELERACAO_PREDEFINIDA = 1.5
+
+/**
+ * Velocidade no solo que um troco realmente faz.
+ *
+ * Sem vento, ou com folga no ar, e a que se pediu - que e o caso normal e o que
+ * uma missao de waypoints faz. Quando nao ha folga, cai para o que a aeronave
+ * consegue manter, e `null` quando ela nem o rumo consegue segurar.
+ *
+ * `maximoNoAr` e a velocidade maxima em missao do aparelho, usada aqui como
+ * tecto da velocidade **no ar**. E um tecto conservador: o aparelho e capaz de
+ * mais no ar do que o que aceita como comando de missao. Conservador e o lado
+ * certo para errar quando o que esta em causa e se a estimativa se cumpre.
+ */
+function velocidadeEfectiva(
+  pedida: number,
+  rumoDoTroco: number,
+  rota: Rota,
+  maximoNoAr: number | undefined,
+): number | null {
+  if (!temVento(rota.vento) || maximoNoAr === undefined) return pedida
+  const limite = velocidadeMaximaNoSolo(rumoDoTroco, rota.vento, maximoNoAr)
+  if (limite === null) return null
+  return Math.min(pedida, limite)
+}
 
 export type Estatisticas = {
   /** Metros, projectado no plano horizontal. */
@@ -40,6 +65,15 @@ function contarFotos(waypoint: Waypoint): number {
 export function calcularEstatisticas(
   rota: Rota,
   aceleracao: number = ACELERACAO_PREDEFINIDA,
+  /**
+   * Velocidade maxima em missao do aparelho, em m/s.
+   *
+   * Sem ela o vento da rota nao entra na conta. E de proposito que e opcional: a
+   * exportacao para Pilot 2 escreve esta duracao dentro do ficheiro, e o que la
+   * vai tem de ser reproduzivel a partir do ficheiro - nao de um vento que
+   * alguem escreveu a mao naquela tarde.
+   */
+  maximoNoAr?: number,
 ): Estatisticas {
   const waypoints = rota.waypoints
   let horizontal = 0
@@ -71,8 +105,13 @@ export function calcularEstatisticas(
      * com "numero invalido para WPML". O troco passa a nao contar para o tempo e
      * quem reporta o problema e `validarVelocidades`, que o diz pelo nome.
      */
-    const velocidade = velocidadeDe(rota, waypoint)
-    if (velocidade > 0) duracao += troco / velocidade
+    const velocidade = velocidadeEfectiva(
+      velocidadeDe(rota, waypoint),
+      rumo(anterior, waypoint),
+      rota,
+      maximoNoAr,
+    )
+    if (velocidade !== null && velocidade > 0) duracao += troco / velocidade
   }
 
   return {
@@ -94,21 +133,31 @@ export function calcularEstatisticas(
  * que decidem se o aparelho volta.
  *
  * O calculo e grosseiro de proposito - distancia horizontal a velocidade global,
- * sem subida nem vento - porque so serve para decidir se ha folga de bateria.
+ * sem contar a subida - porque so serve para decidir se ha folga de bateria.
  */
-export function duracaoDoVooCompleto(rota: Rota): number {
-  const base = calcularEstatisticas(rota).duracao
+export function duracaoDoVooCompleto(rota: Rota, maximoNoAr?: number): number {
+  const base = calcularEstatisticas(rota, ACELERACAO_PREDEFINIDA, maximoNoAr).duracao
   const primeiro = rota.waypoints[0]
   const ultimo = rota.waypoints.at(-1)
   if (!primeiro || !ultimo || !(rota.velocidadeGlobal > 0)) return base
 
-  const ida = distancia(rota.pontoDescolagem, primeiro)
+  /*
+   * A ida e o regresso tambem apanham o vento, e sao eles que decidem a bateria
+   * numa rota que se afaste. Contam-se separados porque vao em rumos diferentes:
+   * quem sai contra o vento volta com ele, e a media dos dois nao serve.
+   */
+  const tempoDe = (de: LatLon, para: LatLon): number => {
+    const metros = distancia(de, para)
+    if (metros === 0) return 0
+    const v = velocidadeEfectiva(rota.velocidadeGlobal, rumo(de, para), rota, maximoNoAr)
+    return v !== null && v > 0 ? metros / v : 0
+  }
 
-  let volta = 0
-  if (rota.acaoFinal === 'goHome') volta = distancia(ultimo, rota.pontoDescolagem)
-  else if (rota.acaoFinal === 'gotoFirstWaypoint') volta = distancia(ultimo, primeiro)
+  let tempo = tempoDe(rota.pontoDescolagem, primeiro)
+  if (rota.acaoFinal === 'goHome') tempo += tempoDe(ultimo, rota.pontoDescolagem)
+  else if (rota.acaoFinal === 'gotoFirstWaypoint') tempo += tempoDe(ultimo, primeiro)
 
-  return base + (ida + volta) / rota.velocidadeGlobal
+  return base + tempo
 }
 
 /** Formata segundos como o Pilot 2 os mostra: `23 m 27 s`. */

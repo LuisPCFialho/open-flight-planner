@@ -6,6 +6,7 @@ import { velocidadeDe } from './operacoes-rota.ts'
 import { interpolarAltura, percursoDosWaypoints } from './perfil.ts'
 import { waypointsComPOIPerdido } from './operacoes-poi.ts'
 import { incursoes, zonasInterditas } from './interdicoes.ts'
+import { quadrante, temVento, trocosComVento } from './vento.ts'
 
 /**
  * Validacoes que correm antes de exportar.
@@ -76,6 +77,7 @@ export function validarRota(rota: Rota, drone: Drone, contexto: ContextoValidaca
     ...validarPOIs(rota),
     ...validarCotasEmFalta(rota, contexto),
     ...validarZonasInterditas(rota),
+    ...validarVento(rota, drone),
   ]
 }
 
@@ -340,7 +342,7 @@ function validarAutonomia(rota: Rota, drone: Drone): Validacao[] {
 
   // O voo completo, com a ida ao primeiro ponto e o regresso: e o que a bateria
   // tem de dar, e nao apenas o percurso entre waypoints que a barra mostra.
-  const duracao = duracaoDoVooCompleto(rota)
+  const duracao = duracaoDoVooCompleto(rota, drone.velocidadeMaxWaypoint)
   const limite = autonomia * 60 * MARGEM_AUTONOMIA
   if (duracao <= limite) return []
 
@@ -451,4 +453,69 @@ function validarZonasInterditas(rota: Rota): Validacao[] {
       waypoints: indices,
     },
   ]
+}
+
+// --- vento -------------------------------------------------------------------
+
+/**
+ * O que o vento escrito a mao faz a esta rota.
+ *
+ * So avisa; nunca bloqueia. Quem decide se sai com vento e quem esta no campo a
+ * olhar para o ceu, e nao um numero que alguem escreveu na vespera. O que a
+ * ferramenta pode dizer e mais util do que uma proibicao: **quais** os trocos em
+ * que a aeronave nao consegue manter a velocidade que se lhe pediu, e por isso
+ * quais os que vao demorar mais do que a estimativa diz.
+ *
+ * O caso grave e proprio: travessia maior do que a velocidade que a aeronave faz
+ * no ar nao e um troco lento, e um troco que ela nao segue. Vai a deriva.
+ */
+function validarVento(rota: Rota, drone: Drone): Validacao[] {
+  if (!temVento(rota.vento)) return []
+
+  const maximo = drone.velocidadeMaxWaypoint
+  if (maximo === undefined) {
+    return [
+      {
+        id: 'vento-sem-maximo',
+        severidade: 'aviso',
+        titulo: 'Vento sem nada com que o comparar',
+        detalhe: `Foram apontados ${rota.vento.velocidade} m/s de ${quadrante(rota.vento.rumo)}, mas a velocidade máxima em missão do ${drone.nome} ainda não foi preenchida e sem ela não há como saber se a aeronave aguenta o rumo.`,
+      },
+    ]
+  }
+
+  const trocos = trocosComVento(
+    rota.waypoints,
+    (i) => velocidadeDe(rota, rota.waypoints[i]!),
+    rota.vento,
+    maximo,
+  )
+
+  const aDeriva = trocos.filter((t) => t.conseguida === null)
+  const lentos = trocos.filter((t) => t.conseguida !== null && t.conseguida < t.pedida - 0.05)
+
+  const validacoes: Validacao[] = []
+
+  if (aDeriva.length > 0) {
+    validacoes.push({
+      id: 'vento-deriva',
+      severidade: 'erro',
+      titulo: 'Com este vento há rumos que a aeronave não segura',
+      detalhe: `Em ${aDeriva.length} ${aDeriva.length === 1 ? 'troço' : 'troços'} o vento de través passa os ${maximo} m/s que o ${drone.nome} faz em missão: a aeronave não consegue manter a linha, é arrastada para fora dela. Com ${rota.vento.velocidade} m/s de ${quadrante(rota.vento.rumo)} esta rota não é para voar.`,
+      waypoints: aDeriva.map((t) => rota.waypoints[t.indice]?.index ?? t.indice),
+    })
+  }
+
+  if (lentos.length > 0) {
+    const pior = lentos.reduce((a, b) => (a.conseguida! < b.conseguida! ? a : b))
+    validacoes.push({
+      id: 'vento-lento',
+      severidade: 'aviso',
+      titulo: 'O vento não deixa manter a velocidade em alguns troços',
+      detalhe: `${lentos.length} ${lentos.length === 1 ? 'troço vai' : 'troços vão'} mais devagar do que o que se pediu, porque manter essa velocidade contra ${rota.vento.velocidade} m/s de ${quadrante(rota.vento.rumo)} exigiria mais do que os ${maximo} m/s que o ${drone.nome} faz em missão. No pior deles a aeronave faz ${pior.conseguida!.toFixed(1)} m/s em vez de ${pior.pedida.toFixed(1)}. A duração estimada já conta com isto.`,
+      waypoints: lentos.map((t) => rota.waypoints[t.indice]?.index ?? t.indice),
+    })
+  }
+
+  return validacoes
 }
