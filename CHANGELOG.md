@@ -10,7 +10,58 @@ ordering below is the useful part, not the calendar.
 
 ## Unreleased
 
+## 0.3.0
+
+Six features and a visual pass. The first three came out of the same question -
+what does this tool still refuse to tell you that you would have to know before
+leaving for site.
+
 ### Added
+
+- **Wind, and the legs where the aircraft cannot hold it.** A waypoint mission is
+  flown at ground speed: ask for 10 m/s and the aircraft does 10 m/s over the
+  terrain, into wind or with it. Expecting a route to take longer against a
+  headwind is thinking of an aeroplane. What changes is the tilt, and the current
+  it draws — until it stops changing: holding 10 over the ground against 8 m/s of
+  wind needs 18 m/s through the air, and there is a point where the aircraft
+  cannot. Past it the ground speed drops, and the estimate taken to the field
+  stops being true. That point is what this computes, and nothing else — vector
+  geometry, with no invented constant. The only aircraft figure that enters is
+  the maximum mission speed, already in the catalogue.
+
+  It does **not** compute endurance. A headwind burns more battery, and how much
+  depends on a power curve DJI does not publish; an invented percentage looks
+  calculated and has nothing behind it. It fetches **no forecast**: the wind is
+  typed in by hand, from the bulletin you looked up. Direction is dragged on a
+  rose, because "where it blows from" versus "where it goes to" is the most
+  repeated mistake in this, and an arrow seen pointing into the centre does not
+  lend itself to it the way a number does. The same arrow sits on the map
+  compass, so how the wind lies relative to the route on screen is visible at a
+  glance.
+
+- **A second pass at ninety degrees.** A single grid has one known problem: faces
+  turned towards the passes are seen well and the perpendicular ones are always
+  seen edge-on. In photogrammetry that gives melted walls in the model; in a
+  solar park it gives one face of every table that is never seen square. Off by
+  default, and the panel says why in numbers: on the test parcel, 17 passes and
+  17.7 km against 40 passes and 36.8 km, with photos going from 799 to 1627.
+
+- **Camera tilt on coverage.** Nadir surveys terrain; tilted sees what stands up —
+  façades, structures, the face of a park's tables. The moment the camera leaves
+  nadir the resolution figure disappears from the panel, and it says why: the
+  spacing comes from `2h·tan(f/2)`, which describes the width a nadir camera
+  covers. Tilted, the footprint becomes a trapezoid stretched forwards and the
+  requested overlap is no longer what you get. A number that has become false is
+  worse than no number.
+
+- **A filter on the waypoint list.** A parcel coverage gives three hundred-odd
+  waypoints, and the list stops being a list: it is a wall. Finding the point a
+  validation flagged, or the one leg missing its photo action, meant scrolling and
+  counting — and the counting fails. Three criteria and a number box, not a
+  general expression filter that would serve every question and none of them
+  quickly. It only appears above twenty points, and it always says how many were
+  left out: a filter forgotten on makes a three-hundred-point route look like it
+  has thirty.
 
 - **A one-page plan summary, made to be printed.** Whoever goes to site does not
   take the planner — they take a phone with the file and, with any sense, a sheet
@@ -19,6 +70,38 @@ ordering below is the useful part, not the calendar.
   coordinates, the solar window, and the validations still unresolved. It carries
   the note that no route from this tool has been flown yet, because whoever takes
   it to a field is testing the tool as much as flying the route.
+
+- **A keyboard shortcut sheet, opened with `?`.** Every one of these commands
+  already existed and none of them was written down anywhere. Virtual flight has
+  fourteen keys — W A S D, Q E, Z C, the four arrows, R, and Alt for fine
+  adjustment — and the only way to find them was to read the comment at the top
+  of `useVooVirtual.ts`, which nobody does. `?` is the one shortcut not suspended
+  during virtual flight: opening a help sheet edits nothing, and flight is
+  exactly when it is needed most.
+
+### Changed
+
+- **The projects screen was a five-column table with one row lost in fourteen
+  hundred pixels of black** — and it is the first screen anyone sees of this. It
+  is now cards, with the product name and a line saying what it does. The empty
+  state explains what a project is, which saves the first question entirely.
+
+- **Weight where weight was missing.** `Export` no longer reads at the same level
+  as `DXF` — outlined rather than filled, because the rest of the interface is
+  meant to be looked at for hours. The four flight numbers get a panel of their
+  own: they are reading, not command. The system's white scrollbars cut the
+  column in half on a dark interface. A focus ring on `:focus-visible`, once, for
+  everything. The centre and delete icons were flickering on every row at the
+  same time, and now fade in under the cursor without moving or becoming
+  unreachable by keyboard. Shadows by height rather than one for everything.
+  Anyone with `prefers-reduced-motion` set gets no transition at all.
+
+### Fixed
+
+- **Firestore refused any document carrying `undefined` in any field**, and
+  "this route has no wind set" is naturally written exactly that way. Removing
+  the wind from a route made it impossible to save — and only for those with
+  accounts switched on.
 
 ## 0.2.0
 

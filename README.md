@@ -16,7 +16,7 @@ own; see [accounts](docs/contas.md).
 account. The routes you make there stay in that browser.
 
 > **Status: not yet flown.** The exporters are built against real KMZ files and
-> covered by 799 tests, but no route produced by this tool has been flown on an
+> covered by 944 tests, but no route produced by this tool has been flown on an
 > aircraft yet. Read [what to verify in the field](docs/verificar-no-campo.md)
 > before you trust it with a battery. If you fly one, please open an issue —
 > that single report is the most useful contribution this project can get.
@@ -45,7 +45,9 @@ This one writes both, picked from the aircraft you selected.
 KMZ/KML, and the coverage is generated from the camera and the altitude — a
 photo at `h` metres with field of view `f` covers `2h·tan(f/2)` of ground. You
 specify altitude and overlap, the way a survey is actually specified; the
-spacing follows.
+spacing follows. Optionally a second pass at ninety degrees, for when what
+matters is the volume of things rather than the ground, and a camera tilt for
+what stands up rather than what lies flat.
 
 **Terrain following that means it.** Altitudes are AGL against a real elevation
 model, with a terrain profile showing clearance along the whole route. On a
@@ -63,6 +65,14 @@ would see, and the 3D frustum shows where it is looking from.
 is what a survey specification is written in. A separate panel gives the hours
 when the sun is high enough for the site and the day — the criterion that
 decides whether a thermography flight is worth the trip.
+
+**Wind, honestly.** A waypoint mission is flown at ground speed, so a headwind
+does not make the route take longer — until the airspeed it would need exceeds
+what the aircraft does in a mission, and then it does. The tool finds that point
+by vector geometry and says which legs are affected; the duration and the battery
+split follow. It does not guess at endurance, because that needs a power curve
+DJI does not publish, and it fetches no forecast: the wind is typed in from the
+bulletin you looked up.
 
 **No-fly zones.** Polygons the route must not cross, checked leg by leg. On a
 coverage route the transitions between passes are the longest legs, and they are
