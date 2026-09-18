@@ -1,4 +1,4 @@
-import type { Projeto, Rota } from '../nucleo/tipos.ts'
+import type { Projeto, Rota, Vento } from '../nucleo/tipos.ts'
 import { novoId } from '../nucleo/ids.ts'
 import { copiarRota } from '../nucleo/operacoes-rota.ts'
 import { bd } from './bd.ts'
@@ -147,6 +147,27 @@ function areaValida(bruto: unknown): boolean {
   )
 }
 
+/**
+ * O vento de um ficheiro, ou nenhum.
+ *
+ * E o unico campo opcional da rota que entra directamente em aritmetica, e a
+ * aritmetica com um numero que nao e numero ja custou caro a este projecto: um
+ * `Math.hypot` com uma cadeia da NaN, o NaN alastra a duracao, e a barra passa a
+ * mostrar "Infinity m NaN s". Um ficheiro vem de fora - de outro posto, de outra
+ * versao, ou de alguem que o abriu num editor - e por isso verifica-se.
+ *
+ * Nao se corrige nem se adivinha: vento que nao se percebe e vento que nao ha,
+ * e uma rota sem vento e exactamente o que a aplicacao fazia antes disto existir.
+ */
+function ventoValido(bruto: unknown): Vento | undefined {
+  if (typeof bruto !== 'object' || bruto === null) return undefined
+  const vento = bruto as Partial<Vento>
+  if (!Number.isFinite(vento.velocidade) || !Number.isFinite(vento.rumo)) return undefined
+  const velocidade = vento.velocidade as number
+  if (velocidade < 0) return undefined
+  return { velocidade, rumo: (((vento.rumo as number) % 360) + 360) % 360 }
+}
+
 function validarRota(bruto: unknown, ordem: number, projetoId: string): Rota {
   if (typeof bruto !== 'object' || bruto === null) {
     throw new FicheiroInvalido(`a rota ${ordem + 1} não é um objecto`)
@@ -196,6 +217,7 @@ function validarRota(bruto: unknown, ordem: number, projetoId: string): Rota {
       areas: Array.isArray(rota.areas) ? rota.areas.filter(areaValida) : [],
       modoCamaraTrajecto: rota.modoCamaraTrajecto ?? 'manter',
       droneId: rota.droneId ?? 'mini5pro',
+      vento: ventoValido(rota.vento),
     },
     projetoId,
   )
