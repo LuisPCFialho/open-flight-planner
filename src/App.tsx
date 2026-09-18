@@ -70,6 +70,7 @@ import type { PontoRota3D } from './mapa/camada-rota-3d.ts'
 import type { DroneNoMapa } from './mapa/camada-drones.ts'
 import { BarraEstatisticas } from './ui/BarraEstatisticas.tsx'
 import { ListaWaypoints, type LinhaWaypoint } from './ui/ListaWaypoints.tsx'
+import { waypointsAssinalados } from './ui/filtro-waypoints.ts'
 import { PainelPropriedades, type AlteracaoWaypoint } from './ui/PainelPropriedades.tsx'
 import { ConfiguracoesRota } from './ui/ConfiguracoesRota.tsx'
 import { BarraFicheiro } from './ui/BarraFicheiro.tsx'
@@ -317,6 +318,15 @@ export function App() {
   }, [rota, drone, cotas, amostrado.pontos, amostrado.cotas, registoFotografico])
 
   const exportacaoBloqueada = temErros(validacoes)
+
+  /*
+   * Os waypoints que alguma validacao apontou, para o filtro da lista.
+   *
+   * Nao e o mesmo que o alerta vermelho de cada linha: esse e so a altura acima
+   * do solo fora dos limites. Este apanha tambem as zonas interditas, o vento, as
+   * accoes que o aparelho nao suporta e os pontos sem a sua foto.
+   */
+  const assinalados = useMemo(() => waypointsAssinalados(validacoes), [validacoes])
 
   // --- voo virtual ----------------------------------------------------------
   const ultimoGravado = useRef<string | null>(null)
@@ -894,6 +904,7 @@ export function App() {
           rota={rota}
           linhas={linhas}
           seleccionados={seleccao.ids}
+          assinalados={assinalados}
           aoSeleccionar={seleccao.seleccionar}
           aoCentrar={(id) => {
             const alvo = rota.waypoints.find((w) => w.id === id)

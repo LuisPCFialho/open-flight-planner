@@ -21,7 +21,7 @@ export const CRITERIOS: readonly { valor: Criterio; rotulo: string; ajuda: strin
   {
     valor: 'alerta',
     rotulo: 'Assinalados',
-    ajuda: 'Só os pontos que uma verificação assinalou',
+    ajuda: 'Só os pontos que uma validação apontou',
   },
   { valor: 'foto', rotulo: 'Com foto', ajuda: 'Só os pontos com acção de tirar foto' },
   {
@@ -52,6 +52,16 @@ export function filtrar(
   linhas: readonly LinhaWaypoint[],
   criterio: Criterio,
   procura: string,
+  /**
+   * Indices dos waypoints que alguma validacao apontou.
+   *
+   * Vem de fora e nao sai da propria linha: `LinhaWaypoint.alerta` e so a altura
+   * acima do solo fora dos limites, que e o que pinta a linha de vermelho. Um
+   * filtro chamado "assinalados" que ignorasse as zonas interditas, o vento e as
+   * accoes que o aparelho nao suporta mentia pelo nome - e mente a quem esta com
+   * pressa, que e quem o usa.
+   */
+  assinalados: ReadonlySet<number> = new Set(),
 ): readonly LinhaWaypoint[] {
   const numero = numeroProcurado(procura)
 
@@ -65,9 +75,20 @@ export function filtrar(
 
   return linhas.filter((linha) => {
     if (numero !== null && linha.waypoint.index + 1 !== numero) return false
-    if (criterio === 'alerta') return linha.alerta
+    if (criterio === 'alerta') return linha.alerta || assinalados.has(linha.waypoint.index)
     if (criterio === 'foto') return temFoto(linha)
     if (criterio === 'sem-foto') return !temFoto(linha)
     return true
   })
+}
+
+/** Os indices que as validacoes apontaram, juntos num conjunto so. */
+export function waypointsAssinalados(
+  validacoes: readonly { waypoints?: number[] }[],
+): ReadonlySet<number> {
+  const indices = new Set<number>()
+  for (const validacao of validacoes) {
+    for (const indice of validacao.waypoints ?? []) indices.add(indice)
+  }
+  return indices
 }

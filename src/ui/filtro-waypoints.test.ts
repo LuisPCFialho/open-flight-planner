@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filtrar, numeroProcurado } from './filtro-waypoints.ts'
+import { filtrar, numeroProcurado, waypointsAssinalados } from './filtro-waypoints.ts'
 import type { LinhaWaypoint } from './ListaWaypoints.tsx'
 import { waypointNovo } from '../nucleo/operacoes-rota.ts'
 
@@ -72,5 +72,46 @@ describe('filtrar', () => {
   it('o numero e o criterio aplicam-se os dois', () => {
     expect(filtrar(LINHAS, 'alerta', '1')).toHaveLength(0)
     expect(filtrar(LINHAS, 'alerta', '2')).toHaveLength(1)
+  })
+})
+
+describe('waypointsAssinalados', () => {
+  it('junta os indices de todas as validacoes', () => {
+    const conjunto = waypointsAssinalados([
+      { waypoints: [1, 2] },
+      { waypoints: [2, 5] },
+      {},
+    ])
+    expect([...conjunto].sort((a, b) => a - b)).toEqual([1, 2, 5])
+  })
+
+  it('sem validacoes nao assinala nada', () => {
+    expect(waypointsAssinalados([]).size).toBe(0)
+  })
+})
+
+describe('o filtro dos assinalados', () => {
+  /*
+   * O alerta da linha e so a altura acima do solo fora dos limites. As zonas
+   * interditas, o vento e as accoes que o aparelho nao suporta apontam waypoints
+   * que nao levam alerta nenhum na linha, e um filtro chamado "assinalados" que
+   * os ignorasse mentia pelo nome.
+   */
+  it('apanha o que as validacoes apontaram, alem do alerta da linha', () => {
+    const achados = filtrar(LINHAS, 'alerta', '', new Set([0]))
+    expect(achados.map((l) => l.waypoint.index)).toEqual([0, 1, 2])
+  })
+
+  it('sem conjunto nenhum continua a valer so o alerta da linha', () => {
+    expect(filtrar(LINHAS, 'alerta', '').map((l) => l.waypoint.index)).toEqual([1, 2])
+  })
+
+  it('um indice assinalado que ja tinha alerta nao aparece duas vezes', () => {
+    const achados = filtrar(LINHAS, 'alerta', '', new Set([1]))
+    expect(achados.map((l) => l.waypoint.index)).toEqual([1, 2])
+  })
+
+  it('os outros criterios nao olham para os assinalados', () => {
+    expect(filtrar(LINHAS, 'foto', '', new Set([1])).map((l) => l.waypoint.index)).toEqual([0, 2])
   })
 })

@@ -18,6 +18,8 @@ type Props = {
   rota: Rota
   linhas: readonly LinhaWaypoint[]
   seleccionados: ReadonlySet<string>
+  /** Indices que alguma validacao apontou. Alimenta o filtro "Assinalados". */
+  assinalados: ReadonlySet<number>
   aoSeleccionar: (id: string, juntar: boolean, intervalo: boolean) => void
   aoCentrar: (id: string) => void
   aoEliminar: (id: string) => void
@@ -27,6 +29,7 @@ export function ListaWaypoints({
   rota,
   linhas,
   seleccionados,
+  assinalados,
   aoSeleccionar,
   aoCentrar,
   aoEliminar,
@@ -34,7 +37,10 @@ export function ListaWaypoints({
   const [criterio, setCriterio] = useState<Criterio>('todos')
   const [procura, setProcura] = useState('')
 
-  const visiveis = useMemo(() => filtrar(linhas, criterio, procura), [linhas, criterio, procura])
+  const visiveis = useMemo(
+    () => filtrar(linhas, criterio, procura, assinalados),
+    [linhas, criterio, procura, assinalados],
+  )
   const filtrada = visiveis.length !== linhas.length
 
   return (
