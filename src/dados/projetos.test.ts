@@ -195,3 +195,110 @@ describe('o vento de um ficheiro', () => {
     expect(comVento(undefined)).toBeUndefined()
   })
 })
+
+describe('o que um ficheiro estragado faz', () => {
+  /*
+   * Um ficheiro de projeto vem de fora: de outro posto, de outra versao da
+   * aplicacao, ou de alguem que o abriu num editor e mexeu. Cada uma destas
+   * recusas existia e nenhuma estava verificada - e uma recusa que nao se
+   * verifica e uma recusa que se pode perder numa refactorizacao sem ninguem dar
+   * por ela, ate o dia em que um ficheiro torto entra e a aplicacao rebenta
+   * tres ecras mais a frente, longe da causa.
+   */
+  function base() {
+    return paraFicheiro({
+      projeto: { id: 'p1', nome: 'obra', cliente: '', local: '', criadoEm: 1 },
+      rotas: [rotaDeTeste()],
+    })
+  }
+
+  function comRota(alteracoes: unknown) {
+    const ficheiro = base() as unknown as { rotas: unknown[] }
+    ficheiro.rotas = [alteracoes]
+    return ficheiro
+  }
+
+  it('recusa um ficheiro sem projeto dentro', () => {
+    expect(() => deFicheiro({ ...base(), projeto: null })).toThrow(/não traz projeto/)
+    expect(() => deFicheiro({ ...base(), projeto: 'obra' })).toThrow(/não traz projeto/)
+  })
+
+  it('recusa um ficheiro cuja lista de rotas nao e uma lista', () => {
+    expect(() => deFicheiro({ ...base(), rotas: {} })).toThrow(/lista de rotas/)
+    expect(() => deFicheiro({ ...base(), rotas: null })).toThrow(/lista de rotas/)
+  })
+
+  it('recusa uma rota que nao e um objecto, dizendo qual', () => {
+    expect(() => deFicheiro(comRota('uma rota'))).toThrow(/a rota 1 não é um objecto/)
+    expect(() => deFicheiro(comRota(null))).toThrow(/a rota 1 não é um objecto/)
+  })
+
+  it('recusa uma rota sem nome e uma rota sem lista de waypoints', () => {
+    const rota = rotaDeTeste() as unknown as Record<string, unknown>
+    expect(() => deFicheiro(comRota({ ...rota, nome: 42 }))).toThrow(/não tem nome/)
+    expect(() => deFicheiro(comRota({ ...rota, waypoints: 'nenhum' }))).toThrow(
+      /não tem lista de waypoints/,
+    )
+  })
+
+  /*
+   * O ponto de descolagem decide a cota de referencia de toda a rota. Sem ele,
+   * ou com ele em NaN, o que sai nao e um erro - e uma rota inteira deslocada em
+   * altura, que e muito pior.
+   */
+  it('recusa uma rota sem ponto de descolagem valido', () => {
+    const rota = rotaDeTeste() as unknown as Record<string, unknown>
+    for (const descolagem of [undefined, null, 'aqui', { lat: Number.NaN, lon: -8 }, { lat: 40 }]) {
+      expect(() => deFicheiro(comRota({ ...rota, pontoDescolagem: descolagem }))).toThrow(
+        /ponto de descolagem válido/,
+      )
+    }
+  })
+
+  it('recusa um waypoint sem altura, dizendo qual', () => {
+    const rota = rotaDeTeste()
+    const waypoints = rota.waypoints.map((w, i) =>
+      i === 2 ? { ...w, altura: Number.NaN } : w,
+    )
+    expect(() => deFicheiro(comRota({ ...rota, waypoints }))).toThrow(/waypoint 3 .* não tem altura/)
+  })
+
+  /*
+   * As areas nao voam: sao contorno para se ter referencia no mapa. Uma area
+   * torta nao e razao para recusar o ficheiro todo - deita-se fora a area e
+   * importa-se o resto, que e o que quem esta a importar quer.
+   */
+  it('deita fora areas tortas sem recusar o ficheiro', () => {
+    const rota = rotaDeTeste() as unknown as Record<string, unknown>
+    const boa = {
+      id: 'a1',
+      nome: 'parcela',
+      contorno: [
+        { lat: 40, lon: -8 },
+        { lat: 40.001, lon: -8 },
+        { lat: 40.001, lon: -7.999 },
+      ],
+    }
+    const importado = deFicheiro(
+      comRota({
+        ...rota,
+        areas: [
+          boa,
+          null,
+          'uma area',
+          { nome: 'sem contorno' },
+          { nome: 'contorno curto', contorno: [{ lat: 40, lon: -8 }] },
+          { nome: 'ponto torto', contorno: [{ lat: 40, lon: -8 }, { lat: 40, lon: -8 }, { lat: Number.NaN, lon: -8 }] },
+        ],
+      }),
+    )
+
+    expect(importado.rotas[0]!.areas).toHaveLength(1)
+    expect(importado.rotas[0]!.areas[0]!.nome).toBe('parcela')
+  })
+
+  it('uma rota sem areas nenhumas importa-se na mesma', () => {
+    const rota = rotaDeTeste() as unknown as Record<string, unknown>
+    expect(deFicheiro(comRota({ ...rota, areas: undefined })).rotas[0]!.areas).toEqual([])
+  })
+})
