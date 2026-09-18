@@ -77,6 +77,7 @@ import { VistaCamara, type TamanhoCamara } from './ui/VistaCamara.tsx'
 import { HudVoo } from './ui/HudVoo.tsx'
 import { PlayerReplay } from './ui/PlayerReplay.tsx'
 import { EcraProjetos } from './ui/EcraProjetos.tsx'
+import { PainelSol } from './ui/PainelSol.tsx'
 import { SelectorRota } from './ui/SelectorRota.tsx'
 
 /** Sever do Vouga: o ponto de descolagem da rota de referencia. */
@@ -166,7 +167,9 @@ export function App() {
    */
   const [modoMapa, setModoMapa] = useState<'navegar' | 'waypoint' | 'poi' | 'medir'>('navegar')
   const [configuracoesAbertas, setConfiguracoesAbertas] = useState(false)
-  const [abaInferior, setAbaInferior] = useState<'perfil' | 'validacoes' | null>('perfil')
+  const [abaInferior, setAbaInferior] = useState<'perfil' | 'validacoes' | 'sol' | null>(
+    'perfil',
+  )
   const [registoFotografico, setRegistoFotografico] = useState(false)
   /*
    * A leitura sob o cursor vive fora do estado da aplicacao.
@@ -1050,6 +1053,16 @@ export function App() {
                     <span className="contador numerico">{validacoes.length}</span>
                   ) : null}
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={abaInferior === 'sol'}
+                  className={abaInferior === 'sol' ? 'activo' : ''}
+                  onClick={() => setAbaInferior('sol')}
+                  title="A que horas o sol está alto que chegue"
+                >
+                  Sol
+                </button>
                 <label className="interruptor" title="Espera-se acção de foto em cada waypoint">
                   <input
                     type="checkbox"
@@ -1063,7 +1076,9 @@ export function App() {
                 </button>
               </nav>
 
-              {abaInferior === 'perfil' ? (
+              {abaInferior === 'sol' ? (
+                <PainelSol local={rota.pontoDescolagem} />
+              ) : abaInferior === 'perfil' ? (
                 <PerfilTerreno
                   perfil={perfil}
                   aglMinimo={rota.alturaMinimaAcimaDoSolo}

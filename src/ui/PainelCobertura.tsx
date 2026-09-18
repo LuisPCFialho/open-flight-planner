@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { resolucaoNoTerreno } from '../nucleo/resolucao.ts'
 import type { Area, Drone, ModoAltitude } from '../nucleo/tipos.ts'
 import {
   gerarCobertura,
@@ -99,6 +100,8 @@ export function PainelCobertura({
     () => (area ? gerarCobertura(area.contorno, opcoes) : null),
     [area, opcoes],
   )
+
+  const resolucao = cobertura ? resolucaoNoTerreno(drone.camara, cobertura.larguraDaFaixa) : null
 
   const waypointsNovos = cobertura?.passagens.reduce((soma, p) => soma + p.length, 0) ?? 0
   const total = waypointsExistentes + waypointsNovos
@@ -218,6 +221,17 @@ export function PainelCobertura({
                 {cobertura.larguraDaFaixa.toFixed(0)} &times;{' '}
                 {cobertura.comprimentoDaFaixa.toFixed(0)} m
               </dd>
+              {/*
+                * É este o número que um caderno de encargos escreve, e não a
+                * altura de voo. Sem megapíxeis na ficha do aparelho não se
+                * calcula, e aí não se diz nada em vez de se inventar.
+                */}
+              {resolucao !== null ? (
+                <>
+                  <dt title="Centímetros de terreno em cada píxel da foto">Resolução</dt>
+                  <dd>{resolucao.toFixed(1)} cm/px</dd>
+                </>
+              ) : null}
               <dt>Entre passagens</dt>
               <dd>{cobertura.espacamento.toFixed(1)} m</dd>
               <dt>Entre fotos</dt>

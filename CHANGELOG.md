@@ -12,6 +12,18 @@ ordering below is the useful part, not the calendar.
 
 ### Added
 
+- **Ground resolution, in cm per pixel.** This is the number a survey
+  specification is written in, not the flight altitude: two cameras at eighty
+  metres cover the same ground at very different resolutions. Shown next to the
+  footprint, and left out entirely for aircraft whose megapixel count is not in
+  the list, because a guessed resolution is worse than none.
+- **Solar window.** For the site and a chosen day, the hours when the sun is
+  high enough, with the elevation curve and solar noon. In module thermography
+  the real criterion is plane-of-array irradiance, which nobody knows the day
+  before; sun elevation is what limits it and what a planner can actually say.
+  Pure astronomy, no external service, and the threshold is editable because it
+  is a rule of thumb rather than a standard.
+
 - **Direction of travel on every leg**, and **the take-off point drawn** with its
   outbound and return legs dashed. The route used to start in mid-air, and on a
   coverage route with parallel legs the order could only be read point by point

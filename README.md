@@ -59,6 +59,11 @@ take-off point, the less time it has to work. Each leg becomes its own route.
 waypoints with the attitude you framed. The camera view shows what the lens
 would see, and the 3D frustum shows where it is looking from.
 
+**Ground resolution and the solar window.** Coverage reports cm per pixel, which
+is what a survey specification is written in. A separate panel gives the hours
+when the sun is high enough for the site and the day — the criterion that
+decides whether a thermography flight is worth the trip.
+
 **Validation before export.** Ground clearance, service ceiling, endurance,
 speed limits, and actions the selected aircraft does not support.
 
