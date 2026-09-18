@@ -8,7 +8,10 @@ ordering below is the useful part, not the calendar.
 
 ---
 
-## Unreleased
+## 0.2.0
+
+Seventeen commits of field-driven work: everything below came out of using the
+tool on a real site and finding it wanting.
 
 ### Added
 
@@ -33,10 +36,6 @@ ordering below is the useful part, not the calendar.
   Pure astronomy, no external service, and the threshold is editable because it
   is a rule of thumb rather than a standard.
 
-- **Direction of travel on every leg**, and **the take-off point drawn** with its
-  outbound and return legs dashed. The route used to start in mid-air, and on a
-  coverage route with parallel legs the order could only be read point by point
-  off the marker numbers.
 - **Markers thin out when they would overlap.** A coverage route puts photos
   twenty metres apart: seen from above, a hundred and eight numbered circles fall
   on top of each other and neither the numbers nor the path can be read — in the
@@ -63,6 +62,53 @@ ordering below is the useful part, not the calendar.
 - **Projects already on the machine are offered up, not stranded.** On first
   sign-in the app notices them and offers to copy them into the account, through
   the same validated path as a JSON import. Nothing is deleted locally.
+
+### Fixed
+
+- **The parcel boundary never drew in the camera view**, because its source and
+  layers were never created. The effect that writes the data existed and called
+  `setData` on a source that did not exist: `getSource` returned undefined, the
+  optional chain swallowed the call, and nothing reported that the drawing was
+  not happening.
+- **The amber footprint on the ground appeared some of the time**, and the
+  camera cone ran off the map. The footprint and the 3D pyramid each had their
+  own calculation, and the ground one required three corners resting on terrain
+  — with the gimbal at twelve or thirteen degrees the upper rays pass above the
+  horizon. The cone is now a fixed size that reads the same every time; the
+  footprint on the ground is what still carries the true measurement, drawn
+  faintly when its corners did not all reach the ground.
+- **Dragging in the camera view now turns the aircraft.** It used to turn the
+  gimbal on both axes, and the gimbal is limited to a quarter turn each way — so
+  past that, dragging sideways did nothing and the aircraft was never seen to
+  turn on the map. The model rotated all along; only Q and E could show it.
+- **The first-person view froze whenever the gimbal pointed above the horizon.**
+  A map camera cannot look up, and with no terrain intersection there was no
+  point to aim at: the view stayed where it last was and only the altitude
+  moved. The ray is now lowered the minimum needed, so the view keeps turning
+  with the gimbal.
+- **The aircraft's heading could not be read.** A quadcopter seen from above is
+  nearly symmetric under quarter turns, and the only cue was the gimbal camera,
+  two pixels wide at map scale. Front propeller tips are now warm and rear ones
+  cold — what the aircraft themselves do with their arm LEDs — and a separate
+  heading arrow says where the nose points.
+- **Warnings and file errors were missing their accents**, in an interface that
+  is meant to be in correct European Portuguese throughout.
+- **The published address in the repository was dead.** The Vercel project had
+  followed the rename; the repository homepage had not.
+
+### Changed
+
+- **Virtual flight no longer rebuilds everything each frame.** Ray marching
+  against terrain ran sixty times a second — with the gimbal near horizontal
+  that is a three-kilometre reach, hundreds of samples per ray — and the frustum
+  edges shared a vertex buffer with the route, so moving the aircraft rebuilt
+  every vertical, leg, chevron and ground mark. Both are fixed, and the
+  application stops dragging.
+- **The build stamp is shown in the corner of the map.** Without it there is no
+  way to tell a new version from a page the browser kept — which cost an
+  afternoon of arguing about fixes that were in the bundle all along.
+
+---
 
 ## 0.1.0 — first public release
 
@@ -95,24 +141,6 @@ ordering below is the useful part, not the calendar.
 - **Coverage measurement** and a linter that understands React hooks.
 
 ### Fixed
-
-- **The parcel boundary never drew in the camera view**, because its source and
-  layers were never created. The effect that writes the data existed and called
-  `setData` on a source that did not exist: `getSource` returned undefined, the
-  optional chain swallowed the call, and nothing reported that the drawing was
-  not happening.
-- **The amber footprint on the ground appeared some of the time.** It and the 3D
-  pyramid each had their own calculation, and the ground one required three
-  corners resting on terrain — with the gimbal at twelve or thirteen degrees the
-  upper rays pass above the horizon. Both now come from one calculation, and a
-  footprint whose corners did not all reach the ground is drawn faintly, because
-  it is where the camera looks rather than what the photo covers.
-- **The aircraft's heading could not be read.** A quadcopter seen from above is
-  nearly symmetric under quarter turns, and the only cue was the gimbal camera,
-  two pixels wide at map scale. Front propeller tips are now warm and rear ones
-  cold, which is what the aircraft themselves do with their arm LEDs.
-- **Warnings and file errors were missing their accents**, in an interface that
-  is meant to be in correct European Portuguese throughout.
 
 - **Rotating in virtual flight moved nothing on screen.** The map turned to keep
   the heading up while the 3D model turned with the heading in world
