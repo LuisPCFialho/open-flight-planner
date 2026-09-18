@@ -7,6 +7,11 @@ import { wgs84ParaPtTm06, type PontoPTTM06 } from './projeccao.ts'
 /**
  * Cotas a partir da topografia de um DXF.
  *
+ * A `FonteComposta`, que junta isto aos mosaicos publicos, vive em
+ * `fonte-composta.ts`. Foi separada porque esta classe trabalha em PT-TM06 e
+ * traz o `proj4` atras dela - quarenta e tal kilobytes que nao tem de ir para
+ * quem nunca importa um DXF, que e a maioria.
+ *
  * Dentro de um triangulo de superficie a cota sai por interpolacao baricentrica,
  * que e exacta. Fora deles, e quando so ha curvas de nivel, usa-se a media
  * ponderada pelo inverso do quadrado da distancia sobre os vizinhos mais
@@ -172,70 +177,4 @@ type Plano = { x: number; y: number; cota: number }
 
 function chaveDaCelula(x: number, y: number): string {
   return `${Math.floor(x / LADO_CELULA)},${Math.floor(y / LADO_CELULA)}`
-}
-
-/**
- * Fonte que prefere a topografia e recorre aos mosaicos publicos fora dela.
- *
- * Cada cota sabe de onde veio, e isso chega a interface: descobrir tarde que
- * metade da rota foi planeada com dados de dezenas de metros de resolucao nao e
- * aceitavel.
- */
-export class FonteComposta implements FonteTerreno {
-  readonly origem: OrigemCota = 'dxf'
-
-  constructor(
-    private readonly topografia: FonteTerrenoDXF,
-    private readonly publica: FonteTerreno,
-  ) {}
-
-  cobre(lat: number, lon: number): boolean {
-    return this.topografia.cobre(lat, lon) || this.publica.cobre(lat, lon)
-  }
-
-  origemEm(lat: number, lon: number): OrigemCota {
-    return this.topografia.cotaSincrona(lat, lon) !== null ? 'dxf' : 'terrarium'
-  }
-
-  async cota(lat: number, lon: number): Promise<number> {
-    const doLevantamento = this.topografia.cotaSincrona(lat, lon)
-    return doLevantamento ?? this.publica.cota(lat, lon)
-  }
-
-  async perfil(pontos: readonly LatLon[], passo: number): Promise<number[]> {
-    const amostras = amostrarPercurso(pontos, passo)
-    const doLevantamento = amostras.map((p) => this.topografia.cotaSincrona(p.lat, p.lon))
-
-    const emFalta = amostras.filter((_, i) => doLevantamento[i] === null)
-
-    /*
-     * `cotas` e opcional na interface, e aqui estava a ser chamado com `?.`: uma
-     * fonte que so implementasse `cota` ponto a ponto devolvia `undefined`, e
-     * cada ponto fora do levantamento acabava com cota zero. Zero e uma cota
-     * perfeitamente plausivel para quem le, e uma rota em AGL sobre terreno dado
-     * como estando ao nivel do mar voa para dentro da encosta. Fora do
-     * levantamento pergunta-se a fonte publica, com o metodo em lote se ela o
-     * tiver e ponto a ponto se nao tiver, e nunca se inventa um valor.
-     */
-    const publicas =
-      emFalta.length === 0
-        ? []
-        : this.publica.cotas
-          ? await this.publica.cotas(emFalta)
-          : await Promise.all(emFalta.map((p) => this.publica.cota(p.lat, p.lon)))
-
-    if (publicas.length !== emFalta.length) {
-      throw new Error(
-        `a fonte ${this.publica.origem} devolveu ${publicas.length} cotas para ${emFalta.length} pontos`,
-      )
-    }
-
-    let proxima = 0
-    return doLevantamento.map((cota) => {
-      if (cota !== null) return cota
-      const publica = publicas[proxima++]
-      if (publica === undefined) throw new Error('cota em falta fora do levantamento topografico')
-      return publica
-    })
-  }
 }

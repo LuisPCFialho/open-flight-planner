@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { distancia } from '../nucleo/geodesia.ts'
 import { ptTm06ParaWgs84, wgs84ParaPtTm06 } from './projeccao.ts'
 import { lerDXF, escreverDXFdeEnsaio, DXFSemCotas } from './dxf.ts'
-import { FonteTerrenoDXF, FonteComposta } from './fonte-dxf.ts'
+import { FonteTerrenoDXF } from './fonte-dxf.ts'
+import { FonteComposta } from './fonte-composta.ts'
 import type { FonteTerreno } from './fonte.ts'
 
 /** Origem do PT-TM06, que por definicao corresponde a (0, 0). */

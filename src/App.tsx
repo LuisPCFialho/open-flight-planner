@@ -48,7 +48,13 @@ import {
 } from './estado/alvo-camara.ts'
 import { FonteTerrariumAWS } from './terreno/terrarium.ts'
 import { descodificarPNGBrowser } from './terreno/png-browser.ts'
-import { FonteComposta, FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
+import { FonteComposta } from './terreno/fonte-composta.ts'
+/*
+ * So o tipo: a classe traz o `proj4` atras dela e nao tem de ir no pedaco
+ * principal. Quem a constroi e `BotoesImportar`, ja depois de ter ido buscar o
+ * leitor de DXF.
+ */
+import type { FonteTerrenoDXF } from './terreno/fonte-dxf.ts'
 import { exportarKML } from './kmz/kml.ts'
 import { descarregarTexto, nomeSeguro } from './descarregar.ts'
 import { envolvente } from './nucleo/areas.ts'

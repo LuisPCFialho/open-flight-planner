@@ -1,7 +1,7 @@
 import type { Area, LatLon } from '../nucleo/tipos.ts'
 import { areaDoContorno, centroDasAreas, envolvente, formatarArea } from '../nucleo/areas.ts'
 import { importarAreas } from '../kmz/ficheiro.ts'
-import { FonteTerrenoDXF } from '../terreno/fonte-dxf.ts'
+import type { FonteTerrenoDXF } from '../terreno/fonte-dxf.ts'
 
 /**
  * Os dois botoes que trazem ficheiros de fora para dentro da rota.
@@ -138,7 +138,10 @@ export function BotaoTopografia({
           void ficheiro
             .text()
             .then(async (texto) => {
-              const { lerDXF } = await import('../terreno/dxf.ts')
+              const [{ lerDXF }, { FonteTerrenoDXF }] = await Promise.all([
+                import('../terreno/dxf.ts'),
+                import('../terreno/fonte-dxf.ts'),
+              ])
               const lida = lerDXF(texto)
               aoImportar(
                 new FonteTerrenoDXF(lida),
