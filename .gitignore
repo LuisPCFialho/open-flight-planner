@@ -12,3 +12,12 @@ preview-teste.log
 coverage
 test-results
 playwright-report
+
+# Acrescentado pelo `vercel link`.
+.vercel
+.env*
+
+# Menos o exemplo, que e para ser seguido. Ja esta no indice e por isso nao
+# desaparecia agora - mas quem o apagasse e voltasse a criar nao o conseguia
+# acrescentar outra vez, e isso da uma tarde perdida a perceber porque.
+!.env.example
