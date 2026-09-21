@@ -10,6 +10,53 @@ ordering below is the useful part, not the calendar.
 
 ## Unreleased
 
+### Added
+
+- **The aircraft banks into its own acceleration.** A multirotor has no other way
+  to move than to tilt its thrust: the horizontal component is what pushes it,
+  and the angle is `atan(a/g)`. No coefficient, no chosen constant — just
+  gravity. Accelerating forward drops the nose; releasing the stick raises it,
+  because braking is acceleration too.
+
+  For there to be acceleration to take that from, there had to be inertia: speed
+  now chases the commanded speed instead of switching on and off. That speed
+  lives in the ground frame, not the aircraft's, and it has a consequence worth
+  the change on its own — turning mid-transit does not turn the velocity with it,
+  so the aircraft crabs until the two line up. That is what a multirotor actually
+  does, and it is what stops the virtual flight from reading like a cursor.
+
+  What is **not** modelled is cruise attitude. At constant speed a multirotor
+  holds its nose slightly down against drag, and by how much depends on a power
+  curve DJI does not publish. Here, constant speed is level flight, and a test
+  pins that choice so it does not look like an oversight.
+
+  The camera arrow does not roll with the aircraft, and does not even bind the
+  attribute. Not a simplification: a gimbal exists precisely to hold the camera
+  level while the airframe tilts.
+
+- **The real sun lights the aircraft.** The shader had a fixed direction written
+  into it, the same at nine in the morning and six in the evening — while the
+  sun's position was already being computed for the site and the hour a few
+  files away. Below the horizon the true direction left the aircraft as a black
+  silhouette, so the light lifts and the ambient term rises, easing in across the
+  eight degrees above the horizon so there is no jump at sunset. That part stops
+  being physically true, and says so.
+
+### Fixed
+
+- **The weekly end-to-end run went green without verifying anything.** The first
+  run after accounts were switched on reported success: three skipped, three
+  flaky, eleven minutes. The guard used `count()`, which does not wait — on a
+  cold load of the published site it returns zero before React paints, so the
+  skip never fired and each test then burned its two-minute timeout looking for a
+  button that was never coming. It now waits for the application to decide which
+  screen it is showing before asking which one it is.
+
+  The skip is also no longer allowed locally. Out there it is a known limitation
+  to tolerate; here, an entry screen means a `.env.local` with accounts that the
+  build picked up — a badly set bench, not a limitation — and it now fails saying
+  exactly that, with the command to fix it.
+
 ## 0.4.0
 
 One feature, two weight reductions, two defects, and the tests that should have

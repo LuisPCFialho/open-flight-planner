@@ -16,7 +16,7 @@ own; see [accounts](docs/contas.md).
 account. The routes you make there stay in that browser.
 
 > **Status: not yet flown.** The exporters are built against real KMZ files and
-> covered by 1000 tests, but no route produced by this tool has been flown on an
+> covered by 1020 tests, but no route produced by this tool has been flown on an
 > aircraft yet. Read [what to verify in the field](docs/verificar-no-campo.md)
 > before you trust it with a battery. If you fly one, please open an issue —
 > that single report is the most useful contribution this project can get.
@@ -65,7 +65,10 @@ flight: climb, transit out, work, return. The further a leg sits from the
 take-off point, the less time it has to work. Each leg becomes its own route.
 
 **Virtual flight.** Fly the aircraft over the map with the keyboard and record
-waypoints with the attitude you framed. The camera view shows what the lens
+waypoints with the attitude you framed. It has inertia, and the aircraft banks
+into its own acceleration — `atan(a/g)`, no fudge factor — because that is the
+only way a multirotor moves. The real sun, for the site and the hour, is what
+lights it. The camera view shows what the lens
 would see, and the 3D frustum shows where it is looking from.
 
 **Ground resolution and the solar window.** Coverage reports cm per pixel, which
