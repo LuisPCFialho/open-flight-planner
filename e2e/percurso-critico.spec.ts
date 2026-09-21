@@ -33,10 +33,42 @@ const ZONA = fileURLToPath(new URL('./fixtures/zona-interdita.kml', import.meta.
  * ignora-se tambem a semana em que ficou vermelho a serio. O que falta nesse dia
  * e ensinar estes ensaios a entrar, e ate la e melhor dizer-se que nao correram
  * do que fingir que correram.
+ *
+ * ## Esperar pelo ecra, e nao perguntar se ja la esta
+ *
+ * A primeira versao disto fazia `count()` no ecra de entrada, e `count()` nao
+ * espera: numa carga fria do sitio publicado devolve zero antes de o React
+ * pintar. O salto nao disparava, o ensaio ficava dois minutos a procura de um
+ * botao que nunca vinha, e com as duas repeticoes do CI eram seis minutos por
+ * ensaio. Na primeira corrida a serio deu tres saltados e tres intermitentes -
+ * uma corrida pura - e o trabalho ficou verde sem ter verificado nada.
+ *
+ * Agora espera-se que a aplicacao decida qual dos dois ecras mostra, e so
+ * depois se pergunta qual deles e.
  */
 async function saltarSePedeEntrada(page: Page): Promise<void> {
   const entrada = page.locator('.ecra-entrada')
-  if ((await entrada.count()) === 0) return
+  const projetos = page.locator('.ecra-projetos')
+
+  await expect(entrada.or(projetos)).toBeVisible({ timeout: 30_000 })
+  if (!(await entrada.isVisible())) return
+
+  /*
+   * Saltar so faz sentido contra um sitio la fora, que e o que `E2E_URL` marca.
+   *
+   * Localmente, um ecra de entrada quer dizer outra coisa: que ha um
+   * `.env.local` com contas configuradas e a versao construida apanhou-o. Isso
+   * nao e uma limitacao conhecida a tolerar todas as semanas - e a bancada mal
+   * montada, e o que faz falta e dize-lo em vez de deixar a serie inteira
+   * passar por cima sem verificar nada.
+   */
+  if (!process.env['E2E_URL']) {
+    throw new Error(
+      'A versao construida arranca em modo de conta e pede entrada, por isso estes ' +
+        'ensaios nao tem por onde comecar. Tens um .env.local com as variaveis ' +
+        'VITE_FIREBASE_*: parqueia-o (mv .env.local .env.local.parado) e corre outra vez.',
+    )
+  }
 
   test.skip(
     true,
