@@ -23,6 +23,17 @@ export type DroneNoMapa = {
   alturaVoo: number
   /** Rumo da aeronave em graus. */
   guinada: number
+  /**
+   * Inclinacao da aeronave em graus, positiva com o nariz acima do horizonte.
+   *
+   * Nao e o gimbal: e o proprio aparelho. Um multirotor so acelera inclinando o
+   * impulso, e sem isto ele deslizava pelo mapa perfeitamente direito, que e a
+   * coisa que mais denuncia um desenho a fingir de voo. Ausente vale zero, que
+   * e o que um aparelho pousado ou a pairar faz.
+   */
+  inclinacao?: number
+  /** Rotacao da aeronave em torno do nariz, positiva a inclinar para a direita. */
+  rolamento?: number
   /** Inclinacao do gimbal em graus, negativa para baixo. */
   gimbalPitch: number
   /** Rotacao do gimbal em graus, relativa ao nariz. */
@@ -103,22 +114,30 @@ const SEM_TINTA: readonly [number, number, number, number] = [0, 0, 0, 0]
  *
  * ```
  *  0..2   centro, em Mercator relativo a origem
- *  3..4   orientacao do aparelho: guinada e inclinacao (que e sempre zero)
+ *  3..4   orientacao do aparelho: guinada e inclinacao
  *  5..6   orientacao da camara: azimute e inclinacao do gimbal
  *  7..10  tinta: rgb, e em alfa quanto dela se mistura
  * 11      aumento, relativo ao tamanho comum
+ * 12      rolamento da aeronave
  * ```
  *
  * As duas malhas partilham este buffer e cada uma le o seu par de angulos, o
  * que e o mesmo que dizer que o mesmo aparelho pode olhar para um lado e voar
  * para outro - que e o que um gimbal faz.
+ *
+ * O rolamento e so da aeronave, e a seta da camara nem chega a ligar esse
+ * atributo - fica no zero por omissao. Nao e uma simplificacao: um gimbal
+ * mantem a camara direita enquanto o aparelho se inclina, e e precisamente para
+ * isso que ele existe. Ver a seta a acompanhar a inclinacao da aeronave seria o
+ * erro.
  */
-const FLUTUANTES_POR_INSTANCIA = 12
+const FLUTUANTES_POR_INSTANCIA = 13
 const BYTES_POR_INSTANCIA = FLUTUANTES_POR_INSTANCIA * 4
 export const DESVIO_ORIENTACAO_DRONE = 3 * 4
 export const DESVIO_ORIENTACAO_CAMARA = 5 * 4
 const DESVIO_TINTA = 7 * 4
 const DESVIO_AUMENTO = 11 * 4
+const DESVIO_ROLAMENTO = 12 * 4
 
 const VERTICE_FONTE = `#version 300 es
 precision highp float;
@@ -134,10 +153,16 @@ in vec2 aOrientacao;
 in vec4 aTinta;
 /** Quantas vezes maior do que o tamanho comum. */
 in float aAumento;
+/** Rotacao em torno do nariz, em radianos. Zero na seta da camara. */
+in float aRolamento;
 
 uniform mat4 uMatriz;
 /** x: quantas vezes aumentar a malha; y: unidades mercator por metro. */
 uniform vec2 uEscala;
+/** De onde vem a luz, normalizada, em (leste, norte, cima). */
+uniform vec3 uSol;
+/** Quanto se ve das faces que a luz nao apanha. */
+uniform float uAmbiente;
 
 out vec4 vCor;
 
@@ -146,10 +171,21 @@ void main() {
   float sa = sin(aOrientacao.x);
   float ci = cos(aOrientacao.y);
   float si = sin(aOrientacao.y);
+  float cr = cos(aRolamento);
+  float sr = sin(aRolamento);
+
+  /*
+   * Rolamento primeiro, depois inclinacao, depois guinada.
+   *
+   * E a ordem de sempre em atitude de aeronave, e nao e indiferente: trocada,
+   * uma aeronave inclinada que role acaba a apontar para onde nao devia.
+   */
+  vec3 r = vec3(aPosicao.x * cr + aPosicao.z * sr, aPosicao.y, -aPosicao.x * sr + aPosicao.z * cr);
+  vec3 rn = vec3(aNormal.x * cr + aNormal.z * sr, aNormal.y, -aNormal.x * sr + aNormal.z * cr);
 
   // Inclinacao em torno do eixo transversal: o nariz sobe ou desce.
-  vec3 p = vec3(aPosicao.x, aPosicao.y * ci - aPosicao.z * si, aPosicao.y * si + aPosicao.z * ci);
-  vec3 n = vec3(aNormal.x, aNormal.y * ci - aNormal.z * si, aNormal.y * si + aNormal.z * ci);
+  vec3 p = vec3(r.x, r.y * ci - r.z * si, r.y * si + r.z * ci);
+  vec3 n = vec3(rn.x, rn.y * ci - rn.z * si, rn.y * si + rn.z * ci);
 
   // Guinada em torno da vertical. A malha tem x para a direita e y para o
   // nariz; aqui passa a leste e norte.
@@ -159,7 +195,15 @@ void main() {
   // Em coordenadas Mercator o y cresce para sul.
   vec3 desvio = vec3(enu.x, -enu.y, enu.z) * (uEscala.x * aAumento * uEscala.y);
 
-  float luz = 0.40 + 0.60 * max(dot(normalize(normalEnu), normalize(vec3(0.35, 0.25, 0.90))), 0.0);
+  /*
+   * A luz vem do sol verdadeiro, para o sitio e a hora da rota.
+   *
+   * Era uma direccao fixa escrita aqui, igual as nove da manha e as seis da
+   * tarde. A posicao do sol ja se calcula em sol.ts, e para o proprio sitio:
+   * nao havia razao nenhuma para a luz ser inventada. (Sem plicas invertidas
+   * neste comentario: ele vive dentro de uma template string, e elas fechavam-na.)
+   */
+  float luz = uAmbiente + (1.0 - uAmbiente) * max(dot(normalize(normalEnu), uSol), 0.0);
   vCor = vec4(mix(aCor.rgb, aTinta.rgb, aTinta.a) * luz, aCor.a);
 
   gl_Position = uMatriz * vec4(aCentro + desvio, 1.0);
@@ -210,6 +254,24 @@ export class CamadaDrones implements CustomLayerInterface {
   #precisaRecarregar = false
   #renders = 0
 
+  /*
+   * A iluminacao, com um valor de partida que serve antes de alguem a definir.
+   *
+   * E a direccao fixa que aqui estava escrita no shader: serve de recurso para
+   * o instante entre a camada nascer e a primeira rota dizer onde e o sitio.
+   */
+  #sol: readonly [number, number, number] = [0.35, 0.25, 0.9]
+  #ambiente = 0.4
+  #localSol: WebGLUniformLocation | null = null
+  #localAmbiente: WebGLUniformLocation | null = null
+
+  /** De onde vem a luz. Vem de `iluminacaoDoSol`, em `sol.ts`. */
+  definirIluminacao(direccao: readonly [number, number, number], ambiente: number): void {
+    this.#sol = direccao
+    this.#ambiente = ambiente
+    this.#mapa?.triggerRepaint()
+  }
+
   onAdd(mapa: MapaLibre, gl: WebGL2RenderingContext): void {
     this.#mapa = mapa
 
@@ -217,6 +279,8 @@ export class CamadaDrones implements CustomLayerInterface {
     this.#programa = programa
     this.#localMatriz = gl.getUniformLocation(programa, 'uMatriz')
     this.#localEscala = gl.getUniformLocation(programa, 'uEscala')
+    this.#localSol = gl.getUniformLocation(programa, 'uSol')
+    this.#localAmbiente = gl.getUniformLocation(programa, 'uAmbiente')
 
     this.#bufferSetas = gl.createBuffer()
     this.#bufferDrones = gl.createBuffer()
@@ -229,6 +293,7 @@ export class CamadaDrones implements CustomLayerInterface {
       malhaDrone(),
       DESVIO_ORIENTACAO_DRONE,
       this.#bufferDrones,
+      true,
     )
     this.#seta = this.#carregarMalha(
       gl,
@@ -236,6 +301,8 @@ export class CamadaDrones implements CustomLayerInterface {
       malhaSetaCamara(),
       DESVIO_ORIENTACAO_CAMARA,
       this.#bufferSetas,
+      // A seta nao rola: o gimbal mantem a camara direita.
+      false,
     )
 
     this.#precisaRecarregar = true
@@ -308,6 +375,8 @@ export class CamadaDrones implements CustomLayerInterface {
 
     gl.useProgram(programa)
     gl.uniformMatrix4fv(this.#localMatriz, false, matrizComTranslacao(principal, this.#origem))
+    gl.uniform3f(this.#localSol, this.#sol[0], this.#sol[1], this.#sol[2])
+    gl.uniform1f(this.#localAmbiente, this.#ambiente)
 
     /*
      * A profundidade tem de estar ligada, senao as helices de um aparelho
@@ -395,6 +464,14 @@ export class CamadaDrones implements CustomLayerInterface {
     malha: MalhaDrone,
     desvioOrientacao: number,
     bufferInstancias: WebGLBuffer | null,
+    /**
+     * Se esta malha roda com a aeronave.
+     *
+     * A seta da camara nao: o gimbal mantem-na direita enquanto o aparelho se
+     * inclina, que e para isso que um gimbal existe. Sem o atributo ligado, o
+     * `aRolamento` fica no zero por omissao do WebGL.
+     */
+    comRolamento: boolean,
   ): MalhaCarregada {
     const vao = gl.createVertexArray()
     gl.bindVertexArray(vao)
@@ -423,6 +500,9 @@ export class CamadaDrones implements CustomLayerInterface {
     ligar(gl, programa, 'aOrientacao', 2, BYTES_POR_INSTANCIA, desvioOrientacao, 1)
     ligar(gl, programa, 'aTinta', 4, BYTES_POR_INSTANCIA, DESVIO_TINTA, 1)
     ligar(gl, programa, 'aAumento', 1, BYTES_POR_INSTANCIA, DESVIO_AUMENTO, 1)
+    if (comRolamento) {
+      ligar(gl, programa, 'aRolamento', 1, BYTES_POR_INSTANCIA, DESVIO_ROLAMENTO, 1)
+    }
 
     const indices = gl.createBuffer()
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices)
@@ -492,9 +572,8 @@ export function construirInstancias(
     dados[base + 1] = m.y - origem[1]
     dados[base + 2] = m.z - origem[2]
 
-    // A aeronave paira direita: so guinada, sem inclinacao.
     dados[base + 3] = ponto.guinada * grau
-    dados[base + 4] = 0
+    dados[base + 4] = (ponto.inclinacao ?? 0) * grau
 
     // A camara olha para a guinada mais a rotacao do gimbal, que e relativa ao
     // nariz, com a inclinacao do gimbal por cima. E a mesma conta que o
@@ -508,6 +587,7 @@ export function construirInstancias(
     dados[base + 10] = tinta[3]
 
     dados[base + 11] = ponto.aumento ?? 1
+    dados[base + 12] = (ponto.rolamento ?? 0) * grau
   }
 
   return { dados, origem, metro }

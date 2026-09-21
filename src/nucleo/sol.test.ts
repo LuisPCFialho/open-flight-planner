@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { janelaSolar, posicaoDoSol } from './sol.ts'
+import { iluminacaoDoSol, janelaSolar, posicaoDoSol } from './sol.ts'
 
 /**
  * A posicao do sol.
@@ -131,5 +131,67 @@ describe('janela solar', () => {
     // A tolerancia e o passo da amostragem: o maximo cai sempre num minuto certo.
     const minutos = (aqui - emGreenwich) / 60000
     expect(Math.abs(minutos - 4 * Math.abs(OBRA.lon))).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('de onde vem a luz', () => {
+  /*
+   * Coimbra, mais coisa menos coisa. Ao meio-dia solar de Junho o sol esta alto
+   * e a sul; ao nascer esta baixo e a leste. Sao as duas coisas que qualquer
+   * pessoa confirma olhando pela janela, e sao as que aqui se verificam.
+   */
+  const LAT = 40.2
+  const LON = -8.4
+
+  /** Hora a que o sol esta mais alto nesse dia, em milesimos. */
+  function meioDiaSolar(dia: string): number {
+    const janela = janelaSolar(LAT, LON, Date.parse(dia), 0)
+    return janela.meioDiaSolar ?? Date.parse(dia)
+  }
+
+  it('ao meio-dia solar a luz vem de cima e um pouco do sul', () => {
+    const { direccao, ambiente } = iluminacaoDoSol(LAT, LON, meioDiaSolar('2026-06-21T12:00:00Z'))
+
+    // A componente vertical domina: o sol esta alto.
+    expect(direccao[2]).toBeGreaterThan(0.8)
+    // E a horizontal aponta a sul, ou seja norte negativo.
+    expect(direccao[1]).toBeLessThan(0)
+    expect(ambiente).toBeCloseTo(0.4, 6)
+  })
+
+  it('a direccao e sempre um vector unitario', () => {
+    for (const hora of ['2026-03-20T06:00:00Z', '2026-06-21T13:00:00Z', '2026-12-21T23:00:00Z']) {
+      const { direccao } = iluminacaoDoSol(LAT, LON, Date.parse(hora))
+      expect(Math.hypot(...direccao)).toBeCloseTo(1, 9)
+    }
+  })
+
+  /*
+   * De noite a direccao verdadeira punha o aparelho todo em sombra, e o que se
+   * via era uma silhueta preta. Isto e uma ferramenta de trabalho: a luz
+   * levanta-se e o ambiente sobe para ele continuar legivel. Deixa de ser
+   * fisicamente verdade, e e uma troca deliberada - este teste fixa-a.
+   */
+  it('com o sol posto a luz levanta-se e o ambiente sobe', () => {
+    const noite = iluminacaoDoSol(LAT, LON, Date.parse('2026-12-21T02:00:00Z'))
+
+    expect(posicaoDoSol(LAT, LON, Date.parse('2026-12-21T02:00:00Z')).elevacao).toBeLessThan(0)
+    expect(noite.direccao[2]).toBeGreaterThan(0.8)
+    expect(noite.ambiente).toBeCloseTo(0.62, 6)
+  })
+
+  it('o aparelho nunca fica completamente as escuras', () => {
+    // A face mais desfavoravel possivel recebe sempre a componente ambiente.
+    for (let h = 0; h < 24; h += 1) {
+      const quando = Date.parse(`2026-12-21T${String(h).padStart(2, '0')}:00:00Z`)
+      expect(iluminacaoDoSol(LAT, LON, quando).ambiente).toBeGreaterThanOrEqual(0.4)
+    }
+  })
+
+  it('a passagem do dia para a noite e gradual, nao um salto', () => {
+    const antes = iluminacaoDoSol(LAT, LON, Date.parse('2026-06-21T19:30:00Z'))
+    const depois = iluminacaoDoSol(LAT, LON, Date.parse('2026-06-21T20:30:00Z'))
+    // Uma hora em redor do pôr do sol nao pode mudar o ambiente de ponta a ponta.
+    expect(Math.abs(depois.ambiente - antes.ambiente)).toBeLessThan(0.22)
   })
 })

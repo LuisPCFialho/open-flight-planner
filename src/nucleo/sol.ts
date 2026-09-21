@@ -163,3 +163,75 @@ export function janelaSolar(
  * Portugal - e editavel de proposito, e quem souber melhor que o mude.
  */
 export const ELEVACAO_MINIMA_PREDEFINIDA = 30
+
+/**
+ * De onde vem a luz, e quanta luz ha sem ela.
+ *
+ * Serve o desenho do aparelho no mapa, que ate agora era iluminado por uma
+ * direccao fixa escrita no shader - a mesma as nove da manha e as seis da
+ * tarde. Como a posicao do sol ja se calcula aqui, e para o proprio sitio e a
+ * propria hora, nao ha razao nenhuma para a luz ser inventada.
+ *
+ * ## O que acontece de noite
+ *
+ * Com o sol posto, a direccao verdadeira poe o aparelho todo em sombra e o que
+ * se ve e uma silhueta preta. Isto e uma ferramenta de trabalho e nao um
+ * simulador: a partir do horizonte a luz levanta-se para cima e a componente
+ * ambiente sobe, de modo a que o aparelho continue legivel. Deixa de ser
+ * fisicamente verdade, e e uma troca deliberada.
+ *
+ * A transicao e gradual entre o horizonte e `ELEVACAO_DE_TRANSICAO` graus, para
+ * o aparelho nao mudar de aspecto de repente ao pôr do sol.
+ */
+
+/** Acima disto a luz e a do sol. Abaixo, vai-se levantando ate ficar de cima. */
+const ELEVACAO_DE_TRANSICAO = 8
+
+/** Quanta luz ha nas faces que o sol nao apanha. */
+const AMBIENTE_DE_DIA = 0.4
+const AMBIENTE_DE_NOITE = 0.62
+
+export type Iluminacao = {
+  /** Direccao normalizada de onde a luz vem, em (leste, norte, cima). */
+  direccao: readonly [number, number, number]
+  /** Quanto se ve das faces que a luz nao apanha, de 0 a 1. */
+  ambiente: number
+}
+
+export function iluminacaoDoSol(lat: number, lon: number, instante: number): Iluminacao {
+  const { elevacao, azimute } = posicaoDoSol(lat, lon, instante)
+
+  /*
+   * Quanto do sol verdadeiro se usa: tudo acima da transicao, nada abaixo do
+   * horizonte, e a interpolar pelo meio.
+   */
+  const peso = Math.min(1, Math.max(0, elevacao / ELEVACAO_DE_TRANSICAO))
+
+  const e = elevacao * GRAUS
+  const a = azimute * GRAUS
+  const doSol: [number, number, number] = [
+    Math.cos(e) * Math.sin(a),
+    Math.cos(e) * Math.cos(a),
+    Math.sin(e),
+  ]
+
+  // A luz de recurso vem de cima, com uma inclinacao ligeira para dar relevo.
+  const deCima: [number, number, number] = [0.35, 0.25, 0.9]
+
+  const misturada: [number, number, number] = [
+    doSol[0] * peso + deCima[0] * (1 - peso),
+    doSol[1] * peso + deCima[1] * (1 - peso),
+    doSol[2] * peso + deCima[2] * (1 - peso),
+  ]
+
+  const comprimento = Math.hypot(...misturada) || 1
+
+  return {
+    direccao: [
+      misturada[0] / comprimento,
+      misturada[1] / comprimento,
+      misturada[2] / comprimento,
+    ],
+    ambiente: AMBIENTE_DE_NOITE + (AMBIENTE_DE_DIA - AMBIENTE_DE_NOITE) * peso,
+  }
+}

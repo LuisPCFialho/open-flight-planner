@@ -2,7 +2,7 @@ import type { LatLon, Rota, Waypoint } from '../nucleo/tipos.ts'
 import { deslocar, paraASL } from '../nucleo/geodesia.ts'
 import { guinadaEfectiva } from '../nucleo/camara-trajecto.ts'
 import type { EstadoReplay } from '../nucleo/replay.ts'
-import type { EstadoVoo } from '../nucleo/voo.ts'
+import type { EstadoVoo, Movimento } from '../nucleo/voo.ts'
 import type { Perfil } from '../nucleo/perfil.ts'
 import type { Alvo } from './useEnquadramento.ts'
 import { pontoAoLongoDoRaio, type Enquadramento } from '../nucleo/camara.ts'
@@ -134,13 +134,24 @@ export function aeronaveDoReplay(estado: EstadoReplay, alturaASL: number): Drone
  *
  * Vai com a guinada da aeronave e os dois angulos do gimbal, que e o que faz o
  * desenho dizer alguma coisa - sem eles era um aparelho sempre virado a norte.
+ *
+ * Leva tambem a atitude, quando ha movimento: um multirotor so acelera
+ * inclinando o impulso, e sem isso ele deslizava pelo mapa perfeitamente
+ * direito. `movimento` e opcional porque o leitor de replay tambem chama isto,
+ * e ai nao ha aceleracao nenhuma de onde a tirar.
  */
-export function aeronaveDoVoo(estado: EstadoVoo, alturaASL: number): DroneNoMapa {
+export function aeronaveDoVoo(
+  estado: EstadoVoo,
+  alturaASL: number,
+  movimento?: Movimento,
+): DroneNoMapa {
   return {
     lat: estado.posicao.lat,
     lon: estado.posicao.lon,
     alturaVoo: alturaASL,
     guinada: estado.guinada,
+    inclinacao: movimento?.inclinacao ?? 0,
+    rolamento: movimento?.rolamento ?? 0,
     gimbalPitch: estado.gimbalPitch,
     gimbalYaw: estado.gimbalYaw,
     seleccionado: false,

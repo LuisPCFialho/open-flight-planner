@@ -4,13 +4,15 @@ import {
   apontarGimbal,
   avancarVoo,
   rodarAeronave,
+  PARADO,
   PASSO_VELOCIDADE,
   VELOCIDADE,
   velocidadeAjustada,
   type EstadoVoo,
+  type Movimento,
 } from '../nucleo/voo.ts'
 
-export type { EstadoVoo }
+export type { EstadoVoo, Movimento }
 
 /**
  * Voo virtual: pilotar a aeronave pelo mapa e gravar o waypoint no sitio e com
@@ -35,6 +37,8 @@ export type { EstadoVoo }
 export type ComandosVoo = {
   activo: boolean
   estado: EstadoVoo
+  /** Para onde vai e como esta inclinada. So existe enquanto se voa. */
+  movimento: Movimento
   arrancar: (inicial: EstadoVoo) => void
   parar: () => void
   /** Move a aeronave sem passar pelo teclado, para o mapa poder posiciona-la. */
@@ -67,6 +71,7 @@ export function useVooVirtual(opcoes: {
     gimbalPitch: -30,
     gimbalYaw: 0,
   })
+  const [movimento, setMovimento] = useState<Movimento>(PARADO)
 
   const [velocidade, setVelocidade] = useState(VELOCIDADE)
   const velocidadeRef = useRef(velocidade)
@@ -95,13 +100,26 @@ export function useVooVirtual(opcoes: {
     callbacks.current.aoGravarWaypoint(estadoRef.current)
   }, [])
 
+  /*
+   * O movimento tambem num ref, pela mesma razao que o estado.
+   *
+   * O ciclo de animacao le-o e escreve-o a cada fotograma, e o valor tem de ser
+   * o actual e nao o do render em que o efeito foi instalado.
+   */
+  const movimentoRef = useRef(movimento)
+  movimentoRef.current = movimento
+
   const arrancar = useCallback((inicial: EstadoVoo) => {
     setEstado(inicial)
+    setMovimento(PARADO)
+    movimentoRef.current = PARADO
     setActivo(true)
   }, [])
 
   const parar = useCallback(() => {
     premidas.current.clear()
+    setMovimento(PARADO)
+    movimentoRef.current = PARADO
     setActivo(false)
   }, [])
 
@@ -199,11 +217,27 @@ export function useVooVirtual(opcoes: {
       pedido = requestAnimationFrame(passo)
 
       const teclas = premidas.current
-      if (teclas.size === 0) return
+      const m = movimentoRef.current
 
-      setEstado((actual) =>
-        avancarVoo(actual, teclas, delta, { velocidade: velocidadeRef.current }),
-      )
+      /*
+       * Parar de integrar exige que nao haja teclas **e** que a aeronave esteja
+       * mesmo parada.
+       *
+       * Antes bastava nao haver teclas, porque sem inercia largar o comando era
+       * parar. Agora largar o comando e o principio de uma travagem: se o ciclo
+       * desistisse aqui, a aeronave ficava a deslizar com a ultima velocidade
+       * congelada e o nariz levantado para sempre.
+       */
+      const emMovimento = Math.hypot(m.leste, m.norte) > 1e-3
+      const inclinada = Math.abs(m.inclinacao) > 1e-3 || Math.abs(m.rolamento) > 1e-3
+      if (teclas.size === 0 && !emMovimento && !inclinada) return
+
+      const seguinte = avancarVoo(estadoRef.current, m, teclas, delta, {
+        velocidade: velocidadeRef.current,
+      })
+      movimentoRef.current = seguinte.movimento
+      setEstado(seguinte.estado)
+      setMovimento(seguinte.movimento)
     }
 
     pedido = requestAnimationFrame(passo)
@@ -213,6 +247,7 @@ export function useVooVirtual(opcoes: {
   return {
     activo,
     estado,
+    movimento,
     arrancar,
     parar,
     colocar,

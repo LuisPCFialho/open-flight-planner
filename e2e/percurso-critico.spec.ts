@@ -191,6 +191,69 @@ test.describe('do limite da parcela ao ficheiro que voa', () => {
     expect(errosDeConsola).toEqual([])
   })
 
+  test('a aeronave arranca e trava em vez de ligar e desligar', async ({ page }) => {
+    /*
+     * A inercia esta coberta por testes de unidade, mas nenhum deles ve o ciclo
+     * de animacao. E la que ela se parte de maneiras que a funcao pura nao
+     * conhece: o ciclo tinha uma paragem antecipada para quando nao ha teclas
+     * premidas, e com inercia isso deixava a aeronave a deslizar para sempre com
+     * a ultima velocidade congelada. O `requestAnimationFrame` nem sequer corre
+     * com a janela por tras de outra, e por isso isto so se verifica aqui.
+     */
+    await abrirProjetoNovo(page)
+
+    await page.getByRole('button', { name: 'Voo virtual', exact: true }).click()
+    const hud = page.locator('.hud-voo')
+    await expect(hud).toBeVisible()
+
+    /** A latitude que o HUD mostra naquele instante. */
+    const latitude = async (): Promise<number> => {
+      const texto = (await hud.innerText()).match(/LATITUDE\s*\n\s*(-?[\d.]+)/)
+      if (!texto?.[1]) throw new Error('o HUD nao mostra a latitude')
+      return Number(texto[1])
+    }
+
+    const partida = await latitude()
+
+    // Um segundo de W, a apontar a norte: a latitude tem de subir.
+    await page.keyboard.down('w')
+    await page.waitForTimeout(1000)
+    await page.keyboard.up('w')
+
+    const aoLargar = await latitude()
+    expect(aoLargar).toBeGreaterThan(partida)
+
+    /*
+     * O que interessa: largar o comando nao para a aeronave a seco. Trezentos
+     * milesimos depois ela ainda andou, porque esta a travar.
+     */
+    await page.waitForTimeout(300)
+    const aTravar = await latitude()
+    expect(aTravar).toBeGreaterThan(aoLargar)
+
+    /*
+      * E acaba mesmo por parar, em vez de deslizar para sempre.
+      *
+      * A espera e por sondagem e nao por um tempo fixo, de proposito: o ciclo
+      * limita o passo a um decimo de segundo, portanto com a maquina ocupada o
+      * tempo simulado anda mais devagar do que o relogio. Um `waitForTimeout`
+      * de tres segundos passava sozinho e falhava no meio da serie completa,
+      * que foi exactamente o que aconteceu a primeira vez que isto correu.
+      */
+    let anterior = await latitude()
+    await expect
+      .poll(
+        async () => {
+          const agora = await latitude()
+          const parou = Math.abs(agora - anterior) < 1e-7
+          anterior = agora
+          return parou
+        },
+        { timeout: 20000, intervals: [250] },
+      )
+      .toBe(true)
+  })
+
   test('uma zona interdita por baixo da cobertura trava a exportacao', async ({ page }) => {
     /*
      * A validacao das zonas interditas verifica o troco inteiro e nao so os

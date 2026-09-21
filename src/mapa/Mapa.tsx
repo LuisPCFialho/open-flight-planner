@@ -13,6 +13,7 @@ import { arrastoDeOrientacao, orientacaoAposArrasto } from './navegacao.ts'
 import { CAMADA_SOMBREADO, estiloBase, FONTE_TERRENO } from './estilo.ts'
 import { CamadaRota3D, type PontoRota3D, type Segmento3D } from './camada-rota-3d.ts'
 import { CamadaDrones, type DroneNoMapa } from './camada-drones.ts'
+import type { Iluminacao } from '../nucleo/sol.ts'
 import { ligarEstilo } from './arranque.ts'
 import { sincronizarMarcadores, sincronizarPOIs } from './marcadores.ts'
 import { marcadoresDensos } from './densidade.ts'
@@ -59,6 +60,8 @@ export type PropsMapa = {
    * nos pontos da rota, acrescentaria um troco e uma vertical a linha de voo.
    */
   aeronave: DroneNoMapa | null
+  /** De onde vem a luz que ilumina o aparelho, e quanta ha sem ela. */
+  iluminacao: Iluminacao | null
   seleccionados: ReadonlySet<string>
   modo3D: boolean
   /**
@@ -664,6 +667,14 @@ export function Mapa(props: PropsMapa) {
       aeronave ? [...props.pontos3D, aeronave] : props.pontos3D,
     )
   }, [props.pontos3D, props.aeronave, pronto])
+
+  useEffect(() => {
+    if (!pronto || !props.iluminacao) return
+    camadaDrones.current?.definirIluminacao(
+      props.iluminacao.direccao,
+      props.iluminacao.ambiente,
+    )
+  }, [props.iluminacao, pronto])
 
   useEffect(() => {
     const instancia = mapa.current

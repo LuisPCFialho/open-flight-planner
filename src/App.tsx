@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon, ModoAltitude, Rota, TipoAccao } from './nucleo/tipos.ts'
 import { calcularEstatisticas } from './nucleo/estatisticas.ts'
 import { alturasAcimaDoSolo, converterModoAltitude, nivelarAcimaDoSolo } from './nucleo/altitude.ts'
@@ -24,6 +24,7 @@ import { acrescentarPOI, poiNovo, removerPOI } from './nucleo/operacoes-poi.ts'
 import { repetirDeslocado, repetirEmSentidoContrario } from './nucleo/repeticao.ts'
 import { acrescentarCobertura } from './nucleo/cobertura.ts'
 import { acrescentarOrbita, gerarOrbita } from './nucleo/orbita.ts'
+import { iluminacaoDoSol } from './nucleo/sol.ts'
 import { dividirPorAutonomia } from './nucleo/baterias.ts'
 import { chaveDaPosicao, useCotasTerreno } from './estado/useCotasTerreno.ts'
 import { useEditorRota } from './estado/useEditorRota.ts'
@@ -334,6 +335,31 @@ export function App() {
    */
   const assinalados = useMemo(() => waypointsAssinalados(validacoes), [validacoes])
 
+  /*
+   * De onde vem a luz que ilumina o aparelho no mapa.
+   *
+   * Do sol verdadeiro, para o ponto de descolagem da rota e para a hora que e
+   * agora. Era uma direccao fixa escrita no shader - a mesma as nove da manha e
+   * as seis da tarde - e a posicao do sol ja se calculava aqui ao lado.
+   *
+   * O instante vem de estado e nao de `Date.now()` no render, que seria impuro
+   * e punha a arvore a redesenhar-se sem nada ter mudado. De minuto a minuto
+   * chega: o sol anda quinze graus por hora.
+   */
+  const [instanteDaLuz, setInstanteDaLuz] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setInstanteDaLuz(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const iluminacao = useMemo(
+    () =>
+      rota
+        ? iluminacaoDoSol(rota.pontoDescolagem.lat, rota.pontoDescolagem.lon, instanteDaLuz)
+        : null,
+    [rota, instanteDaLuz],
+  )
+
   // --- voo virtual ----------------------------------------------------------
   const ultimoGravado = useRef<string | null>(null)
 
@@ -441,9 +467,10 @@ export function App() {
   const aeronaveNoMapa = useMemo<DroneNoMapa | null>(() => {
     if (!alvoCamara) return null
     if (comandoDaCamara.replay) return aeronaveDoReplay(comandoDaCamara.replay, alvoCamara.alturaASL)
-    if (comandoDaCamara.voo) return aeronaveDoVoo(comandoDaCamara.voo, alvoCamara.alturaASL)
+    if (comandoDaCamara.voo)
+      return aeronaveDoVoo(comandoDaCamara.voo, alvoCamara.alturaASL, voo.movimento)
     return null
-  }, [comandoDaCamara.replay, comandoDaCamara.voo, alvoCamara])
+  }, [comandoDaCamara.replay, comandoDaCamara.voo, alvoCamara, voo.movimento])
 
   const aeronaveNoCorte = useMemo(
     () =>
@@ -937,6 +964,7 @@ export function App() {
               rota={rota}
               pontos3D={pontos3D}
               aeronave={aeronaveNoMapa}
+              iluminacao={iluminacao}
               arestasEnquadramento={arestasEnquadramento}
             intervaloAcimaDoSolo={intervaloAGL}
             sombreado={sombreado}
