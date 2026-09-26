@@ -19,6 +19,7 @@ type Atalho = { teclas: string[]; descricao: string }
 const EDICAO: readonly Atalho[] = [
   { teclas: ['Ctrl', 'Z'], descricao: 'Desfazer' },
   { teclas: ['Ctrl', 'Shift', 'Z'], descricao: 'Refazer' },
+  { teclas: ['Ctrl', 'A'], descricao: 'Seleccionar todos os waypoints da rota' },
   { teclas: ['Delete'], descricao: 'Eliminar o que está seleccionado' },
   { teclas: ['↑'], descricao: 'Seleccionar o waypoint anterior' },
   { teclas: ['↓'], descricao: 'Seleccionar o waypoint seguinte' },
@@ -29,7 +30,7 @@ const RATO: readonly Atalho[] = [
   { teclas: ['clique'], descricao: 'Com "Criar waypoints" ligado, põe um ponto no mapa' },
   { teclas: ['Alt', 'clique'], descricao: 'Num troço, insere um ponto no meio dele' },
   { teclas: ['Ctrl', 'clique'], descricao: 'Junta ou tira o ponto da selecção' },
-  { teclas: ['Shift', 'clique'], descricao: 'Selecciona o intervalo até ao ponto' },
+  { teclas: ['Shift', 'clique'], descricao: 'Selecciona o intervalo até ao ponto, na lista ou no mapa' },
 ]
 
 const VOO: readonly Atalho[] = [

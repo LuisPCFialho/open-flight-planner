@@ -286,6 +286,93 @@ test.describe('do limite da parcela ao ficheiro que voa', () => {
       .toBe(true)
   })
 
+  test('filtrar, apanhar os que faltam, e trata-los todos de uma vez', async ({ page }) => {
+    /*
+     * O percurso que o planeamento a serio faz: gerar a cobertura sem accao de
+     * foto, descobrir quais e que ficaram sem ela, apanha-los todos e dar-lhes
+     * a foto de uma vez. Editar em lote ja existia; o que nao havia era maneira
+     * de chegar a duzias de pontos sem lhes bater um a um com o ctrl premido.
+     */
+    await abrirProjetoNovo(page)
+    await page.locator('input[type="file"][data-tipo="referencia"]').setInputFiles(PARCELA)
+    await expect(page.getByText(/parcela\.kml: 1 área\(s\)/)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Cobrir', exact: true }).click()
+    const cobrir = page.getByRole('dialog', { name: 'Cobrir área com passagens' })
+
+    // Sem accao de foto: e assim que se cria o problema que este percurso resolve.
+    await cobrir.getByLabel('Um waypoint por foto').uncheck()
+
+    /*
+     * Mais baixo do que a altura de partida, para haver pontos que cheguem.
+     *
+     * O filtro so aparece acima de vinte waypoints - abaixo disso e ruido - e a
+     * esta parcela, a oitenta metros, saem doze. Trinta da passagens que chegam
+     * para o filtro fazer sentido, que e a situacao que este percurso encena.
+     */
+    await cobrir.getByLabel('Altura acima do solo').fill('30')
+    await cobrir.getByLabel('Altura acima do solo').blur()
+
+    await cobrir.getByRole('button', { name: /waypoints/ }).click()
+    await expect(cobrir).toBeHidden()
+
+    await expect
+      .poll(async () => page.locator('.linha-waypoint').count())
+      .toBeGreaterThan(20)
+
+    /*
+      * Sem distinguir maiusculas, de proposito.
+      *
+      * O `innerText` devolve o texto **renderizado**, e a folha de estilo poe
+      * este rotulo em maiusculas - enquanto o `toContainText` le o texto do DOM
+      * e ve "Fotos". Os dois veem coisas diferentes do mesmo elemento, e foi
+      * isso que fez este ensaio falhar da primeira vez.
+      */
+    const estatisticas = page.locator('.estatisticas')
+    const fotos = async (): Promise<number> =>
+      Number((await estatisticas.innerText()).match(/Fotos\s*(\d+)/i)?.[1] ?? '-1')
+
+    await expect.poll(fotos).toBe(0)
+
+    // --- filtrar pelos que nao tiram foto -----------------------------------
+    const lista = page.locator('.painel-esquerdo')
+    await lista.getByRole('button', { name: 'Sem foto' }).click()
+
+    // --- apanha-los todos de uma vez ----------------------------------------
+    const apanhar = lista.getByRole('button', { name: /^Seleccionar/ })
+    await expect(apanhar).toBeVisible()
+    const quantos = Number((await apanhar.innerText()).match(/(\d+)/)?.[1] ?? '0')
+    expect(quantos).toBeGreaterThan(10)
+    await apanhar.click()
+
+    await expect(lista.getByText(`${quantos} seleccionados`)).toBeVisible()
+
+    // --- dar-lhes a foto ----------------------------------------------------
+    const propriedades = page.locator('.painel-direito')
+    // As abas sao `role="tab"`, nao botoes - o papel e que as distingue.
+    await propriedades.getByRole('tab', { name: 'Acções' }).click()
+    await propriedades.getByRole('button', { name: 'Tirar foto', exact: true }).click()
+
+    await expect.poll(fotos).toBe(quantos)
+
+    /*
+     * E subir a altura de todos sem lhes tirar as diferencas: `+10` soma dez a
+     * cada um, ao contrario de escrever um valor, que os igualava.
+     */
+    await propriedades.getByRole('tab', { name: 'Parâmetros' }).click()
+    const alturasAntes = await page.locator('.linha-waypoint .altura').allInnerTexts()
+
+    await propriedades.getByRole('button', { name: '+10', exact: true }).first().click()
+
+    const alturasDepois = await page.locator('.linha-waypoint .altura').allInnerTexts()
+    expect(alturasDepois).toHaveLength(alturasAntes.length)
+    for (const [i, antes] of alturasAntes.entries()) {
+      const a = Number(antes.replace(/[^\d.-]/g, ''))
+      const d = Number((alturasDepois[i] ?? '').replace(/[^\d.-]/g, ''))
+      expect(d).toBeCloseTo(a + 10, 3)
+    }
+  })
+
   test('uma zona interdita por baixo da cobertura trava a exportacao', async ({ page }) => {
     /*
      * A validacao das zonas interditas verifica o troco inteiro e nao so os

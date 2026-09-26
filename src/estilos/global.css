@@ -2449,6 +2449,29 @@ button.ligacao {
  * Tudo o resto - mapa, listas, paineis - e trabalho de ecra e nao serve para
  * nada impresso. Sem isto o `Ctrl+P` dava vinte paginas de nada.
  */
+/* --- seleccionar muitos de uma vez ----------------------------------------- */
+
+.seleccao-lote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--borda);
+  background: var(--fundo);
+}
+
+.seleccao-lote button {
+  font-size: 11px;
+  padding: 3px 7px;
+}
+
+.seleccao-lote span {
+  font-size: 11px;
+  color: var(--destaque);
+}
+
 /* --- filtro da lista de waypoints ------------------------------------------ */
 
 .filtro-waypoints {

@@ -25,7 +25,7 @@ import type { POI, Waypoint } from '../nucleo/tipos.ts'
  */
 export type AccoesDeMarcador = {
   current: {
-    aoSeleccionar: (id: string, juntar: boolean) => void
+    aoSeleccionar: (id: string, juntar: boolean, intervalo: boolean) => void
     aoMoverWaypoint: (id: string, lat: number, lon: number, terminado: boolean) => void
     aoEliminarWaypoint: (id: string) => void
     aoRemoverPOI: (id: string) => void
@@ -108,11 +108,20 @@ export function sincronizarMarcadores(
       elemento.type = 'button'
       elemento.className = 'marcador-waypoint'
 
+      /*
+       * Ctrl junta um, shift apanha o intervalo - como na lista e como em
+       * qualquer lista.
+       *
+       * Antes as duas teclas faziam a mesma coisa, juntar. Quem quisesse os
+       * vinte pontos de uma passagem tinha de lhes bater um a um com o ctrl
+       * premido, e no mapa e onde se ve qual e a passagem.
+       */
       elemento.addEventListener('click', (evento) => {
         evento.stopPropagation()
         accoes.current.aoSeleccionar(
           waypoint.id,
-          evento.shiftKey || evento.ctrlKey || evento.metaKey,
+          evento.ctrlKey || evento.metaKey,
+          evento.shiftKey,
         )
       })
 

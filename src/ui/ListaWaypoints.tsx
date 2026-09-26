@@ -21,6 +21,9 @@ type Props = {
   /** Indices que alguma validacao apontou. Alimenta o filtro "Assinalados". */
   assinalados: ReadonlySet<number>
   aoSeleccionar: (id: string, juntar: boolean, intervalo: boolean) => void
+  /** Poe a seleccao exactamente nestes, largando o que la estivesse. */
+  aoSubstituirSeleccao: (ids: readonly string[]) => void
+  aoLimparSeleccao: () => void
   aoCentrar: (id: string) => void
   aoEliminar: (id: string) => void
 }
@@ -31,6 +34,8 @@ export function ListaWaypoints({
   seleccionados,
   assinalados,
   aoSeleccionar,
+  aoSubstituirSeleccao,
+  aoLimparSeleccao,
   aoCentrar,
   aoEliminar,
 }: Props) {
@@ -42,6 +47,7 @@ export function ListaWaypoints({
     [linhas, criterio, procura, assinalados],
   )
   const filtrada = visiveis.length !== linhas.length
+  const quantosSeleccionados = seleccionados.size
 
   return (
     <div className="painel painel-esquerdo">
@@ -49,6 +55,44 @@ export function ListaWaypoints({
         <h2>Lista de trajetórias</h2>
         <span className="etiqueta-modo">{rota.modoAltitude}</span>
       </header>
+
+
+      {/*
+        * Apanhar muitos de uma vez.
+        *
+        * Editar em lote ja existia - as accoes, a altura que sobe x metros em
+        * todos sem lhes tirar as diferencas - mas nao havia como chegar a vinte
+        * pontos sem lhes bater um a um com o ctrl premido. Numa cobertura de
+        * trezentos isso nao e desconfortavel, e impossivel.
+        *
+        * O botao selecciona o que o filtro esta a mostrar, e e dai que vem a
+        * forca disto: filtrar por "Sem foto" e carregar aqui da exactamente os
+        * pontos que precisam de foto, sem ninguem os contar.
+        */}
+      {linhas.length > 0 ? (
+        <div className="seleccao-lote">
+          <button
+            type="button"
+            onClick={() => aoSubstituirSeleccao(visiveis.map((l) => l.waypoint.id))}
+            title={
+              filtrada
+                ? 'Selecciona os que o filtro está a mostrar'
+                : 'Selecciona todos os waypoints da rota'
+            }
+          >
+            {filtrada ? `Seleccionar os ${visiveis.length}` : `Seleccionar todos (${linhas.length})`}
+          </button>
+
+          {quantosSeleccionados > 0 ? (
+            <>
+              <span className="numerico">{quantosSeleccionados} seleccionados</span>
+              <button type="button" onClick={aoLimparSeleccao} title="Largar a selecção">
+                Limpar
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {/*
         * O filtro so aparece quando a lista e grande de mais para se ler.

@@ -663,6 +663,7 @@ export function App() {
       },
       mover: seleccao.mover,
       atalhos: () => setAtalhosAbertos((aberto) => !aberto),
+      seleccionarTudo: () => seleccao.substituir(rota?.waypoints.map((w) => w.id) ?? []),
     },
     voo.activo,
   )
@@ -938,6 +939,8 @@ export function App() {
           linhas={linhas}
           seleccionados={seleccao.ids}
           assinalados={assinalados}
+          aoSubstituirSeleccao={seleccao.substituir}
+          aoLimparSeleccao={seleccao.limpar}
           aoSeleccionar={seleccao.seleccionar}
           aoCentrar={(id) => {
             const alvo = rota.waypoints.find((w) => w.id === id)
@@ -990,7 +993,7 @@ export function App() {
               aoClicarNoMapa={aoClicarNoMapa}
               aoInserirWaypoint={aoInserirWaypoint}
               aoMoverWaypoint={aoMoverWaypoint}
-              aoSeleccionar={(id, juntar) => seleccao.seleccionar(id, juntar)}
+              aoSeleccionar={seleccao.seleccionar}
               aoMoverCursor={canalCursor.escrever}
             aoMudarOrientacao={canalOrientacao.escrever}
             apontarANorte={pedidoDeNorte}

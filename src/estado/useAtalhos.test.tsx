@@ -17,6 +17,7 @@ function comandosFalsos() {
     escapar: vi.fn(),
     mover: vi.fn<(passo: 1 | -1) => void>(),
     atalhos: vi.fn(),
+    seleccionarTudo: vi.fn(),
   } satisfies ComandosDeAtalho
 }
 
@@ -182,6 +183,39 @@ describe('a folha de atalhos', () => {
     campo.focus()
     await teclado.keyboard('?')
     expect(comandos.atalhos).not.toHaveBeenCalled()
+    campo.remove()
+  })
+})
+
+describe('seleccionar tudo', () => {
+  /*
+   * Editar em lote ja existia; chegar a vinte pontos e que nao havia maneira
+   * senao bater-lhes um a um com o ctrl premido.
+   */
+  it('Ctrl+A apanha a rota toda', async () => {
+    const teclado = ligar()
+    await teclado.keyboard('{Control>}a{/Control}')
+    expect(comandos.seleccionarTudo).toHaveBeenCalledTimes(1)
+  })
+
+  /*
+   * Sem `preventDefault` o browser seleccionava tambem o texto da pagina toda
+   * por baixo, e ficava tudo azul.
+   */
+  it('nao deixa o browser seleccionar a pagina por baixo', () => {
+    renderHook(() => useAtalhos(comandos, false))
+    const evento = new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, cancelable: true, bubbles: true })
+    window.dispatchEvent(evento)
+    expect(evento.defaultPrevented).toBe(true)
+  })
+
+  it('escrever um "a" num campo nao selecciona nada', async () => {
+    const teclado = ligar()
+    const campo = document.createElement('input')
+    document.body.appendChild(campo)
+    campo.focus()
+    await teclado.keyboard('{Control>}a{/Control}')
+    expect(comandos.seleccionarTudo).not.toHaveBeenCalled()
     campo.remove()
   })
 })

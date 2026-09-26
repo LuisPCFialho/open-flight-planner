@@ -25,6 +25,8 @@ export type ComandosDeAtalho = {
   mover: (passo: 1 | -1) => void
   /** Interrogacao: abre e fecha a folha de atalhos. */
   atalhos: () => void
+  /** Ctrl+A: apanha a rota toda, para editar em lote. */
+  seleccionarTudo: () => void
 }
 
 /**
@@ -88,6 +90,17 @@ export function useAtalhos(comandos: ComandosDeAtalho, suspenso: boolean): void 
       if (comando && tecla === 'y') {
         evento.preventDefault()
         actuais.current.refazer()
+        return
+      }
+      /*
+       * Ctrl+A apanha a rota toda.
+       *
+       * O `preventDefault` importa: sem ele o browser selecciona tambem o texto
+       * da pagina inteira por baixo, e fica tudo azul.
+       */
+      if (comando && tecla === 'a') {
+        evento.preventDefault()
+        actuais.current.seleccionarTudo()
         return
       }
       if (evento.shiftKey && tecla === 'f') {

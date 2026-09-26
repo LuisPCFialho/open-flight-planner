@@ -106,7 +106,7 @@ export type PropsMapa = {
   aoInserirWaypoint: (posicao: number, lat: number, lon: number) => void
   /** `definitivo` distingue o arrastar continuo do largar, para o historico. */
   aoMoverWaypoint: (id: string, lat: number, lon: number, definitivo: boolean) => void
-  aoSeleccionar: (id: string, juntar: boolean) => void
+  aoSeleccionar: (id: string, juntar: boolean, intervalo: boolean) => void
   aoMoverCursor: (cursor: CursorTerreno | null) => void
   aoRemoverPOI: (id: string) => void
   /** Apaga o waypoint, pelo mesmo caminho do botao da lista, para se poder desfazer. */
