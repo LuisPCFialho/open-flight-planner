@@ -16,7 +16,7 @@ own; see [accounts](docs/contas.md).
 account. The routes you make there stay in that browser.
 
 > **Status: not yet flown.** The exporters are built against real KMZ files and
-> covered by 1020 tests, but no route produced by this tool has been flown on an
+> covered by 1023 tests, but no route produced by this tool has been flown on an
 > aircraft yet. Read [what to verify in the field](docs/verificar-no-campo.md)
 > before you trust it with a battery. If you fly one, please open an issue —
 > that single report is the most useful contribution this project can get.

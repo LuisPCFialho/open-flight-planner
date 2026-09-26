@@ -12,6 +12,20 @@ ordering below is the useful part, not the calendar.
 
 ### Added
 
+- **Reaching many waypoints at once.** Bulk editing was already all there: the
+  photo action applied to the whole selection, the altitude that rises ten
+  metres on every one without flattening the differences between them, the
+  "several values" placeholder on fields that diverge. What was missing was any
+  way to reach twenty points other than clicking them one at a time with ctrl
+  held — and on a three-hundred-point coverage route that is not uncomfortable,
+  it is impossible.
+
+  A button now selects whatever the filter is showing, and that is where the
+  power is: filter by "no photo", click it, and you have exactly the points that
+  need one without anyone counting them. `Ctrl+A` takes the whole route. And
+  shift on the map now takes the range rather than repeating what ctrl does —
+  the map being precisely where you can see which pass you want.
+
 - **The aircraft banks into its own acceleration.** A multirotor has no other way
   to move than to tilt its thrust: the horizontal component is what pushes it,
   and the angle is `atan(a/g)`. No coefficient, no chosen constant — just
