@@ -18,14 +18,14 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "dexie": "^4.4.6",
+    "dexie": "^4.4.7",
     "dxf-parser": "^1.1.2",
-    "firebase": "^12.19.0",
+    "firebase": "^13.1.0",
     "jszip": "^3.10.2",
-    "maplibre-gl": "^6.9.1",
+    "maplibre-gl": "^6.16.0",
     "proj4": "^2.22.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
